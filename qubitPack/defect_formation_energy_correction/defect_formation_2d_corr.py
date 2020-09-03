@@ -24,10 +24,10 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 
-DB_CONFIG_PATH = "/Users/jeng-yuantsai/PycharmProjects/git/my_pycharm_projects/database/db_config/" \
-                 "formation_energy_related"
-DB_CONFIG_LOCAL = defaultdict(str)
-DB_CONFIG_OWLS = defaultdict(str)
+# DB_CONFIG_PATH = "/Users/jeng-yuantsai/PycharmProjects/git/my_pycharm_projects/database/db_config/" \
+#                  "formation_energy_related"
+# DB_CONFIG_LOCAL = defaultdict(str)
+# DB_CONFIG_OWLS = defaultdict(str)
 
 # for db_config in glob(DB_CONFIG_PATH+"/*"):
 #     if "local" in db_config:
@@ -42,8 +42,8 @@ DB_CONFIG_OWLS = defaultdict(str)
 #                   )
 #     )
 # )
-db_config_index = 4
-db = dict(enumerate(glob(DB_CONFIG_PATH + "/*")))[int(db_config_index)]
+# db_config_index = 4
+# db = dict(enumerate(glob(DB_CONFIG_PATH + "/*")))[int(db_config_index)]
 
 
 class FormationEnergy2DCorr:
@@ -417,6 +417,87 @@ class FormationEnergy2DCorr:
         return IE_sheet
 
 
+class AnistropicCorrection:
+    def __init__(self, bulk_db_file, bulk_entry_filter, defect_db_file, defect_entry_filter,
+                 dielectric_db_file, dielectric_filter, charge, defect_site_in_bulk):
+
+        self.bulk_db_file = bulk_db_file
+        self.bulk_entry_filter = bulk_entry_filter
+        self.bulk_entry = VaspCalcDb.from_db_file(self.bulk_db_file).collection.find_one(self.bulk_entry_filter)
+        print(self.bulk_entry["task_id"])
+
+        self.defect_db_file = defect_db_file
+        self.defect_entry_filter = defect_entry_filter
+        self.defect_entry = VaspCalcDb.from_db_file(self.defect_db_file).collection.find_one(self.defect_entry_filter)
+        print(self.defect_entry["task_id"])
+
+        # self.bulk_structure = Structure.from_file(os.path.join(bulk_path, "POSCAR.gz"))
+        self.bulk_structure = Structure.from_dict(self.bulk_entry["input"]["structure"])
+        # self.defect_structure = Structure.from_file(os.path.join(defect_path, "POSCAR.gz"))
+        self.defect_structure = Structure.from_dict(self.defect_entry["input"]["structure"])
+
+        # self.bulk_outcar = Outcar(os.path.join(bulk_path, "OUTCAR.gz"))
+        self.bulk_outcar = self.bulk_entry["calcs_reversed"][0]["output"]["outcar"]
+        # self.defect_outcar = Outcar(os.path.join(defect_path, "OUTCAR.gz"))
+        self.defect_outcar = self.defect_entry["calcs_reversed"][0]["output"]["outcar"]
+        self.defect_site_in_bulk = defect_site_in_bulk
+        self.charge = charge
+        # self.uncorrected_energy = Vasprun(os.path.join(defect_path, "vasprun.xml.gz")).final_energy - \
+        #                           Vasprun(os.path.join(bulk_path, "vasprun.xml.gz")).final_energy
+        self.uncorrected_energy = self.defect_entry["calcs_reversed"][0]["output"]["energy"] - \
+                                  self.bulk_entry["calcs_reversed"][0]["output"]["energy"]
+        # self.vbm = Vasprun(os.path.join(bulk_path, "vasprun.xml.gz")).get_band_structure().get_vbm()["energy"]
+        self.vbm = self.bulk_entry["calcs_reversed"][0]["output"]["vbm"]
+        self.bandgap = self.bulk_entry["calcs_reversed"][0]["output"]["bandgap"]
+        self.dielectric_entry = VaspCalcDb.from_db_file(dielectric_db_file).collection.find_one(dielectric_filter)
+        self.dielectric_tensor = self.dielectric_entry["calcs_reversed"][0]["output"]["outcar"]["dielectric_tensor"]
+
+    def _site_matching_indices(self):
+        matching = []
+        for bulk_site, bulk_specie in enumerate(self.bulk_structure.species):
+            sites_pair = []
+            if bulk_specie == self.defect_structure.species[bulk_site]:
+                sites_pair.append(bulk_site)
+                sites_pair.append(bulk_site)
+                matching.append(sites_pair)
+        print("matching list: {}".format(matching))
+        return matching
+
+    def _kumagai_correction(self):
+        kumagai_params = {
+            "bulk_atomic_site_averages": self.bulk_outcar["electrostatic_potential"],
+            "defect_atomic_site_averages": self.defect_outcar["electrostatic_potential"],
+            "site_matching_indices": self._site_matching_indices(),
+            "initial_defect_structure": self.defect_structure,
+            "defect_frac_sc_coords": self.defect_structure.sites[self.defect_site_in_bulk].frac_coords  # defect_frac_sc_coords (array): Defect Position in fractional coordinates of the supercell
+        }
+        kc = KumagaiCorrection(self.dielectric_tensor)
+        return kumagai_params, kc
+
+    def defect_en(self):
+        kumagai_parameters = self._kumagai_correction()[0]
+        kumagai_parameters.update({"vbm": self.vbm, "bandgap": self.bandgap})
+        substitution = Substitution(self.bulk_structure, self.bulk_structure[self.defect_site_in_bulk], self.charge)
+        dn = DefectEntry(substitution, self.uncorrected_energy,
+                    parameters=self._kumagai_correction()[0]
+                    )
+        kc_corr = self._kumagai_correction()[1].get_correction(dn)
+        dn = DefectEntry(
+            substitution, self.uncorrected_energy,
+            parameters=kumagai_parameters,
+            corrections=kc_corr
+        )
+        # a = self._kumagai_correction()[1]
+        # a.get_correction(dn)
+        # p = a.plot()
+        # p.show()
+        print(self.dielectric_tensor)
+        print(dn.corrections)
+        print(dn.uncorrected_energy+self.charge*self.vbm)
+        print(dn.formation_energy())
+        print(self.bandgap)
+
+
 class FormationEnergy2D:
 
     def __init__(self, bulk_db_files, bulk_entry_filter, defect_db_files, defect_entry_filter,
@@ -454,7 +535,7 @@ class FormationEnergy2D:
         # print("\n{}".format(pd4))
 
         print("bulk_entries: {}, defect_entries: {}, bk_vbm_bg_entries: {}".format(len(bulk_entries), len(defect_entries),
-                                                                               len(bk_vbm_bg_entries)))
+                                                                                   len(bk_vbm_bg_entries)))
         self.defect_entry_objects = defaultdict(list)
         for bulk, bk_vbm_bg in zip(bulk_entries, bk_vbm_bg_entries):
             nsites = bulk["nsites"]
@@ -464,8 +545,8 @@ class FormationEnergy2D:
                     vbm = bk_vbm_bg["calcs_reversed"][0]["output"]["vbm"]
                     bg = bk_vbm_bg["calcs_reversed"][0]["output"]["bandgap"]
                     for defect in defect_entries:
-                        area = 0.5*defect["input"]["structure"]["lattice"]["a"]*\
-                               defect["input"]["structure"]["lattice"]["b"]*\
+                        area = 0.5*defect["input"]["structure"]["lattice"]["a"]* \
+                               defect["input"]["structure"]["lattice"]["b"]* \
                                math.sin(math.radians(defect["input"]["structure"]["lattice"]["gamma"]))
                         if defect["nsites"] == nsites-1 and defect["input"]["structure"]["lattice"]["c"] == lz:
                             d_obj = Vacancy(structure=Structure.from_dict(bulk["input"]["structure"]),
@@ -596,7 +677,7 @@ class FormationEnergy2D:
                     colors = dict(zip(areas, ["dodgerblue", "darkorange"]))
                     axes[idx].plot(A_X, A_y, "o", color=colors[i], label=area[i])
                     axes[idx].plot(np.append(np.array([[0]]), A_X, axis=0),
-                            A_result[-1].predict(np.append(np.array([[0]]), A_X, axis=0)), color=colors[i],
+                                   A_result[-1].predict(np.append(np.array([[0]]), A_X, axis=0)), color=colors[i],
                                    linestyle="dotted")
                 except Exception as err:
                     print(err)
@@ -614,7 +695,7 @@ class FormationEnergy2D:
             # plot
             colors = ["dodgerblue", "darkorange"]
             axes[idx+1].plot(np.append(np.array([[0]]), tot_X, axis=0),
-                    tot[-1].predict(np.append(np.array([[0]]), tot_X, axis=0)), linestyle="dotted", color="black")
+                             tot[-1].predict(np.append(np.array([[0]]), tot_X, axis=0)), linestyle="dotted", color="black")
             for x, y, color in zip(tot_X, tot_y, colors):
                 axes[idx+1].plot(x, y, "o", color=color)
 
@@ -646,92 +727,9 @@ class FormationEnergy2D:
         print("**"*20, ",Finally")
         print(pd.DataFrame(results))
         fig.suptitle(chemsys, fontsize=16)
-        fig.savefig("/Users/jeng-yuantsai/Research/qubit/plt/{}.eps".format(calc_name), format="eps")
+        # fig.savefig("/Users/jeng-yuantsai/Research/qubit/plt/{}.eps".format(calc_name), format="eps")
         plt.show()
         return results
-
-
-
-
-class AnistropicCorrection:
-    def __init__(self, bulk_db_file, bulk_entry_filter, defect_db_file, defect_entry_filter,
-                 dielectric_db_file, dielectric_filter, charge, defect_site_in_bulk):
-
-        self.bulk_db_file = bulk_db_file
-        self.bulk_entry_filter = bulk_entry_filter
-        self.bulk_entry = VaspCalcDb.from_db_file(self.bulk_db_file).collection.find_one(self.bulk_entry_filter)
-        print(self.bulk_entry["task_id"])
-
-        self.defect_db_file = defect_db_file
-        self.defect_entry_filter = defect_entry_filter
-        self.defect_entry = VaspCalcDb.from_db_file(self.defect_db_file).collection.find_one(self.defect_entry_filter)
-        print(self.defect_entry["task_id"])
-
-        # self.bulk_structure = Structure.from_file(os.path.join(bulk_path, "POSCAR.gz"))
-        self.bulk_structure = Structure.from_dict(self.bulk_entry["input"]["structure"])
-        # self.defect_structure = Structure.from_file(os.path.join(defect_path, "POSCAR.gz"))
-        self.defect_structure = Structure.from_dict(self.defect_entry["input"]["structure"])
-
-        # self.bulk_outcar = Outcar(os.path.join(bulk_path, "OUTCAR.gz"))
-        self.bulk_outcar = self.bulk_entry["calcs_reversed"][0]["output"]["outcar"]
-        # self.defect_outcar = Outcar(os.path.join(defect_path, "OUTCAR.gz"))
-        self.defect_outcar = self.defect_entry["calcs_reversed"][0]["output"]["outcar"]
-        self.defect_site_in_bulk = defect_site_in_bulk
-        self.charge = charge
-        # self.uncorrected_energy = Vasprun(os.path.join(defect_path, "vasprun.xml.gz")).final_energy - \
-        #                           Vasprun(os.path.join(bulk_path, "vasprun.xml.gz")).final_energy
-        self.uncorrected_energy = self.defect_entry["calcs_reversed"][0]["output"]["energy"] - \
-                                  self.bulk_entry["calcs_reversed"][0]["output"]["energy"]
-        # self.vbm = Vasprun(os.path.join(bulk_path, "vasprun.xml.gz")).get_band_structure().get_vbm()["energy"]
-        self.vbm = self.bulk_entry["calcs_reversed"][0]["output"]["vbm"]
-        self.bandgap = self.bulk_entry["calcs_reversed"][0]["output"]["bandgap"]
-        self.dielectric_entry = VaspCalcDb.from_db_file(dielectric_db_file).collection.find_one(dielectric_filter)
-        self.dielectric_tensor = self.dielectric_entry["calcs_reversed"][0]["output"]["outcar"]["dielectric_tensor"]
-
-    def _site_matching_indices(self):
-        matching = []
-        for bulk_site, bulk_specie in enumerate(self.bulk_structure.species):
-            sites_pair = []
-            if bulk_specie == self.defect_structure.species[bulk_site]:
-                sites_pair.append(bulk_site)
-                sites_pair.append(bulk_site)
-                matching.append(sites_pair)
-        print("matching list: {}".format(matching))
-        return matching
-
-    def _kumagai_correction(self):
-        kumagai_params = {
-            "bulk_atomic_site_averages": self.bulk_outcar["electrostatic_potential"],
-            "defect_atomic_site_averages": self.defect_outcar["electrostatic_potential"],
-            "site_matching_indices": self._site_matching_indices(),
-            "initial_defect_structure": self.defect_structure,
-            "defect_frac_sc_coords": self.defect_structure.sites[self.defect_site_in_bulk].frac_coords  # defect_frac_sc_coords (array): Defect Position in fractional coordinates of the supercell
-        }
-        kc = KumagaiCorrection(self.dielectric_tensor)
-        return kumagai_params, kc
-
-    def defect_en(self):
-        kumagai_parameters = self._kumagai_correction()[0]
-        kumagai_parameters.update({"vbm": self.vbm, "bandgap": self.bandgap})
-        substitution = Substitution(self.bulk_structure, self.bulk_structure[self.defect_site_in_bulk], self.charge)
-        dn = DefectEntry(substitution, self.uncorrected_energy,
-                    parameters=self._kumagai_correction()[0]
-                    )
-        kc_corr = self._kumagai_correction()[1].get_correction(dn)
-        dn = DefectEntry(
-            substitution, self.uncorrected_energy,
-            parameters=kumagai_parameters,
-            corrections=kc_corr
-        )
-        # a = self._kumagai_correction()[1]
-        # a.get_correction(dn)
-        # p = a.plot()
-        # p.show()
-        print(self.dielectric_tensor)
-        print(dn.corrections)
-        print(dn.uncorrected_energy+self.charge*self.vbm)
-        print(dn.formation_energy())
-        print(self.bandgap)
 
 
 def main():
@@ -788,7 +786,7 @@ def main():
 
 
     def regular_antisite(project, collection_name, compounds, aexx=0.25):
-        path = "/Users/jeng-yuantsai/Research/qubit/calculations/"
+        path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/"
         c = [20, 25]
         # bulk_k = [[0.25, 0.25, 0], [-0.5, -0.5, 0]]
         bulk_k = [[0,0,0]]
