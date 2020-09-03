@@ -25,7 +25,9 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.defects.core import Vacancy, Substitution
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
+
 from VaspBandUnfolding import unfold
+
 from datetime import datetime
 import os, copy, sys
 from glob import glob
@@ -108,7 +110,6 @@ class PBEDefectWF:
 class DefectWF:
 
     def __init__(self, orig_st, natom, defect_type, substitution, distort=0, vacuum_thickness=None):
-        self.lpad = LaunchPad.auto_load()
         self.orig_st = orig_st
         self.distort = distort
         self.defect_st, self.NN, self.defect_entry, self.defect_site_in_bulk_index = defect_from_primitive_cell(
