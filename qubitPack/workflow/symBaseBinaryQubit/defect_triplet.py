@@ -19,13 +19,17 @@ from pymatgen import Structure
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 
 
+
+
+
+
 class SymBaseBinaryQubit(DefectWF):
     # def __init__(self, orig_st, natom, defect_type, substitution, distort=0, vacuum_thickness=None):
     #     super().__init__(orig_st, natom, defect_type, substitution, distort, vacuum_thickness)
 
     @classmethod
-    def binary_vacancy(cls, cat="MxC3vToChDeltaE"):
-        lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/MxC3vToChDeltaE/my_launchpad.yaml")
+    def binary_vacancy(cls, cat="c2dbVac"):
+        lpad = LaunchPad.from_file("/home/tug03990/config/project/symBaseBinaryQubit/c2dbVac/my_launchpad.yaml")
         col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
         # mx2s = col.find({"task_id":{"$in":[3091, 3083, 3093, 3097, 3094, 3102]}})
         # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
