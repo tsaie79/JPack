@@ -852,7 +852,7 @@ from atomate.vasp.database import VaspCalcDb
 import pandas as pd
 import numpy as np
 
-db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/qubit/calculations/antisiteQubit/scan_opt_test/db.json')
+db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/scan_opt_test/db.json')
 col = db.collection
 
 data = [
@@ -872,6 +872,6 @@ data = [
               e["input"]["structure"]["lattice"]["c"]
     }
     for e in col.find()]
-raw = pd.DataFrame(data).round(3).sort_values(["formula"]).to_clipboard()
+raw = pd.DataFrame(data).round(3).sort_values(["formula"])
 print(raw)
 
