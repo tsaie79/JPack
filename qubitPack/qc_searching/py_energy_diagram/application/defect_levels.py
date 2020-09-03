@@ -1,4 +1,4 @@
-from qc_searching.py_energy_diagram.application.energydiagram import ED
+from qubitPack.qc_searching.py_energy_diagram.application.energydiagram import ED
 
 
 class EnergyLevel(ED):

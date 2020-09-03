@@ -1,7 +1,7 @@
-from qc_searching.analysis.dos_plot_from_db import DosPlotDB
-from qc_searching.analysis.read_eigen import DetermineDefectState
+from qubitPack.qc_searching.analysis.dos_plot_from_db import DosPlotDB
+from qubitPack.qc_searching.analysis.read_eigen import DetermineDefectState
 import matplotlib.pyplot as plt
-from qc_searching.analysis.dos_plot_from_db import DB_CONFIG_PATH
+from qubitPack.qc_searching.analysis.dos_plot_from_db import DB_CONFIG_PATH
 from glob import glob
 import os
 import numpy as np
@@ -38,7 +38,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot"):
 
 
 if __name__ == '__main__':
-    proj_path = "/Users/jeng-yuantsai/Research/qubit/calculations/mx2_antisite_basic_aexx0.25_final"
+    proj_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/mx2_antisite_basic_aexx0.25_final"
     save_path = os.path.join(proj_path)
     for dir_name in ["defect_states", "structures", "xlsx"]:
         os.makedirs(os.path.join(save_path, dir_name), exist_ok=True)
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         {"task_id": 3292},
         4, -2,
         save_path,
-        True,
+        False,
         "tot"
     )
 

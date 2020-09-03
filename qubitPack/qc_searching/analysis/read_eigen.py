@@ -7,9 +7,9 @@ import os, json
 import matplotlib.pyplot as plt
 import plotly
 import plotly.tools as tls
-from qc_searching.py_energy_diagram.application.defect_levels import EnergyLevel
+from qubitPack.qc_searching.py_energy_diagram.application.defect_levels import EnergyLevel
 from collections import defaultdict
-from qc_searching.analysis.dos_plot_from_db import DB_CONFIG_LOCAL, FIG_SAVING_FILE_PATH
+from qubitPack.qc_searching.analysis.dos_plot_from_db import DB_CONFIG_LOCAL, FIG_SAVING_FILE_PATH
 
 
 class EigenParse:
