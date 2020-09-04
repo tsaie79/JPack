@@ -1,10 +1,11 @@
 from qubitPack.workflow.antisiteQubit.wf_owls import DefectWF
-from qubitPack.workflow.tool_box import find_cation_anion
+from qubitPack.workflow.tool_box import *
 
-from fireworks import LaunchPad
+from fireworks import LaunchPad, Workflow
 
 from atomate.vasp.database import VaspCalcDb
 from atomate.vasp.workflows.jcustom.hse_full import get_wf_full_hse
+from atomate.vasp.fireworks.core import ScanOptimizeFW
 from atomate.vasp.powerups import (
     add_additional_fields_to_taskdocs,
     preserve_fworker,
@@ -15,8 +16,47 @@ from atomate.vasp.powerups import (
 )
 
 from pymatgen import Structure
+from pymatgen.io.vasp.sets import MPHSERelaxSet
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
+
+from monty.serialization import loadfn
+
+
+def relax_pc():
+    lpad = LaunchPad.from_file("/home/tug03990/atomate/example/config/project/"
+                               "symBaseBinaryQubit/scan_relax_pc/my_launchpad.yaml")
+
+    mx2s = loadfn("/home/tug03990/atomate/example/config/project/symBaseBinaryQubit/"
+                  "scan_relax_pc/gap_gt1-binary-NM.json")
+
+    for mx2 in mx2s:
+        if mx2["irreps"]:
+            pc = mx2["structure"]
+            pc = modify_vacuum(pc, 20)
+            scan_opt = ScanOptimizeFW(structure=pc, name="SCAN_relax")
+            wf = Workflow([scan_opt], name="{}:SCAN_opt".format(mx2["formula"]))
+            wf = add_modify_incar(wf)
+            wf = add_modify_incar(
+                wf,
+                {
+                    "incar_update": {
+                        "LCHARG": False,
+                        "LWAVE": False
+                    }
+                }
+            )
+            mx2.pop("structure")
+            wf = add_additional_fields_to_taskdocs(
+                wf,
+                {"c2db_info": mx2}
+            )
+            wf = add_modify_incar(wf)
+            wf = set_execution_options(wf, category="scan_relax_pc")
+            wf = preserve_fworker(wf)
+            lpad.add_wf(wf)
+
+
 
 
 
@@ -105,4 +145,5 @@ class SymBaseBinaryQubit(DefectWF):
 
 
 if __name__ == '__main__':
-    SymBaseBinaryQubit.binary_vacancy()
+    relax_pc()
+    # SymBaseBinaryQubit.binary_vacancy()

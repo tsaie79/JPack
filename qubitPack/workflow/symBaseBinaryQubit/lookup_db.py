@@ -5,7 +5,7 @@ from atomate.vasp.database import VaspCalcDb
 import pandas as pd
 from phonopy.phonon.irreps import character_table
 
-db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/code/qubitPack/database_profile/db_dk_local.json")
+db = VaspCalcDb.from_db_file("/qubitPack/database_profile/db_dk_local.json")
 col = db.collection
 
 filter = {
@@ -43,8 +43,8 @@ for e in col.find(filter):
         for irrep, char_vec in irreps.items():
             print(char_vec)
             if char_vec[0] >= 2:
-                # site_irreps.append((str(specie), site, irrep, char_vec[0]))
-                site_irreps.append(str(specie))
+                site_irreps.append((str(specie), site, irrep, char_vec[0]))
+                # site_irreps.append(str(specie))
                 break
 
 
@@ -63,15 +63,16 @@ for e in col.find(filter):
             "gap_nosoc": e["gap_nosoc"],
             "soc_intensity": e["gap_hse_nosoc"] - e["gap_hse"],
             "ehull": e["ehull"],
-            "uid":e["uid"]
+            "uid":e["uid"],
+            "structure": e["structure"]
         }
     )
 
 
 
 df = pd.DataFrame(data).round(3).sort_values(["soc_intensity", "ehull"], ascending=True)
-df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM.json", orient="records", indent=4)
-df.to_excel("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM.xlsx", index=False)
+# df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM.json", orient="records", indent=4)
+df.to_excel("/Users/jeng-yuantsai/Research/project/qubit/xlsx/gap_gt1-binary-NM.xlsx", index=False)
 
 #%%
 from atomate.vasp.database import VaspCalcDb
