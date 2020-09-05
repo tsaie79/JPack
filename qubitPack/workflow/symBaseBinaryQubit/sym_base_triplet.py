@@ -104,7 +104,7 @@ class SymBaseBinaryQubit(DefectWF):
                 for na, thicks in geo_spec.items():
                     for thick in thicks:
                         for dtort in [0]:
-                            vacancy_insttance = cls(pc, na, ("vacancies", vac), False, dtort, thick)
+                            vacancy_insttance = cls(pc, na, ("vacancies", vac), "C", dtort, thick)
                             wf = get_wf_full_hse(
                                 structure=vacancy_insttance.defect_st,
                                 charge_states=[0],
@@ -153,7 +153,7 @@ class SymBaseBinaryQubit(DefectWF):
                             wf = set_execution_options(wf, category=cat)
                             wf = preserve_fworker(wf)
                             wf.name = wf.name+":dx[{}]".format(vacancy_insttance.distort)
-                            lpad.add_wf(wf)
+                            # lpad.add_wf(wf)
 
 
 if __name__ == '__main__':
