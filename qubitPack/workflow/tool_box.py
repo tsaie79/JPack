@@ -117,7 +117,7 @@ def defect_from_primitive_cell(orig_st, defect_type, natom, substitution=None, d
     defect_st, NN, defect_entry, defect_site_in_bulk_index = find_nn()
 
     # Move ions around the vacancy randomly
-    # add defect into NN for DOS
+    # add defect into nn_dist for DOS
     for site in NN.keys():
         perturb = get_rand_vec(distort)
         defect_st.translate_sites(site, perturb)
@@ -133,7 +133,7 @@ def defect_from_primitive_cell(orig_st, defect_type, natom, substitution=None, d
 
     print("After distortion: {}\n{}".format(NN, "=="*50))
 
-    # To make a substitution to a NN among given element (default None)
+    # To make a substitution to a nn_dist among given element (default None)
     if substitution:
         defect_st.replace(list(NN.keys())[0], substitution)
         print("substitution coord = {}".format(defect_st[list(NN.keys())[0]]))
@@ -153,6 +153,8 @@ def defect_from_primitive_cell(orig_st, defect_type, natom, substitution=None, d
 
 class GenDefect:
     def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None):
+        for site_property in orig_st.site_properties:
+            orig_st.remove_site_property(site_property)
         self.orig_st = orig_st
         self.defect_type = defect_type
         self.natom = natom
@@ -166,27 +168,28 @@ class GenDefect:
             self.defect_st = self.defect_entry["supercell"]["structure"].get_sorted_structure()
             self.defect_site_in_bulk = self.defect_entry["bulk_supercell_site"]
             self.defect_site_in_bulk_index = None
-            self.nn_index = None
+            self.NN = None
 
             if defect_type[0] == "substitutions":
                 try:
                     self.defect_site_in_bulk_index = self.defect_st.index(self.defect_site_in_bulk)
                 except ValueError:
                     self.defect_site_in_bulk_index = self.defect_st.index(self.defect_site_in_bulk.to_unit_cell())
-                self.nn_index = [self.defect_st.index(self.defect_st[nn['site_index']])
-                                 for nn in CrystalNN().get_nn_info(self.defect_st, self.defect_site_in_bulk_index)]
+                self.NN = [self.defect_st.index(self.defect_st[nn['site_index']])
+                           for nn in CrystalNN().get_nn_info(self.defect_st, self.defect_site_in_bulk_index)]
 
             elif defect_type[0] == "vacancies":
                 try:
                     self.defect_site_in_bulk_index = self.bulk_st.index(self.defect_site_in_bulk)
                 except ValueError:
                     self.defect_site_in_bulk_index = self.bulk_st.index(self.defect_site_in_bulk.to_unit_cell())
-                self.nn_index = [self.defect_st.index(self.bulk_st[nn['site_index']])
-                                 for nn in CrystalNN().get_nn_info(self.bulk_st, self.defect_site_in_bulk_index)]
+                self.NN = [self.defect_st.index(self.bulk_st[nn['site_index']])
+                           for nn in CrystalNN().get_nn_info(self.bulk_st, self.defect_site_in_bulk_index)]
 
-            self.NN = dict(before=None, after=None)
-            self.NN["before"] = dict(zip(self.nn_index, range(len(self.nn_index))))
-            print("defect site coord. = {}-{}".format(self.defect_site_in_bulk, self.defect_site_in_bulk.to_unit_cell()))
+            self.nn_dist = dict(before=None, after=None)
+            self.nn_dist["before"] = dict(zip([str(idx) for idx in self.NN], range(len(self.NN))))
+            print("defect site coord. = orig: {} unit: {}".format(
+                self.defect_site_in_bulk, self.defect_site_in_bulk.to_unit_cell()))
 
             self.defect_entry["supercell"].pop("structure")
             self.defect_entry["supercell"]["bulk"] = self.bulk_st
@@ -203,54 +206,50 @@ class GenDefect:
 
     def substitutions(self, distort, substitution):
         bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
-                       for NN_index in self.NN["before"]]
+                       for NN_index in self.NN]
         bond_length = np.array(bond_length).round(3)
 
-        self.NN["before"] = dict(zip(self.NN["before"], bond_length))
-        self.nn_index = list(self.NN["before"].keys())
+        self.nn_dist["before"] = dict(zip([str(idx) for idx in self.NN], bond_length))
 
         if substitution:
             self.make_complex(substitution)
 
-        self.NN["before"][self.defect_site_in_bulk_index] = 0
-        print("=="*50, "\nBefore distortion: {}".format(self.NN))
+        self.NN.append(self.defect_site_in_bulk_index)
+        self.nn_dist["before"][self.defect_site_in_bulk_index] = 0
+        print("==" * 50, "\nBefore distortion: {}".format(self.nn_dist["before"]))
 
         if distort:
             self.move_sites(distort)
             bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
-                           for NN_index in self.NN["before"]]
+                           for NN_index in self.NN]
             bond_length = np.array(bond_length).round(3)
-            self.NN["after"] = dict(zip(self.NN["before"].keys(), bond_length))
-            self.nn_index = list(self.NN["after"].keys())
-            print("After distortion: {}\n{}".format(self.NN, "=="*50))
+            self.nn_dist["after"] = dict(zip([str(idx) for idx in self.NN], bond_length))
+            print("After distortion: {}\n{}".format(self.nn_dist["after"], "==" * 50))
 
     def vacancies(self, distort, substitution):
         bond_length = [self.bulk_st.get_distance(self.defect_site_in_bulk_index, NN_index['site_index'])
                        for NN_index in CrystalNN().get_nn_info(self.bulk_st, self.defect_site_in_bulk_index)]
         bond_length = np.array(bond_length).round(3)
 
-        self.NN["before"] = dict(zip(self.NN["before"], bond_length))
-        self.nn_index = self.NN["before"].keys()
-        self.nn_index = list(self.NN["before"].keys())
+        self.nn_dist["before"] = dict(zip(self.NN, bond_length))
 
         if substitution:
             self.make_complex(substitution)
 
-        print("=="*50, "\nBefore distortion: {}".format(self.NN))
+        print("==" * 50, "\nBefore distortion: {}".format(self.nn_dist["before"]))
 
         if distort:
             sudo_bulk = self.move_sites(distort)
             bond_length = [sudo_bulk.get_distance(self.defect_site_in_bulk_index, NN_index['site_index'])
                            for NN_index in CrystalNN().get_nn_info(sudo_bulk, self.defect_site_in_bulk_index)]
             bond_length = np.array(bond_length).round(3)
-            self.NN["after"] = dict(zip(self.NN["before"].keys(), bond_length))
-            self.nn_index = list(self.NN["after"].keys())
-            print("After distortion: {}\n{}".format(self.NN, "=="*50))
+            self.nn_dist["after"] = dict(zip([str(idx) for idx in self.NN], bond_length))
+            print("After distortion: {}\n{}".format(self.nn_dist["after"], "==" * 50))
 
     def move_sites(self, distort):
         self.distort = distort
         sudo_bulk = self.bulk_st.copy()
-        for site in self.NN["before"]:
+        for site in self.NN:
             perturb = get_rand_vec(distort)
             self.defect_st.translate_sites([site], perturb, frac_coords=False)
             sudo_bulk.translate_sites([site], perturb, frac_coords=False)
@@ -258,17 +257,18 @@ class GenDefect:
         return sudo_bulk
 
     def make_complex(self, substitution):
-        self.defect_st.replace(self.nn_index[0], substitution)
+        self.defect_st.replace(self.NN[0], substitution)
 
-        print("substitution coord = {}".format(self.defect_st[self.nn_index[0]]))
-        self.defect_entry["complex"] = {"site": self.defect_st[self.nn_index[0]], "site_specie": substitution}
+        print("substitution coord = {}".format(self.defect_st[self.NN[0]]))
+        self.defect_entry["complex"] = {"site": self.defect_st[self.NN[0]], "site_specie": substitution}
         self.defect_entry["defect_type"] = "complex"
 
-        defect_sites_in_bulk = [self.defect_st[nn] for nn in self.nn_index]
+        defect_sites_in_bulk = [self.defect_st[nn] for nn in self.NN]
 
         self.defect_st.sort()
         if self.defect_type[0] == "substitutions":
             self.defect_site_in_bulk_index = self.defect_st.index(self.defect_site_in_bulk)
 
-        self.nn_index = [self.defect_st.index(nn) for nn in defect_sites_in_bulk]
-        self.NN["before"] = dict(zip(self.nn_index, self.NN["before"].values()))
+        self.NN = [self.defect_st.index(nn) for nn in defect_sites_in_bulk]
+        self.nn_dist["before"] = dict(zip([str(idx) for idx in self.NN], self.nn_dist["before"].values()))
+

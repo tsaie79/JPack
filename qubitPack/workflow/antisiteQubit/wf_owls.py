@@ -200,9 +200,9 @@ class DefectWF:
                 # pc = Structure.from_dict(mx2["structure"])
                 pc = Structure.from_dict(mx2["output"]["structure"])
                 # if "Te" in pc.formula:
-                #     pc = special_treatment_to_structure(pc, "selective_dynamics", nn=[74, 55, 49, 54])
+                #     pc = special_treatment_to_structure(pc, "selective_dynamics", NN=[74, 55, 49, 54])
                 # else:
-                #     pc = special_treatment_to_structure(pc, "selective_dynamics", nn=[0, 6, 5, 25])
+                #     pc = special_treatment_to_structure(pc, "selective_dynamics", NN=[0, 6, 5, 25])
                 defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
                 cation, anion = find_cation_anion(pc)
 
@@ -301,9 +301,9 @@ class DefectWF:
                 # pc = Structure.from_dict(mx2["structure"])
                 pc = Structure.from_dict(mx2["output"]["structure"])
                 # if "Te" in pc.formula:
-                #     pc = special_treatment_to_structure(pc, "selective_dynamics", nn=[74, 55, 49, 54])
+                #     pc = special_treatment_to_structure(pc, "selective_dynamics", NN=[74, 55, 49, 54])
                 # else:
-                #     pc = special_treatment_to_structure(pc, "selective_dynamics", nn=[0, 6, 5, 25])
+                #     pc = special_treatment_to_structure(pc, "selective_dynamics", NN=[0, 6, 5, 25])
 
                 defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
                 cation, anion = find_cation_anion(pc)

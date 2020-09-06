@@ -86,15 +86,16 @@ class SymBaseBinaryQubit:
 
             cation, anion = find_cation_anion(pc)
 
-            for vac in range(len(defect["substitutions"])):
+            for vac in range(len(defect["vacancies"])):
                 print(cation, anion)
                 # cation vacancy
                 if "{}".format("N") not in defect["vacancies"][vac]["name"]:
                     continue
+                print(vac)
                 for na, thicks in geo_spec.items():
                     for thick in thicks:
                         for dtort in [0]:
-                            vacancies = GenDefect(pc, ("vacancies", vac), na, thick)
+                            vacancies = GenDefect(pc, ["vacancies", vac], na, thick)
                             vacancies.vacancies(dtort, "C")
                             wf = get_wf_full_hse(
                                 structure=vacancies.defect_st,
@@ -104,8 +105,12 @@ class SymBaseBinaryQubit:
                                 nupdowns=[-1],
                                 encut=520,
                                 include_hse_relax=True,
-                                vasptodb={"category": cat, "NN": vacancies.NN,
-                                          "defect_entry": vacancies.defect_entry},
+                                vasptodb={
+                                    "category": cat,
+                                    "NN": vacancies.NN,
+                                    "NN_dist": vacancies.nn_dist,
+                                    "defect_entry": vacancies.defect_entry
+                                },
                                 wf_addition_name="{}:{}".format(vacancies.defect_st.num_sites, thick)
                             )
 
@@ -144,7 +149,7 @@ class SymBaseBinaryQubit:
                             wf = set_execution_options(wf, category=cat)
                             wf = preserve_fworker(wf)
                             wf.name = wf.name+":dx[{}]".format(vacancies.distort)
-                            # lpad.add_wf(wf)
+                            lpad.add_wf(wf)
 
 
 if __name__ == '__main__':
