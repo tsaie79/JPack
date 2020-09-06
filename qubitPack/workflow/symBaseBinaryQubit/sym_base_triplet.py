@@ -1,4 +1,3 @@
-from qubitPack.workflow.antisiteQubit.wf_owls import DefectWF
 from qubitPack.workflow.tool_box import *
 
 from fireworks import LaunchPad, Workflow
@@ -57,18 +56,9 @@ def relax_pc():
             lpad.add_wf(wf)
 
 
-
-
-
-
-
-
-class SymBaseBinaryQubit(DefectWF):
-    # def __init__(self, orig_st, natom, defect_type, substitution, distort=0, vacuum_thickness=None):
-    #     super().__init__(orig_st, natom, defect_type, substitution, distort, vacuum_thickness)
-
-    @classmethod
-    def binary_vacancy(cls, cat="BN_vac"):
+class SymBaseBinaryQubit:
+    @staticmethod
+    def binary_vacancy(cat="BN_vac"):
         lpad = LaunchPad.from_file("/home/tug03990/config/project/symBaseBinaryQubit/BN_vac/my_launchpad.yaml")
         col = VaspCalcDb.from_db_file('/home/tug03990/atomate/example/config/project/symBaseBinaryQubit/scan_relax_pc/'
                                       'db.json').collection
@@ -104,18 +94,19 @@ class SymBaseBinaryQubit(DefectWF):
                 for na, thicks in geo_spec.items():
                     for thick in thicks:
                         for dtort in [0]:
-                            vacancy_insttance = cls(pc, na, ("vacancies", vac), "C", dtort, thick)
+                            vacancies = GenDefect(pc, ("vacancies", vac), na, thick)
+                            vacancies.vacancies(dtort, "C")
                             wf = get_wf_full_hse(
-                                structure=vacancy_insttance.defect_st,
+                                structure=vacancies.defect_st,
                                 charge_states=[0],
                                 gamma_only=False,
                                 dos_hse=True,
                                 nupdowns=[-1],
                                 encut=520,
                                 include_hse_relax=True,
-                                vasptodb={"category": cat, "NN": vacancy_insttance.NN,
-                                          "defect_entry": vacancy_insttance.defect_entry},
-                                wf_addition_name="{}:{}".format(vacancy_insttance.defect_st.num_sites, thick)
+                                vasptodb={"category": cat, "NN": vacancies.NN,
+                                          "defect_entry": vacancies.defect_entry},
+                                wf_addition_name="{}:{}".format(vacancies.defect_st.num_sites, thick)
                             )
 
                             def kpoints(kpts):
@@ -140,7 +131,7 @@ class SymBaseBinaryQubit(DefectWF):
                             wf = add_additional_fields_to_taskdocs(
                                 wf,
                                 {"lattice_constant": "SCAN",
-                                 "perturbed": vacancy_insttance.distort}
+                                 "perturbed": vacancies.distort}
                             )
 
                             wf = add_modify_incar(wf, {"incar_update": {"NSW":150}}, "PBE_relax")
@@ -152,7 +143,7 @@ class SymBaseBinaryQubit(DefectWF):
                             # related to directory
                             wf = set_execution_options(wf, category=cat)
                             wf = preserve_fworker(wf)
-                            wf.name = wf.name+":dx[{}]".format(vacancy_insttance.distort)
+                            wf.name = wf.name+":dx[{}]".format(vacancies.distort)
                             # lpad.add_wf(wf)
 
 

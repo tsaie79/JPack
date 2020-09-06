@@ -109,17 +109,17 @@ class PBEDefectWF:
 
 class DefectWF:
 
-    def __init__(self, orig_st, natom, defect_type, substitution, distort=0, vacuum_thickness=None):
-        self.orig_st = orig_st
-        self.distort = distort
-        self.defect_st, self.NN, self.defect_entry, self.defect_site_in_bulk_index = defect_from_primitive_cell(
-            orig_st=self.orig_st,
-            defect_type=defect_type,
-            natom=natom,
-            substitution=substitution,
-            distort=self.distort,
-            vacuum_thickness=vacuum_thickness
-        )
+    # def __init__(self, orig_st, natom, defect_type, substitution, distort=0, vacuum_thickness=None):
+        # self.orig_st = orig_st
+        # self.distort = distort
+        # self.defect_st, self.NN, self.defect_entry, self.defect_site_in_bulk_index = defect_from_primitive_cell(
+        #     orig_st=self.orig_st,
+        #     defect_type=defect_type,
+        #     natom=natom,
+        #     substitution=substitution,
+        #     distort=self.distort,
+        #     vacuum_thickness=vacuum_thickness
+        # )
 
     @classmethod
     def wfs(cls):
@@ -214,12 +214,14 @@ class DefectWF:
                     for na, thicks in geo_spec.items():
                         for thick in thicks:
                             for dtort in [0, 0.001]:
-                                se_antisite = DefectWF(orig_st=pc,
-                                                       defect_type=("substitutions", sub),
-                                                       natom=na,
-                                                       vacuum_thickness=thick,
-                                                       substitution=None,
-                                                       distort=dtort)
+                                se_antisite = GenDefect(
+                                    orig_st=pc,
+                                    defect_type=("substitutions", sub),
+                                    natom=na,
+                                    vacuum_thickness=thick
+                                )
+                                se_antisite.substitutions(dtort, None)
+
                                 # # se_antisite.NN = [5, 6, 0, 25]
                                 # se_antisite.NN = [54, 49, 55, 74]
                                 # se_antisite.defect_st = move_site(Structure.from_dict(mx2["output"]["structure"]),
