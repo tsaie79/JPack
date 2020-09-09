@@ -231,7 +231,7 @@ class GenDefect:
                        for NN_index in CrystalNN().get_nn_info(self.bulk_st, self.defect_site_in_bulk_index)]
         bond_length = np.array(bond_length).round(3)
 
-        self.nn_dist["before"] = dict(zip(self.NN, bond_length))
+        self.nn_dist["before"] = dict(zip([str(idx) for idx in self.NN], bond_length))
 
         if substitution:
             self.make_complex(substitution)
