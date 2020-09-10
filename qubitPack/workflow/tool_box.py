@@ -257,7 +257,6 @@ class GenDefect:
             NN_tot = zip(self.NN, self.NN)
         for site, sudo_bulk_site in NN_tot:
             perturb = get_rand_vec(distort)
-            print(perturb)
             self.defect_st.translate_sites([site], perturb, frac_coords=False)
             sudo_bulk.translate_sites([sudo_bulk_site], perturb, frac_coords=False)
         return sudo_bulk
