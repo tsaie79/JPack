@@ -155,13 +155,17 @@ class GenDefect:
     def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None):
         for site_property in orig_st.site_properties:
             orig_st.remove_site_property(site_property)
-        self.orig_st = orig_st
+        if vacuum_thickness:
+            self.orig_st = modify_vacuum(orig_st, vacuum_thickness)
+        else:
+            self.orig_st = orig_st
         self.defect_type = defect_type
         self.natom = natom
         self.vacuum_thickness = vacuum_thickness
         self.distort = None
-        self.defects = ChargedDefectsStructures(orig_st, cellmax=natom, antisites_flag=True).defects
+        self.defects = ChargedDefectsStructures(self.orig_st, cellmax=natom, antisites_flag=True).defects
         self.bulk_st = self.defects["bulk"]["supercell"]["structure"]
+        self.NN_for_sudo_bulk = []
 
         if (defect_type[0] == "substitutions") or (defect_type[0] == "vacancies"):
             self.defect_entry = self.defects[self.defect_type[0]][self.defect_type[1]]
@@ -201,8 +205,6 @@ class GenDefect:
         else:
             print("!!!Please insert substitutions, vacancies, or bulk!!!")
 
-    def modify_vacuum(self):
-        self.orig_st = modify_vacuum(self.orig_st, self.vacuum_thickness)
 
     def substitutions(self, distort, substitution):
         bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
@@ -249,18 +251,28 @@ class GenDefect:
     def move_sites(self, distort):
         self.distort = distort
         sudo_bulk = self.bulk_st.copy()
-        for site in self.NN:
+        if self.NN_for_sudo_bulk:
+            NN_tot = zip(self.NN, self.NN_for_sudo_bulk)
+        else:
+            NN_tot = zip(self.NN, self.NN)
+        for site, sudo_bulk_site in NN_tot:
             perturb = get_rand_vec(distort)
+            print(perturb)
             self.defect_st.translate_sites([site], perturb, frac_coords=False)
-            sudo_bulk.translate_sites([site], perturb, frac_coords=False)
-            self.sudo_bulk = sudo_bulk
+            sudo_bulk.translate_sites([sudo_bulk_site], perturb, frac_coords=False)
         return sudo_bulk
 
     def make_complex(self, substitution):
-        self.defect_st.replace(self.NN[0], substitution)
+        self.defect_entry["complex"] = {"site": [], "site_specie": []}
+        for sub, idx in zip(substitution, range(len(substitution))):
+            self.defect_st.replace(self.NN[idx], sub)
+            print("substitution coord = {}".format(self.NN[idx]))
 
-        print("substitution coord = {}".format(self.defect_st[self.NN[0]]))
-        self.defect_entry["complex"] = {"site": self.defect_st[self.NN[0]], "site_specie": substitution}
+            self.NN_for_sudo_bulk.append(self.NN[idx])
+
+            self.defect_entry["complex"]["site"].append(self.defect_st[self.NN[idx]])
+            self.defect_entry["complex"]["site_specie"].append(sub)
+
         self.defect_entry["defect_type"] = "complex"
 
         defect_sites_in_bulk = [self.defect_st[nn] for nn in self.NN]
