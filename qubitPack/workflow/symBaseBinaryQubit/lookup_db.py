@@ -25,9 +25,11 @@ show = {
 data = []
 for e in col.find(filter):
     st = Structure.from_dict(e["structure"])
-    sites = SpacegroupAnalyzer(st, symprec=1e-4).get_symmetry_dataset()["std_positions"]
-    site_syms = SpacegroupAnalyzer(st, symprec=1e-4).get_symmetry_dataset()["site_symmetry_symbols"]
-    point_gp = SpacegroupAnalyzer(st, symprec=1e-4).get_symmetry_dataset()["pointgroup"]
+    space_sym_analyzer = SpacegroupAnalyzer(st, symprec=1e-4)
+    sites = space_sym_analyzer.get_symmetry_dataset()["std_positions"]
+    site_syms = space_sym_analyzer.get_symmetry_dataset()["site_symmetry_symbols"]
+    point_gp = space_sym_analyzer.get_symmetry_dataset()["pointgroup"]
+    vw = space_sym_analyzer.get_symmetry_dataset()["wyckoffs"]
     site_irreps = []
     for specie, site, site_sym in zip(st.species, sites, site_syms):
         print(site_sym)

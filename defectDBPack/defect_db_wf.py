@@ -58,11 +58,11 @@ def relax_pc():
             lpad.add_wf(wf)
 
 
-def binary_vacancy_scan(cat="TMDCs_complex", defect_type=("vacancies", "S"), impurity_on_nn=None): #BN_vac
+def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impurity_on_nn=None): #BN_vac
     lpad = LaunchPad.from_file(
         os.path.join(
             os.path.expanduser("~"),
-            "config/project/symBaseBinaryQubit/{}/my_launchpad.yaml".format(cat)))
+            "config/project/defect_db/{}/my_launchpad.yaml".format(cat)))
     col = VaspCalcDb.from_db_file(
         os.path.join(
             os.path.expanduser("~"),
@@ -70,7 +70,7 @@ def binary_vacancy_scan(cat="TMDCs_complex", defect_type=("vacancies", "S"), imp
 
     mx2s = col.find(
         {
-            "task_id": {"$in": [161]}
+            "task_id": {"nsites": 2}
         }
     )
 
