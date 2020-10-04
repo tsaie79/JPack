@@ -11,7 +11,8 @@ from atomate.vasp.powerups import (
     add_modify_incar,
     add_modify_kpoints,
     set_queue_options,
-    set_execution_options
+    set_execution_options,
+    clean_up_files
 )
 
 from pymatgen import Structure
@@ -20,6 +21,7 @@ from pymatgen.io.vasp.sets import MPScanRelaxSet, MPHSERelaxSet
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 
 from monty.serialization import loadfn
+import os
 
 
 def relax_pc():
@@ -58,14 +60,19 @@ def relax_pc():
 
 class SymBaseBinaryQubit:
     @staticmethod
-    def binary_vacancy(cat="BN_vac"):
-        lpad = LaunchPad.from_file("/home/tug03990/config/project/symBaseBinaryQubit/BN_vac/my_launchpad.yaml")
-        col = VaspCalcDb.from_db_file('/home/tug03990/atomate/example/config/project/symBaseBinaryQubit/scan_relax_pc/'
-                                      'db.json').collection
+    def binary_vacancy_hse(cat="shrink_sigma", defect_type=("substitutions", "W_on_S"), impurity_on_nn=None):
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/antisiteQubit/{}/my_launchpad.yaml".format(cat)))
+        col = VaspCalcDb.from_db_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/symBaseBinaryQubit/scan_relax_pc/db.json")).collection
 
         mx2s = col.find(
             {
-                "task_id": {"$in": [1]}
+                "task_id": {"$in": [161]} # 1: BN 161:WS2 124:MoS2
             }
         )
 
@@ -86,33 +93,35 @@ class SymBaseBinaryQubit:
 
             cation, anion = find_cation_anion(pc)
 
-            for vac in range(len(defect["vacancies"])):
+            for vac in range(len(defect[defect_type[0]])):
                 print(cation, anion)
                 # cation vacancy
-                if "{}".format("N") not in defect["vacancies"][vac]["name"]:
+                if defect_type[1] not in defect[defect_type[0]][vac]["name"]:
                     continue
                 print(vac)
                 for na, thicks in geo_spec.items():
                     for thick in thicks:
-                        for dtort in [0]:
-                            vacancies = GenDefect(pc, ["vacancies", vac], na, thick)
-                            vacancies.vacancies(dtort, "C")
-                            enmax = 1.3*max([potcar.enmax for potcar in MPHSERelaxSet(vacancies.defect_st).potcar])
+                        for dtort in [0, 0.001]:
+                            gen_defect = GenDefect(pc, [defect_type[0], vac], na, thick)
+                            if not impurity_on_nn:
+                                impurity_on_nn = []
+                            gen_defect.vacancies(dtort, list(impurity_on_nn))
+                            enmax = 1.3*max([potcar.enmax for potcar in MPScanRelaxSet(gen_defect.defect_st).potcar])
                             wf = get_wf_full_hse(
-                                structure=vacancies.defect_st,
+                                structure=gen_defect.defect_st,
                                 charge_states=[0],
                                 gamma_only=False,
-                                dos_hse=True,
+                                dos=True,
                                 nupdowns=[2],
                                 encut=enmax,
                                 include_hse_relax=True,
                                 vasptodb={
                                     "category": cat,
-                                    "NN": vacancies.NN,
-                                    "NN_dist": vacancies.nn_dist,
-                                    "defect_entry": vacancies.defect_entry
+                                    "NN": gen_defect.NN,
+                                    "NN_dist": gen_defect.nn_dist,
+                                    "defect_entry": gen_defect.defect_entry
                                 },
-                                wf_addition_name="{}:{}".format(vacancies.defect_st.num_sites, thick)
+                                wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick)
                             )
 
                             def kpoints(kpts):
@@ -136,8 +145,8 @@ class SymBaseBinaryQubit:
                             # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_scf")
                             wf = add_additional_fields_to_taskdocs(
                                 wf,
-                                {"lattice_constant": "SCAN",
-                                 "perturbed": vacancies.distort}
+                                {"pc_from": "symBaseBinaryQubit/scan_relax_pc",
+                                 "perturbed": gen_defect.distort}
                             )
 
                             wf = add_modify_incar(wf, {"incar_update": {"NSW":150}}, "PBE_relax")
@@ -149,18 +158,23 @@ class SymBaseBinaryQubit:
                             # related to directory
                             wf = set_execution_options(wf, category=cat)
                             wf = preserve_fworker(wf)
-                            wf.name = wf.name+":dx[{}]".format(vacancies.distort)
+                            wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
                             lpad.add_wf(wf)
 
     @staticmethod
-    def binary_vacancy_scan(cat="BN_vac"):
-        lpad = LaunchPad.from_file("/home/tug03990/config/project/symBaseBinaryQubit/BN_vac/my_launchpad.yaml")
-        col = VaspCalcDb.from_db_file('/home/tug03990/atomate/example/config/project/symBaseBinaryQubit/scan_relax_pc/'
-                                      'db.json').collection
+    def binary_vacancy_scan(cat="TMDCs_complex", defect_type=("vacancies", "S"), impurity_on_nn=None): #BN_vac
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/symBaseBinaryQubit/{}/my_launchpad.yaml".format(cat)))
+        col = VaspCalcDb.from_db_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/symBaseBinaryQubit/scan_relax_pc/db.json")).collection
 
         mx2s = col.find(
             {
-                "task_id": {"$in": [1]}
+                "task_id": {"$in": [161]}
             }
         )
 
@@ -181,32 +195,34 @@ class SymBaseBinaryQubit:
 
             cation, anion = find_cation_anion(pc)
 
-            for vac in range(len(defect["vacancies"])):
+            for vac in range(len(defect[defect_type[0]])):
                 print(cation, anion)
                 # cation vacancy
-                if "{}".format("B") not in defect["vacancies"][vac]["name"]:
+                if defect_type[1] not in defect[defect_type[0]][vac]["name"]:
                     continue
                 print(vac)
                 for na, thicks in geo_spec.items():
                     for thick in thicks:
                         for dtort in [0]:
-                            vacancies = GenDefect(pc, ["vacancies", vac], na, thick)
-                            vacancies.vacancies(dtort, False)
-                            enmax = 1.3*max([potcar.enmax for potcar in MPScanRelaxSet(vacancies.defect_st).potcar])
+                            gen_defect = GenDefect(pc, [defect_type[0], vac], na, thick)
+                            if not impurity_on_nn:
+                                impurity_on_nn = []
+                            gen_defect.vacancies(dtort, list(impurity_on_nn))
+                            enmax = 1.3*max([potcar.enmax for potcar in MPScanRelaxSet(gen_defect.defect_st).potcar])
                             wf = get_wf_full_scan(
-                                structure=vacancies.defect_st,
+                                structure=gen_defect.defect_st,
                                 charge_states=[0],
-                                gamma_only=True,
-                                dos_hse=True,
+                                gamma_only=False,
+                                dos=True,
                                 nupdowns=[-1],
                                 encut=enmax,
                                 vasptodb={
                                     "category": cat,
-                                    "NN": vacancies.NN,
-                                    "NN_dist": vacancies.nn_dist,
-                                    "defect_entry": vacancies.defect_entry
+                                    "NN": gen_defect.NN,
+                                    "NN_dist": gen_defect.nn_dist,
+                                    "defect_entry": gen_defect.defect_entry
                                 },
-                                wf_addition_name="{}:{}".format(vacancies.defect_st.num_sites, thick)
+                                wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick)
                             )
 
                             def kpoints(kpts):
@@ -230,8 +246,8 @@ class SymBaseBinaryQubit:
                             # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_scf")
                             wf = add_additional_fields_to_taskdocs(
                                 wf,
-                                {"lattice_constant": "SCAN",
-                                 "perturbed": vacancies.distort}
+                                {"pc_from": "symBaseBinaryQubit/scan_relax_pc",
+                                 "perturbed": gen_defect.distort}
                             )
 
                             wf = add_modify_incar(wf, {"incar_update": {"NSW":150}}, "SCAN_relax")
@@ -241,8 +257,12 @@ class SymBaseBinaryQubit:
                             # related to directory
                             wf = set_execution_options(wf, category=cat)
                             wf = preserve_fworker(wf)
-                            wf.name = wf.name+":dx[{}]".format(vacancies.distort)
+                            wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
+                            wf = clean_up_files(wf, files={"CHG*"}, fw_name_constraint="SCAN_scf")
                             lpad.add_wf(wf)
+
+
+
 
 if __name__ == '__main__':
     # relax_pc()

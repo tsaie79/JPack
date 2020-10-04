@@ -49,15 +49,15 @@ class DosPlotDB:
         # print("bandgap=%.4f\ncbm=%.4f\nvbm=%.4f\nfermi=%.4f\n" % (bandgap, cbm, vbm, fermi))
         # return bandgap, cbm, vbm, fermi
 
-    def total_dos(self):
+    def total_dos(self, energy_upper_bound, energy_lower_bound):
 
         # 2. plot dos
-        plotter = DosPlotter(zero_at_efermi=False, stack=False, sigma=0)
+        plotter = DosPlotter(zero_at_efermi=True, stack=False, sigma=0)
         # os.makedirs(self.name + "_figures/%s/" % "total", exist_ok=True)
         # 2.1 total dos
         # print(self.complete_dos1.get_site_spd_dos(self.complete_dos1.structure.sites[0])[OrbitalType.s])
-        plotter.add_dos("tdos", self.complete_dos1, line_style="--")
-        plot = plotter.get_plot(xlim=[self.vbm_primitive-2, self.cbm_primitive+2])
+        plotter.add_dos("tdos", self.complete_dos1, line_style="-")
+        plot = plotter.get_plot(xlim=[self.vbm_primitive-energy_lower_bound, self.cbm_primitive+energy_upper_bound])
 
         # plotly_plot = tls.mpl_to_plotly(fig)
         # plotly.offline.plot(plotly_plot, filename=os.path.join("/home/jengyuantsai/PycharmProjects/qc_searching/analysis/test_figures","procar.html"))
@@ -68,10 +68,9 @@ class DosPlotDB:
         plot.legend(loc=1)
         plot.title(self.e1["formula_pretty"]+" total_dos")
 
-        plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}-{}-{}.png".format(
+        plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.tdos.png".format(
             self.e1["formula_pretty"],
             self.e1["task_label"],
-            self.e1["input"]["incar"]["NUPDOWN"],
             self.e1["task_id"]
         )), img_format="png")
         plot.show()
@@ -93,10 +92,11 @@ class DosPlotDB:
         plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
         plot.legend(loc=1)
         plot.title(self.e1["formula_pretty"] + " site%d %s" % (index, self.complete_dos1.structure.sites[index].specie))
-        plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.orbital_dos.png".format(
+        plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}.{}_idx{}.orbital_dos.png".format(
             self.e1["formula_pretty"],
             self.e1["task_id"],
             self.e1["task_label"],
+            index
         )), img_format="png")
         plot.show()
         # plot.savefig(self.name + "_figures/%s/" % self.fig_name + self.name + "_%s_%d.eps" % (

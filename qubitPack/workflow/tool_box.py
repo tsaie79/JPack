@@ -205,7 +205,6 @@ class GenDefect:
         else:
             print("!!!Please insert substitutions, vacancies, or bulk!!!")
 
-
     def substitutions(self, distort, substitution):
         bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
                        for NN_index in self.NN]

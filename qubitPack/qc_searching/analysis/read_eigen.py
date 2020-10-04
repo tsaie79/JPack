@@ -173,8 +173,8 @@ class DetermineDefectState:
         if self.show_edges == "band_edges":
             energy_range = [self.vbm - self.vacuum_locpot_primitive - div[0], self.cbm -
                             self.vacuum_locpot_primitive + div[1]]
-        elif self.show_edges == "band_edges":
-            energy_range = [self.show_edges[0], self.show_edges[1]]
+        # elif self.show_edges == "band_edges":
+        #     energy_range = [self.show_edges[0], self.show_edges[1]]
 
         try:
             for i in self.eigenvals["1"][kpoint]:
@@ -303,12 +303,12 @@ class DetermineDefectState:
                 round(self.vbm-self.vacuum_locpot_primitive, 3),
                 round(self.cbm-self.vacuum_locpot_primitive, 3)
             )
-            plt.title("%s_%s_k%s_%s_%s_chg.%d" % (self.entry["formula_pretty"], title,
-                     str(kpoint), str(threshold), str(round(self.vacuum_locpot, 3)), self.entry["charge_state"]))
+            # plt.title("%s_%s_k%s_%s_%s_chg.%d" % (self.entry["formula_pretty"], title,
+            #          str(kpoint), str(threshold), str(round(self.vacuum_locpot, 3)), self.entry["charge_state"]))
 
-        elif self.show_edges:
-            fig = eng.plotting(round(self.show_edges[0]-self.vacuum_locpot_primitive, 3),
-                               round(self.show_edges[1]-self.vacuum_locpot_primitive, 3))
+        # if self.show_edges:
+        #     fig = eng.plotting(round(self.show_edges[0]-self.vacuum_locpot_primitive, 3),
+        #                        round(self.show_edges[1]-self.vacuum_locpot_primitive, 3))
         fig.savefig(os.path.join(self.save_fig_path, "defect_states", "{}_{}_{}.defect_states.png".format(
             self.entry["formula_pretty"],
             self.entry["task_id"],

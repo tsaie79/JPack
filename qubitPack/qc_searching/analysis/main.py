@@ -20,7 +20,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot"):
     tot, proj = can.get_candidates(
         [1, 1],
         0,
-        threshold=0,
+        threshold=0.1,
         select_up=None,
         select_dn=None
     )
@@ -31,14 +31,15 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot"):
 
     if plot:
         dos_plot = DosPlotDB(db=db, db_filter=db_filter, cbm=cbm, vbm=vbm, path_save_fig=path_save_fig)
-        dos_plot.sites_plots(energy_upper_bound=4, energy_lower_bound=4)
+        dos_plot.sites_plots(energy_upper_bound=2, energy_lower_bound=2)
+        dos_plot.total_dos(energy_upper_bound=2, energy_lower_bound=2)
         print(dos_plot.nn)
-        dos_plot.orbital_plot(dos_plot.nn[-1], 4, 4)
+        dos_plot.orbital_plot(48, 2, 2)
         plt.show()
 
 
 if __name__ == '__main__':
-    proj_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/symBaseBinaryQubit/BN_vac"
+    proj_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/symBaseBinaryQubit/TMDCs_complex"
     save_path = os.path.join(proj_path)
     for dir_name in ["defect_states", "structures", "xlsx"]:
         os.makedirs(os.path.join(save_path, dir_name), exist_ok=True)
@@ -51,8 +52,8 @@ if __name__ == '__main__':
 
     main(
         db_json,
-        {"task_id": 340},
-        4, -2,
+        {"task_id": 393},
+        6, -1,
         save_path,
         True,
         "tot"
