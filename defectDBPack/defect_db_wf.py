@@ -70,11 +70,12 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
 
     mx2s = col.find(
         {
-            "nsites":2
+            "task_id":60
         }
     )
     geo_spec = None
     aexx = 0.25
+    test = []
     for mx2 in mx2s:
         pc = Structure.from_dict(mx2["output"]["structure"])
         if mx2["nsites"] == 2:
@@ -90,79 +91,83 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
 
         cation, anion = find_cation_anion(pc)
         good_sym_site_symbols = list(dict.fromkeys(mx2["c2db_info"]["irreps"]))
-
+        print(good_sym_site_symbols)
         for good_sym_site_symbol in good_sym_site_symbols:
-            defect_type = ("substitutions", "_on_{}".format(good_sym_site_symbol))
+            defect_type = ("substitutions", "on_{}".format(good_sym_site_symbol))
             for de_idx in range(len(defect[defect_type[0]])):
                 print(cation, anion)
                 # cation vacancy
-                if defect_type[1] not in defect[defect_type[0]][de_idx]["name"]:
-                    continue
-                print(de_idx)
-                for na, thicks in geo_spec.items():
-                    for thick in thicks:
-                        for dtort in [0]:
-                            gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick)
-                            if not impurity_on_nn:
-                                impurity_on_nn = []
-                            gen_defect.vacancies(dtort, list(impurity_on_nn))
-                            enmax = 1.3*max([potcar.enmax for potcar in MPScanRelaxSet(gen_defect.defect_st).potcar])
+                if defect_type[1] == "_".join(defect[defect_type[0]][de_idx]["name"].split("_")[-2:]):
+                    for na, thicks in geo_spec.items():
+                        for thick in thicks:
+                            for dtort in [0]:
+                                gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick)
+                                if not impurity_on_nn:
+                                    impurity_on_nn = []
+                                gen_defect.vacancies(dtort, list(impurity_on_nn))
+                                enmax = 1.3*max([potcar.enmax for potcar in MPScanRelaxSet(gen_defect.defect_st).potcar])
 
-                            defect_data = gen_defect.defect_entry
+                                defect_data = gen_defect.defect_entry
 
-                            wf = get_wf_full_scan(
-                                structure=gen_defect.defect_st,
-                                charge_states=[0],
-                                gamma_only=False,
-                                dos=True,
-                                nupdowns=[-1],
-                                encut=enmax,
-                                vasptodb={
-                                    "category": cat,
-                                    "NN": gen_defect.NN,
-                                    "NN_dist": gen_defect.nn_dist,
-                                    "defect_entry": defect_data,
-                                },
-                                wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick)
-                            )
+                                wf = get_wf_full_scan(
+                                    structure=gen_defect.defect_st,
+                                    charge_states=[0],
+                                    gamma_only=False,
+                                    dos=True,
+                                    nupdowns=[-1],
+                                    encut=enmax,
+                                    vasptodb={
+                                        "category": cat,
+                                        "NN": gen_defect.NN,
+                                        "NN_dist": gen_defect.nn_dist,
+                                        "defect_entry": defect_data,
+                                    },
+                                    wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick)
+                                )
 
-                            def kpoints(kpts):
-                                kpoints_kwarg = {
-                                    'comment': "Jcustom",
-                                    "style": "G",
-                                    "num_kpts": 0,
-                                    'kpts': [kpts],
-                                    'kpts_weights': None,
-                                    'kpts_shift': (0, 0, 0),
-                                    'coord_type': None,
-                                    'labels': None,
-                                    'tet_number': 0,
-                                    'tet_weight': 0,
-                                    'tet_connections': None
-                                }
-                                return kpoints_kwarg
+                                def kpoints(kpts):
+                                    kpoints_kwarg = {
+                                        'comment': "Jcustom",
+                                        "style": "G",
+                                        "num_kpts": 0,
+                                        'kpts': [kpts],
+                                        'kpts_weights': None,
+                                        'kpts_shift': (0, 0, 0),
+                                        'coord_type': None,
+                                        'labels': None,
+                                        'tet_number': 0,
+                                        'tet_weight': 0,
+                                        'tet_connections': None
+                                    }
+                                    return kpoints_kwarg
 
-                            # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "PBE_relax")
-                            # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_relax")
-                            # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_scf")
-                            wf = add_additional_fields_to_taskdocs(
-                                wf,
-                                {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
-                                 "perturbed": gen_defect.distort}
-                            )
+                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "PBE_relax")
+                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_relax")
+                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_scf")
+                                wf = add_additional_fields_to_taskdocs(
+                                    wf,
+                                    {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
+                                     "perturbed": gen_defect.distort}
+                                )
 
-                            wf = add_modify_incar(wf, {"incar_update": {"NSW":150}}, "SCAN_relax")
-                            wf = add_modify_incar(wf, {"incar_update": {"LWAVE": False}}, "SCAN_scf")
-                            wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_relax")
-                            wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_scf")
-                            # related to directory
-                            wf = set_execution_options(wf, category=cat)
-                            wf = preserve_fworker(wf)
-                            wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
-                            # wf = clean_up_files(wf, files=["CHG*"], fw_name_constraint="SCAN_scf")
-                            print(wf)
-                            lpad.add_wf(wf)
+                                wf = add_modify_incar(wf, {"incar_update": {"NSW":150}}, "SCAN_relax")
+                                wf = add_modify_incar(wf, {"incar_update": {"LWAVE": False}}, "SCAN_scf")
+                                wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_relax")
+                                wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_scf")
+                                # related to directory
+                                wf = set_execution_options(wf, category=cat)
+                                wf = preserve_fworker(wf)
+                                wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
+                                # task_name_constraint=x meaning after x do powersup
+                                wf = clean_up_files(wf, files=["CHG*", "DOS*", "LOCPOT*"], fw_name_constraint="SCAN_scf",
+                                                    task_name_constraint="VaspToDb")
 
+                                print(wf)
+                                test.append(wf)
+                                # lpad.add_wf(wf)
+
+
+    print(len(test))
 
 
 
