@@ -163,12 +163,7 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
                                                     task_name_constraint="VaspToDb")
 
                                 print(wf)
-                                test.append(wf)
-                                # lpad.add_wf(wf)
-
-
-    print(len(test))
-
+                                lpad.add_wf(wf)
 
 
 if __name__ == '__main__':
