@@ -222,7 +222,7 @@ class GenDefect:
             self.make_complex(substitution)
 
         self.NN.append(self.defect_site_in_bulk_index)
-        self.nn_dist["before"][self.defect_site_in_bulk_index] = 0
+        self.nn_dist["before"][str(self.defect_site_in_bulk_index)] = 0
         print("==" * 50, "\nBefore distortion: {}".format(self.nn_dist["before"]))
 
         if distort:
