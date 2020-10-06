@@ -5,7 +5,7 @@ from atomate.vasp.database import VaspCalcDb
 import pandas as pd
 from phonopy.phonon.irreps import character_table
 
-db = VaspCalcDb.from_db_file("/qubitPack/database_profile/db_dk_local.json")
+db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/code/JPack/qubitPack/database_profile/db_dk_local.json")
 col = db.collection
 
 filter = {
@@ -57,7 +57,10 @@ for e in col.find(filter):
     data.append(
         {
             "formula": e["formula"],
-            "irreps": site_irreps,
+            "species": [str(sp) for sp in st.species],
+            "site_sym": site_syms,
+            # "irreps": site_irreps,
+            "Wf_position": vw,
             "spacegroup": e["spacegroup"],
             "pmg_point_gp": point_gp,
             "gap_hse": e["gap_hse"],
@@ -66,15 +69,18 @@ for e in col.find(filter):
             "soc_intensity": e["gap_hse_nosoc"] - e["gap_hse"],
             "ehull": e["ehull"],
             "uid":e["uid"],
-            "structure": e["structure"]
+            # "structure": e["structure"]
         }
     )
 
 
 
-df = pd.DataFrame(data).round(3).sort_values(["soc_intensity", "ehull"], ascending=True)
-# df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM.json", orient="records", indent=4)
-df.to_excel("/Users/jeng-yuantsai/Research/project/qubit/xlsx/gap_gt1-binary-NM.xlsx", index=False)
+df = pd.DataFrame(data)
+df = df.round(3).sort_values(["soc_intensity", "ehull"], ascending=True)
+df.set_index("uid", inplace=True)
+df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.json",
+           orient="index", indent=4, index=True)
+# df.to_excel("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.xlsx", index=False)
 
 #%%
 from atomate.vasp.database import VaspCalcDb
@@ -114,3 +120,22 @@ df1 = pd.DataFrame(data).to_excel("/Users/jeng-yuantsai/Research/project/defectD
 # df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/"
 #            "gap_gt1-binary-NM-no-cori_duplicate.json", orient="records", indent=4)
 
+
+#%% scan_relax_pc update
+from atomate.vasp.database import VaspCalcDb
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+
+db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc/db.json")
+
+for e in db.collection.find():
+    st = Structure.from_dict(e["output"]["structure"])
+    sym = SpacegroupAnalyzer(st, symprec=1e-4).get_symmetry_dataset()
+    d = {}
+    for k, v in sym.items():
+        if type(v).__name__ == "ndarray":
+            d[k] = v.tolist()
+        else:
+            d[k] = v
+    d.update({"symprec":1e-4})
+    d.update({"species": [str(sp) for sp in st.species]})
+    db.collection.update_one({"task_id": e["task_id"]}, {"$set":{"sym_data":d}})

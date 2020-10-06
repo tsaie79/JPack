@@ -101,10 +101,11 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
                     for na, thicks in geo_spec.items():
                         for thick in thicks:
                             for dtort in [0]:
-                                gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick)
                                 if not impurity_on_nn:
                                     impurity_on_nn = []
-                                gen_defect.vacancies(dtort, list(impurity_on_nn))
+                                gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick, distort=dtort,
+                                                       sub_on_side=list(impurity_on_nn))
+                                # gen_defect.vacancies(dtort, list(impurity_on_nn))
                                 enmax = 1.3*max([potcar.enmax for potcar in MPScanRelaxSet(gen_defect.defect_st).potcar])
 
                                 defect_data = gen_defect.defect_entry
@@ -163,7 +164,7 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
                                                     task_name_constraint="VaspToDb")
 
                                 print(wf)
-                                lpad.add_wf(wf)
+                                # lpad.add_wf(wf)
 
 
 if __name__ == '__main__':

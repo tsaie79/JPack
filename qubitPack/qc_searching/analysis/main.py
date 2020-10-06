@@ -39,7 +39,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot"):
 
 
 if __name__ == '__main__':
-    proj_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/symBaseBinaryQubit/TMDCs_complex"
+    proj_path = "/Users/jeng-yuantsai/Research/project/defectDB/calculations/defect_db/binary_defect"
     save_path = os.path.join(proj_path)
     for dir_name in ["defect_states", "structures", "xlsx"]:
         os.makedirs(os.path.join(save_path, dir_name), exist_ok=True)
@@ -52,8 +52,8 @@ if __name__ == '__main__':
 
     main(
         db_json,
-        {"task_id": 393},
-        6, -1,
+        {"task_id": 49},
+        2, -2,
         save_path,
         True,
         "tot"

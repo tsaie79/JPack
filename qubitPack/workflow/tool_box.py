@@ -152,7 +152,7 @@ def defect_from_primitive_cell(orig_st, defect_type, natom, substitution=None, d
 
 
 class GenDefect:
-    def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None):
+    def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None, distort=None, sub_on_side=None):
         for site_property in orig_st.site_properties:
             orig_st.remove_site_property(site_property)
         if vacuum_thickness:
@@ -204,6 +204,12 @@ class GenDefect:
 
         else:
             print("!!!Please insert substitutions, vacancies, or bulk!!!")
+
+        if defect_type[0] == "substitutions":
+            self.substitutions(distort, sub_on_side)
+
+        elif defect_type[0] == "vacancies":
+            self.vacancies(distort, sub_on_side)
 
     def substitutions(self, distort, substitution):
         bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
