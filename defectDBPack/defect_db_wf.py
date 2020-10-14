@@ -58,7 +58,7 @@ def relax_pc():
             lpad.add_wf(wf)
 
 
-def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impurity_on_nn=None): #BN_vac
+def binary_scan_defect(cat="binary_defect", impurity_on_nn=None): #BN_vac
     lpad = LaunchPad.from_file(
         os.path.join(
             os.path.expanduser("~"),
@@ -70,13 +70,13 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
 
     mx2s = col.find(
         {
-            "task_id":60
+            "nsites": 2
         }
     )
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s:
+    for mx2 in mx2s[1:]:
         pc = Structure.from_dict(mx2["output"]["structure"])
         if mx2["nsites"] == 2:
             geo_spec = {25*2: [20]}
@@ -90,14 +90,26 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
         defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
 
         cation, anion = find_cation_anion(pc)
+
         good_sym_site_symbols = list(dict.fromkeys(mx2["c2db_info"]["irreps"]))
+
+        # Exclude those element in irrep
+        # species = list(dict.fromkeys(mx2["sym_data"]["species"]))
+        # for tgt in good_sym_site_symbols:
+        #     species.remove(tgt)
+        # good_sym_site_symbols = species
+
         print(good_sym_site_symbols)
         for good_sym_site_symbol in good_sym_site_symbols:
-            defect_type = ("substitutions", "on_{}".format(good_sym_site_symbol))
+            defect_type = ("vacancies", "{}".format(good_sym_site_symbol))
             for de_idx in range(len(defect[defect_type[0]])):
                 print(cation, anion)
-                # cation vacancy
-                if defect_type[1] == "_".join(defect[defect_type[0]][de_idx]["name"].split("_")[-2:]):
+
+                # antisite
+                # if defect_type[1] == "_".join(defect[defect_type[0]][de_idx]["name"].split("_")[-1]):
+
+                # vacancy
+                if defect_type[1] == defect[defect_type[0]][de_idx]["name"].split("_")[-1]:
                     for na, thicks in geo_spec.items():
                         for thick in thicks:
                             for dtort in [0]:
@@ -160,11 +172,11 @@ def binary_scan_defect(cat="binary_defect", defect_type=("vacancies", "S"), impu
                                 wf = preserve_fworker(wf)
                                 wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
                                 # task_name_constraint=x meaning after x do powersup
-                                wf = clean_up_files(wf, files=["CHG*", "DOS*", "LOCPOT*"], fw_name_constraint="SCAN_scf",
+                                wf = clean_up_files(wf, files=["CHG*", "DOS*", "LOCPOT*"],
                                                     task_name_constraint="VaspToDb")
 
                                 print(wf)
-                                # lpad.add_wf(wf)
+                                lpad.add_wf(wf)
 
 
 if __name__ == '__main__':

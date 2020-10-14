@@ -102,24 +102,6 @@ for e in col.find():
 df = pd.DataFrame(data).sort_values(["bandgap"], ascending=False)
 df.to_json("cori_relax_lc.json", orient="records")
 
-#%%
-from  monty.serialization import loadfn
-import pandas as pd
-
-src = loadfn("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/cori_relax_lc.json")
-tgt = loadfn("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM.json")
-data = []
-for e in src:
-    for idx, ee in enumerate(tgt):
-        if e["formula"] == ee["formula"] and e["spacegroup"] == ee["spacegroup"]:
-            data.append(ee)
-
-df1 = pd.DataFrame(data).to_excel("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/duplicate_c2db.xlsx", index=False)
-# df = pd.DataFrame(tgt).round(3).sort_values(["soc_intensity", "ehull"], ascending=True)
-# df.to_excel("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-no-cori_duplicate.xlsx", index=False)
-# df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/"
-#            "gap_gt1-binary-NM-no-cori_duplicate.json", orient="records", indent=4)
-
 
 #%% scan_relax_pc update
 from atomate.vasp.database import VaspCalcDb
@@ -139,3 +121,19 @@ for e in db.collection.find():
     d.update({"symprec":1e-4})
     d.update({"species": [str(sp) for sp in st.species]})
     db.collection.update_one({"task_id": e["task_id"]}, {"$set":{"sym_data":d}})
+
+
+#%% get structure from SCAN_relax
+from atomate.vasp.database import VaspCalcDb
+from pymatgen import Structure
+
+db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
+                             'scan_relax_pc/db.json')
+
+# task_id = 34
+filter = {"nsites":4}
+es = db.collection.find(filter)[:5]
+for e in es:
+    st = Structure.from_dict(e["output"]["structure"])
+    st.to("POSCAR", '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
+                    'scan_relax_pc/structures/tid_{}_ehull_{}.vasp'.format(e["task_id"], e["c2db_info"]["ehull"]))

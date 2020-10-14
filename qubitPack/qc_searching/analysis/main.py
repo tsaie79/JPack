@@ -20,7 +20,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot"):
     tot, proj = can.get_candidates(
         [1, 1],
         0,
-        threshold=0.1,
+        threshold=0,
         select_up=None,
         select_dn=None
     )
@@ -34,12 +34,12 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot"):
         dos_plot.sites_plots(energy_upper_bound=2, energy_lower_bound=2)
         dos_plot.total_dos(energy_upper_bound=2, energy_lower_bound=2)
         print(dos_plot.nn)
-        dos_plot.orbital_plot(48, 2, 2)
+        dos_plot.orbital_plot(dos_plot.nn[-1], 2, 2)
         plt.show()
 
 
 if __name__ == '__main__':
-    proj_path = "/Users/jeng-yuantsai/Research/project/defectDB/calculations/defect_db/binary_defect"
+    proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
     save_path = os.path.join(proj_path)
     for dir_name in ["defect_states", "structures", "xlsx"]:
         os.makedirs(os.path.join(save_path, dir_name), exist_ok=True)
@@ -52,8 +52,8 @@ if __name__ == '__main__':
 
     main(
         db_json,
-        {"task_id": 49},
-        2, -2,
+        {"task_id": 345},
+        5, -1,
         save_path,
         True,
         "tot"
