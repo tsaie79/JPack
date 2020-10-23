@@ -51,3 +51,6 @@ def c_terminate_mgb2(cat="c_term"):
 
     wf = set_execution_options(wf, category=cat)
     lpad.add_wf(wf)
+
+
+c_terminate_mgb2()
