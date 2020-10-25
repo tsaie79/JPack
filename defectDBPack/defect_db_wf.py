@@ -108,7 +108,7 @@ def binary_scan_defect(cat="binary_defect_vac_AB2", impurity_on_nn=None): #BN_va
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s[45:60]:
+    for mx2 in mx2s[130:150]:
         pc = Structure.from_dict(mx2["output"]["structure"])
         if mx2["nsites"] == 2:
             geo_spec = {25*2: [20]}

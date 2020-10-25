@@ -76,3 +76,28 @@ for e in es:
     # e.pop("elements")
     ess.append(e)
 df = pd.DataFrame(ess).sort_values(["group","defect_name", "mag"], inplace=False).set_index("formula_pretty")
+
+#%% Build the alignment of cbm and vbm of defect and host materials
+from atomate.vasp.database import VaspCalcDb
+
+import numpy as np
+
+from matplotlib import pyplot as plt
+
+
+defect = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
+                                 'search_triplet_from_defect_db/db.json')
+
+
+host = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
+                               'scan_relax_pc/db.json')
+
+test_host = host.collection.find_one({"task_id": 1})
+vac_host = max(test_host["calcs_reversed"][2]["output"]["locpot"]["2"])
+
+vac_vbm = test_host["output"]["vbm"]
+vac_cbm = test_host["output"]["cbm"]
+
+print(vac_host-vac_cbm, vac_host-vac_vbm)
+
+
