@@ -52,7 +52,7 @@ class DosPlotDB:
     def total_dos(self, energy_upper_bound, energy_lower_bound):
 
         # 2. plot dos
-        plotter = DosPlotter(zero_at_efermi=True, stack=False, sigma=0)
+        plotter = DosPlotter(zero_at_efermi=False, stack=False, sigma=0)
         # os.makedirs(self.name + "_figures/%s/" % "total", exist_ok=True)
         # 2.1 total dos
         # print(self.complete_dos1.get_site_spd_dos(self.complete_dos1.structure.sites[0])[OrbitalType.s])
@@ -79,7 +79,7 @@ class DosPlotDB:
 
     def orbital_plot(self, index, energy_upper_bound, energy_lower_bound):
 
-        plotter = DosPlotter(zero_at_efermi=True, stack=True, sigma=0)
+        plotter = DosPlotter(zero_at_efermi=False, stack=True, sigma=0)
         print("==" * 50)
         print(self.complete_dos1.structure.sites[index])
         projection = dict(zip(["s", "y", "z", "x", "xy", "yz", "z2", "xz", "x2-y2"],
@@ -107,7 +107,7 @@ class DosPlotDB:
         title = self.e1["formula_pretty"]
 
         def sites_total_plots():
-            dosplot = DosPlotter(zero_at_efermi=True, stack=True)
+            dosplot = DosPlotter(zero_at_efermi=False, stack=True)
             for i in self.nn:
                 dosplot.add_dos(str(i), self.complete_dos1.get_site_dos(self.complete_dos1.structure[i]))
             dosplot.add_dos("total_dos", self.complete_dos1)

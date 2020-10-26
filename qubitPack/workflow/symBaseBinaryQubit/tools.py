@@ -60,7 +60,7 @@ es = db.collection.aggregate(
         {"$addFields":{"defect_name":"$defect_entry.name", "point_group":"$output.spacegroup.point_group"}},
         {"$project": {"_id":0, "formula_pretty":1, "nsites":1, "elements":1,
                       "mag":1, "charge_state":1, "chemsys":1, "defect_name":1,
-                      "point_group":1
+                      "point_group":1, "task_id":1
                       }},
         {"$match":{"mag":{"$gte":1.9, "$lte":2.1}}},
         {"$sort":{"mag":-1}},
@@ -72,10 +72,11 @@ ess = []
 for e in es:
     els = [Element(e["elements"][0]).group, Element(e["elements"][1]).group]
     els.sort()
-    e.update({"group": "{}-{}".format(els[0], els[1])})
+    e.update({"group": "{}_{}".format(els[0], els[1])})
     # e.pop("elements")
     ess.append(e)
-df = pd.DataFrame(ess).sort_values(["group","defect_name", "mag"], inplace=False).set_index("formula_pretty")
+df = pd.DataFrame(ess).sort_values(["group","point_group", "charge_state"], inplace=False).set_index("task_id")
+df.to_clipboard()
 
 #%% Build the alignment of cbm and vbm of defect and host materials
 from atomate.vasp.database import VaspCalcDb
@@ -92,12 +93,33 @@ defect = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseB
 host = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
                                'scan_relax_pc/db.json')
 
-test_host = host.collection.find_one({"task_id": 1})
+test_host = host.collection.find_one({"task_id": 180})
 vac_host = max(test_host["calcs_reversed"][2]["output"]["locpot"]["2"])
 
 vac_vbm = test_host["output"]["vbm"]
 vac_cbm = test_host["output"]["cbm"]
 
-print(vac_host-vac_cbm, vac_host-vac_vbm)
+print(vac_cbm-vac_host, vac_vbm-vac_host)
+print(vac_host)
+defect_host = defect.collection.find_one({"task_id": 303})
+vac_defect = max(defect_host["calcs_reversed"][0]["output"]["locpot"]["2"])
 
+defect_vac_vbm = defect_host["output"]["vbm"]
+defect_vac_cbm = defect_host["output"]["cbm"]
+print(defect_vac_cbm-vac_defect, defect_vac_vbm-vac_defect)
+print(vac_defect)
+print(vac_host-vac_defect)
+print(vac_cbm-vac_defect, vac_vbm-vac_defect)
 
+df = pd.DataFrame([{"id": "defect",
+                    "vbm": -4.737,
+                    "abs_vbm":-4.737-vac_defect,
+                    "cbm": 0.282,
+                    "abs_cbm":0.282-vac_defect,
+                    "vacuum": vac_defect},
+                   {"id": "host",
+                    "vbm": -4.684,
+                    "abs_vbm":-4.684-vac_host,
+                    "cbm": 0.0998,
+                    "abs_cbm":0.0998-vac_host,
+                    "vacuum": vac_host}])

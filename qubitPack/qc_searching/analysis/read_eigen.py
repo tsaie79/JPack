@@ -140,39 +140,60 @@ class ProcarParse:
 
 
 class DetermineDefectState:
-    def __init__(self, show_edges, db, db_filter, cbm, vbm, save_fig_path, locpot=True):
+    def __init__(self, show_edges, db, db_filter, cbm, vbm, save_fig_path, locpot=True, db_host=None):
         db = VaspCalcDb.from_db_file(db)
+
         self.save_fig_path = save_fig_path
 
         self.entry = db.collection.find_one(db_filter)
         print("---task_id: %s---" % self.entry["task_id"])
 
-        if locpot and self.entry["vacuum_locpot"]:
-            self.vacuum_locpot = self.entry["vacuum_locpot"]["value"]
+        if locpot and db_host:
+            self.vacuum_locpot = max(self.entry["calcs_reversed"][0]["output"]["locpot"]["2"])
+
+            db_host = VaspCalcDb.from_db_file(db_host)
+            self.entry_host = db_host.collection.find_one({"task_id": int(self.entry["pc_from"].split("/")[-1])})
+            self.vacuum_locpot_host = max(self.entry_host["calcs_reversed"][2]["output"]["locpot"]["2"])
+
+            self.cbm = self.entry_host["output"]["cbm"] - self.vacuum_locpot_host #A
+            self.vbm = self.entry_host["output"]["vbm"] - self.vacuum_locpot_host
+            efermi_to_defect_vac = self.entry["calcs_reversed"][0]["output"]["efermi"] - self.vacuum_locpot
+
+            self.efermi = efermi_to_defect_vac
+
         else:
+            print("No vacuum alignment!")
             self.vacuum_locpot = 0
+            self.efermi = self.entry["calcs_reversed"][0]["output"]["efermi"]
+            self.cbm = cbm
+            self.vbm = vbm
 
-        if locpot and self.entry["info_primitive"]["vacuum_locpot_primitive"]:
-            self.vacuum_locpot_primitive = self.entry["info_primitive"]["vacuum_locpot_primitive"]["value"]
-        else:
-            self.vacuum_locpot_primitive = 0
+        # if locpot and self.entry["vacuum_locpot"]:
+        #     self.vacuum_locpot = self.entry["vacuum_locpot"]["value"]
+        # else:
+        #     self.vacuum_locpot = 0
 
-        self.efermi = self.entry["calcs_reversed"][0]["output"]["efermi"]
-        self.cbm = cbm + self.efermi
-        self.vbm = vbm + self.efermi
+        # if locpot and self.entry["info_primitive"]["vacuum_locpot_primitive"]:
+        #     self.vacuum_locpot_primitive = self.entry["info_primitive"]["vacuum_locpot_primitive"]["value"]
+        # else:
+        #     self.vacuum_locpot_primitive = 0
+
         self.nn = self.entry["NN"]
         self.proj_eigenvals = db.get_proj_eigenvals(self.entry["task_id"])
         self.eigenvals = db.get_eigenvals(self.entry["task_id"])
         self.show_edges = show_edges
-        print("total_mag:{}".format(self.entry["calcs_reversed"][0]["output"]["outcar"]["total_magnetization"]))
+        print("total_mag:{:.3f}".format(self.entry["calcs_reversed"][0]["output"]["outcar"]["total_magnetization"]))
+        print("cbm:{:.3f}, vbm:{:.3f}, efermi:{:.3f}".format(self.cbm+self.vacuum_locpot,
+                                                            self.vbm+self.vacuum_locpot,
+                                                            self.efermi+self.vacuum_locpot,
+                                                            ))
 
     def get_candidates(self, div, kpoint=0, threshold=0.2, select_up=None, select_dn=None):
         # find promising eigenstates with (band_index, [energy, occupation])
         eigenvals = defaultdict(list)
         energy_range = None
         if self.show_edges == "band_edges":
-            energy_range = [self.vbm - self.vacuum_locpot_primitive - div[0], self.cbm -
-                            self.vacuum_locpot_primitive + div[1]]
+            energy_range = [self.vbm-0.1, self.cbm+0.1]
         # elif self.show_edges == "band_edges":
         #     energy_range = [self.show_edges[0], self.show_edges[1]]
 
@@ -239,9 +260,9 @@ class DetermineDefectState:
         up = defaultdict(tuple)
         dn = defaultdict(tuple)
         for i in promising_band["1"]:
-            up[i[0]] = (round(i[1][0]-self.vacuum_locpot, 3), (i[1][1] > 0.9, i[1][1], i[2]))
+            up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
         for i in promising_band["-1"]:
-            dn[i[0]] = (round(i[1][0]-self.vacuum_locpot, 3), (i[1][1] > 0.9, i[1][1], i[2]))
+            dn[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
         #up = dict([(round(i[1][0]-self.vacuum_locpot, 3), i[1][1] > 0.9) for i in promising_band["1"]])
         #dn = dict([(round(i[1][0]-self.vacuum_locpot, 3), i[1][1] > 0.9) for i in promising_band["-1"]])
         sheet_up = defaultdict(list)
@@ -300,8 +321,8 @@ class DetermineDefectState:
         title = self.entry["task_label"]
         if self.show_edges == "band_edges":
             fig = eng.plotting(
-                round(self.vbm-self.vacuum_locpot_primitive, 3),
-                round(self.cbm-self.vacuum_locpot_primitive, 3)
+                round(self.vbm + self.vacuum_locpot, 3),
+                round(self.cbm + self.vacuum_locpot, 3)
             )
             # plt.title("%s_%s_k%s_%s_%s_chg.%d" % (self.entry["formula_pretty"], title,
             #          str(kpoint), str(threshold), str(round(self.vacuum_locpot, 3)), self.entry["charge_state"]))
@@ -351,12 +372,6 @@ class DetermineDefectState:
         for i in index[0]: print("down: %s" % candidate_dn_band[i:i+2, :])
 
 
-
-
 if __name__ == '__main__':
-    can = DetermineDefectState(db="db_w1te2_040752_local", show_edges="band_edges", task_id=183, locpot=False)
-    can.cbm = -0.78
-    can.vbm = -2.6
-    print(can.entry["task_type"])
-    can.get_candidates([1, 0], 2, threshold=0.1)
+    pass
 
