@@ -23,12 +23,19 @@ class DosPlotDB:
         self.path_save_fig = path_save_fig
         db1 = VaspCalcDb.from_db_file(db)
         self.e1 = db1.collection.find_one(filter=db_filter)
-        Structure.from_dict(self.e1["output"]["structure"]).to("POSCAR", os.path.join(self.path_save_fig, "structures",
-                                                                                     "{}_{}_{}.vasp".format(
-                                                                                         self.e1["formula_pretty"],
-                                                                                         self.e1["task_id"],
-                                                                                         self.e1["task_label"]
-                                                                                     )))
+        if self.path_save_fig:
+            Structure.from_dict(self.e1["output"]["structure"]).to(
+                "POSCAR",
+                os.path.join(
+                    self.path_save_fig,
+                    "structures", "{}_{}_{}.vasp".format(
+                        self.e1["formula_pretty"],
+                        self.e1["task_id"],
+                        self.e1["task_label"]
+                    )
+                )
+            )
+
         print("dos_1:%s" % self.e1["task_id"])
         self.complete_dos1 = db1.get_dos(self.e1["task_id"])
         self.cbm_primitive = cbm
@@ -68,12 +75,13 @@ class DosPlotDB:
         plot.legend(loc=1)
         plot.title(self.e1["formula_pretty"]+" total_dos")
 
-        plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.tdos.png".format(
-            self.e1["formula_pretty"],
-            self.e1["task_label"],
-            self.e1["task_id"]
-        )), img_format="png")
-        plot.show()
+        if self.path_save_fig:
+            plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.tdos.png".format(
+                self.e1["formula_pretty"],
+                self.e1["task_label"],
+                self.e1["task_id"]
+            )), img_format="png")
+            plot.show()
 
         return plot
 
@@ -92,13 +100,17 @@ class DosPlotDB:
         plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
         plot.legend(loc=1)
         plot.title(self.e1["formula_pretty"] + " site%d %s" % (index, self.complete_dos1.structure.sites[index].specie))
-        plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}.{}_idx{}.orbital_dos.png".format(
-            self.e1["formula_pretty"],
-            self.e1["task_id"],
-            self.e1["task_label"],
-            index
-        )), img_format="png")
+
+        if self.path_save_fig:
+            plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}.{}_idx{}.orbital_dos.png".format(
+                self.e1["formula_pretty"],
+                self.e1["task_id"],
+                self.e1["task_label"],
+                index
+            )), img_format="png")
+
         plot.show()
+
         # plot.savefig(self.name + "_figures/%s/" % self.fig_name + self.name + "_%s_%d.eps" % (
         #     self.complete_dos.structure.sites[index].specie, index), img_format="eps")
         return plot
@@ -120,10 +132,13 @@ class DosPlotDB:
             # plotly_plot = tls.mpl_to_plotly(fig)
             # plotly.offline.plot(plotly_plot, filename=os.path.join("procar.html"))
             plot.title(title+" site PDOS"+" Charge state:%d" % self.e1["charge_state"])
-            plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.pdos.png".format(
-                title,
-                self.e1["task_id"],
-                self.e1["task_label"])), img_format="png")
+
+            if self.path_save_fig:
+                plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.pdos.png".format(
+                    title,
+                    self.e1["task_id"],
+                    self.e1["task_label"])), img_format="png")
+
             return plot
 
         def spd_plots():
@@ -144,7 +159,6 @@ class DosPlotDB:
             plot.legend()
             plot.axvline(x=self.cbm_primitive, color="k", linestyle="--")
             plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
-
 
         if spd:
             spd_plots()

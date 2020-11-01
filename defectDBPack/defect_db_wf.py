@@ -61,7 +61,7 @@ def relax_pc():
             lpad.add_wf(wf)
 
 
-def binary_scan_defect(cat="binary_defect_vac_AB2", impurity_on_nn=None): #BN_vac
+def binary_scan_defect(cat="binary_defect", impurity_on_nn=None): #BN_vac
     lpad = LaunchPad.from_file(
         os.path.join(
             os.path.expanduser("~"),
@@ -79,7 +79,7 @@ def binary_scan_defect(cat="binary_defect_vac_AB2", impurity_on_nn=None): #BN_va
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s[130:150]:
+    for mx2 in mx2s[10:30]:
         pc = Structure.from_dict(mx2["output"]["structure"])
         if mx2["nsites"] == 2:
             geo_spec = {25*2: [20]}
@@ -104,7 +104,8 @@ def binary_scan_defect(cat="binary_defect_vac_AB2", impurity_on_nn=None): #BN_va
 
         print(good_sym_site_symbols)
         for good_sym_site_symbol in good_sym_site_symbols:
-            defect_type = ("vacancies", "{}".format(good_sym_site_symbol))
+            # defect_type = ("vacancies", "{}".format(good_sym_site_symbol))
+            defect_type = ("substitutions", "{}".format(good_sym_site_symbol))
             for de_idx in range(len(defect[defect_type[0]])):
                 print(cation, anion)
 
@@ -128,13 +129,14 @@ def binary_scan_defect(cat="binary_defect_vac_AB2", impurity_on_nn=None): #BN_va
                                 # add charge state regarding nelect
                                 charge, nupdn = None, None
                                 if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
-                                    charge = [1,-1, 0]
-                                    nupdn = [-1,-1,-1]
+                                    charge = [1,-1]#[1,-1, 0]
+                                    nupdn = [-1,-1]#[-1,-1,-1]
                                     print(charge)
                                     # if odd nelect, it used to be charge=[0]
                                 else:
-                                    charge = [0]
-                                    nupdn = [-1]
+                                    continue
+                                    # charge = [0]
+                                    # nupdn = [-1]
 
                                 wf = get_wf_full_scan(
                                     structure=gen_defect.defect_st,

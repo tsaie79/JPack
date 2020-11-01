@@ -7,7 +7,7 @@ import os
 import numpy as np
 
 
-def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", locpot=False, db_host=None):
+def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", locpot=None):
     """
     When one is using "db_cori_tasks_local", one must set ssh-tunnel as following:
     "ssh -f tsaie79@cori.nersc.gov -L 2222:mongodb07.nersc.gov:27017 -N mongo -u 2DmaterialQuantumComputing_admin -p
@@ -15,22 +15,32 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
     """
 
     can = DetermineDefectState(db=db, db_filter=db_filter, cbm=cbm, vbm=vbm, show_edges="band_edges",
-                               save_fig_path=path_save_fig, locpot=locpot, db_host=db_host)
+                               save_fig_path=path_save_fig, locpot=locpot)
 
-    tot, proj = can.get_candidates(
+    tot, proj, d_df = can.get_candidates(
         0,
-        threshold=0,
+        threshold=0.1,
         select_up=None,
         select_dn=None
     )
+    print(d_df)
+    print("=="*20)
+    print(proj)
+    print("=="*20)
+    print(tot)
+    # print("=="*20)
+    # print(d_df)
+
     if clipboard == "tot":
         tot.to_clipboard("\t")
-    else:
+    elif clipboard == "proj":
         proj.to_clipboard("\t")
+    elif clipboard == "dist":
+        d_df.to_clipboard("\t")
 
     if plot:
         cbm_set, vbm_set = None, None
-        if locpot and db_host:
+        if locpot:
             cbm_set = can.cbm + can.vacuum_locpot
             vbm_set = can.vbm + can.vacuum_locpot
         else:
@@ -47,26 +57,25 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
 if __name__ == '__main__':
     proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
     save_path = os.path.join(proj_path)
+    db_json = os.path.join(proj_path, "db.json")
 
     host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
     db_host_json = os.path.join(host_path, "db.json")
 
-    for dir_name in ["defect_states", "structures", "xlsx"]:
-        os.makedirs(os.path.join(save_path, dir_name), exist_ok=True)
+    # for dir_name in ["defect_states", "structures", "xlsx"]:
+    #     os.makedirs(os.path.join(save_path, dir_name), exist_ok=True)
     # path = '/Users/jeng-yuantsai/Research/qubit/My_manuscript/mx2_antisite_basic/defect_states'
     # db_json = "/Users/jeng-yuantsai/Research/qubit/My_manuscript/WSe_2/support/c2db_TMDC_search"
-    db_json = os.path.join(proj_path, "db.json")
     # db_json = '/Users/jeng-yuantsai/Research/qubit/My_manuscript/mx2_antisite_basic/db.json'
     # p1 = os.path.join(db_json, "db_WSe2_like_Ef_from_C2DB.json")
     # p2 = os.path.join(db_json, "db_c2db_tmdc_bglg1.json")
 
     main(
         db_json,
-        {"task_id": 934},
-        0, -2.2,
-        save_path,
-        False,
-        "tot",
+        {"task_id": 1004},
+        -2.261, -3.5,
+        proj_path,
         True,
+        "dist",
         db_host_json
     )

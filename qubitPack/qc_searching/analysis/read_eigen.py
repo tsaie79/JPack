@@ -140,18 +140,19 @@ class ProcarParse:
 
 
 class DetermineDefectState:
-    def __init__(self, show_edges, db, db_filter, cbm, vbm, save_fig_path, locpot=True, db_host=None):
+    def __init__(self, show_edges, db, db_filter, cbm, vbm, save_fig_path, locpot=None):
         db = VaspCalcDb.from_db_file(db)
 
         self.save_fig_path = save_fig_path
 
         self.entry = db.collection.find_one(db_filter)
+
         print("---task_id: %s---" % self.entry["task_id"])
 
-        if locpot and db_host:
+        if locpot:
             self.vacuum_locpot = max(self.entry["calcs_reversed"][0]["output"]["locpot"]["2"])
 
-            db_host = VaspCalcDb.from_db_file(db_host)
+            db_host = VaspCalcDb.from_db_file(locpot)
             self.entry_host = db_host.collection.find_one({"task_id": int(self.entry["pc_from"].split("/")[-1])})
             self.vacuum_locpot_host = max(self.entry_host["calcs_reversed"][2]["output"]["locpot"]["2"])
 
@@ -188,7 +189,7 @@ class DetermineDefectState:
                                                             self.efermi+self.vacuum_locpot,
                                                             ))
 
-    def get_candidates(self, div, kpoint=0, threshold=0.2, select_up=None, select_dn=None):
+    def get_candidates(self, kpoint=0, threshold=0.2, select_up=None, select_dn=None):
         # find promising eigenstates with (band_index, [energy, occupation])
         eigenvals = defaultdict(list)
         energy_range = None
@@ -216,46 +217,42 @@ class DetermineDefectState:
         # find promising states if total projection of nn is larger than 0.2
         promising_band = defaultdict(list)
         band_up_proj = []
-        band_dn_proj = []
         for band in eigenvals["1"]:
             total_proj = 0
             for ion_idx in self.nn:
                 total_proj += sum(self.proj_eigenvals["1"][kpoint][band[0]][ion_idx])
             if total_proj >= threshold:
-                print("band_index: {}".format(band[0]))
+                # print("band_index: {}".format(band[0]))
                 promising_band["1"].append((band[0], band[1], total_proj))
                 sheet_procar = defaultdict(list)
-                for ion_idx in self.nn:
-                    sheet_procar[ion_idx] = self.proj_eigenvals["1"][kpoint][band[0]][ion_idx]
-                sheet_procar["orbital"] = ['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']
-                df = pd.DataFrame(sheet_procar)
-                df["band_index"] = [band[0] for i in sheet_procar["orbital"]]
-                df["spin"] = ["up" for i in sheet_procar["orbital"]]
-                band_up_proj.append(df)
-                print(df)
+                for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
+                    test = {}
+                    for ion_idx in self.nn:
+                        test.update({ion_idx: self.proj_eigenvals["1"][kpoint][band[0]][ion_idx][idx]})
+                    test.update({"band_index": band[0]}) #
+                    test.update({"spin":"up"}) #
+                    test.update({"orbital":o})
+                    band_up_proj.append(test)
 
+        band_dn_proj = []
         for band in eigenvals["-1"]:
             total_proj = 0
             for ion_idx in self.nn:
                 total_proj += sum(self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx])
             if total_proj >= threshold:
-                print("band_index: {}".format(band[0]))
+                # print("band_index: {}".format(band[0]))
                 promising_band["-1"].append((band[0], band[1], total_proj))
-                sheet_procar = defaultdict(list)
-                for ion_idx in self.nn:
-                    sheet_procar[ion_idx] = self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx]
-                sheet_procar["orbital"] = ['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']
-                df = pd.DataFrame(sheet_procar)
-                df["band_index"] = [band[0] for i in sheet_procar["orbital"]]
-                df["spin"] = ["dn" for i in sheet_procar["orbital"]]
-                band_dn_proj.append(df)
-                print(df)
+                # sheet_procar = defaultdict(list)
+                for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
+                    test = {}
+                    for ion_idx in self.nn:
+                        test.update({ion_idx: self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx][idx]})
+                    test.update({"band_index": band[0]}) #
+                    test.update({"spin":"dn"}) #
+                    test.update({"orbital":o})
+                    band_dn_proj.append(test)
 
-        band_up_proj = pd.concat(band_up_proj)
-        band_dn_proj = pd.concat(band_dn_proj)
-
-
-        # mark states with occupation > 0.9
+        # Total defect states
         up_channel, dn_channel = None, None
         up = defaultdict(tuple)
         dn = defaultdict(tuple)
@@ -263,14 +260,12 @@ class DetermineDefectState:
             up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
         for i in promising_band["-1"]:
             dn[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
-        #up = dict([(round(i[1][0]-self.vacuum_locpot, 3), i[1][1] > 0.9) for i in promising_band["1"]])
-        #dn = dict([(round(i[1][0]-self.vacuum_locpot, 3), i[1][1] > 0.9) for i in promising_band["-1"]])
         sheet_up = defaultdict(list)
         sheet_up["band_index"] = list(up.keys())
         sheet_up["energy"] = [i[0] for i in up.values()]
         sheet_up["occupied"] = [i[1][0] for i in up.values()]
         sheet_up["tot_proj"] = [i[1][2] for i in up.values()]
-        sheet_up["# occ. e"] = [i[1][1] for i in up.values()]
+        sheet_up["n_occ_e"] = [i[1][1] for i in up.values()]
         sheet_up["spin"] = ["up" for i in range(len(up.keys()))]
 
         sheet_down = defaultdict(list)
@@ -278,7 +273,7 @@ class DetermineDefectState:
         sheet_down["energy"] = [i[0] for i in dn.values()]
         sheet_down["occupied"] = [i[1][0] for i in dn.values()]
         sheet_down["tot_proj"] = [i[1][2] for i in dn.values()]
-        sheet_down["# occ. e"] = [i[1][1] for i in dn.values()]
+        sheet_down["n_occ_e"] = [i[1][1] for i in dn.values()]
         sheet_down["spin"] = ["dn" for i in range(len(dn.keys()))]
 
         df_up = pd.DataFrame(sheet_up).set_index(["band_index"])
@@ -294,17 +289,6 @@ class DetermineDefectState:
         else:
             up_channel = df_up.sort_index(ascending=False)
             dn_channel = df_dn.sort_index(ascending=False)
-        print("up channel:\n{}".format(up_channel))
-        print("down channel:\n{}".format(dn_channel))
-        pd.concat([up_channel, dn_channel]).to_excel(os.path.join(self.save_fig_path, "xlsx", "{}_{}_{}.xlsx".format(
-            self.entry["formula_pretty"],
-            self.entry["task_id"],
-            self.entry["task_label"])))
-
-        pd.concat([df_up_proj, df_dn_proj]).to_excel(os.path.join(self.save_fig_path, "xlsx",  "{}_{}_{}.proj.xlsx".format(
-            self.entry["formula_pretty"],
-            self.entry["task_id"],
-            self.entry["task_label"])))
 
         if select_up and select_dn:
             up_levels = dict(zip(up_channel.loc[select_up, "energy"], up_channel.loc[select_up, "occupied"]))
@@ -317,25 +301,55 @@ class DetermineDefectState:
             eng = EnergyLevel(up_levels, dn_levels)
             fig = None
 
-
-        title = self.entry["task_label"]
         if self.show_edges == "band_edges":
             fig = eng.plotting(
                 round(self.vbm + self.vacuum_locpot, 3),
                 round(self.cbm + self.vacuum_locpot, 3)
             )
-            # plt.title("%s_%s_k%s_%s_%s_chg.%d" % (self.entry["formula_pretty"], title,
-            #          str(kpoint), str(threshold), str(round(self.vacuum_locpot, 3)), self.entry["charge_state"]))
 
-        # if self.show_edges:
-        #     fig = eng.plotting(round(self.show_edges[0]-self.vacuum_locpot_primitive, 3),
-        #                        round(self.show_edges[1]-self.vacuum_locpot_primitive, 3))
-        fig.savefig(os.path.join(self.save_fig_path, "defect_states", "{}_{}_{}.defect_states.png".format(
-            self.entry["formula_pretty"],
-            self.entry["task_id"],
-            self.entry["task_label"])))
+        if self.save_fig_path:
+            fig.savefig(os.path.join(self.save_fig_path, "defect_states", "{}_{}_{}.defect_states.png".format(
+                self.entry["task_id"],
+                self.entry["formula_pretty"],
+                self.entry["task_label"])))
 
-        return pd.concat([up_channel, dn_channel]), pd.concat([band_up_proj, band_dn_proj])
+        state_df = pd.concat([up_channel, dn_channel], ignore_index=True)
+        proj_state_df = pd.DataFrame(band_up_proj + band_dn_proj)
+
+        # depict defate states
+        ## up
+        up_states = state_df.loc[state_df["spin"] == "up"]
+        up_dist_from_vbm = up_states["energy"] - (self.vbm + self.vacuum_locpot)
+        up_dist_from_vbm = up_dist_from_vbm.round(3)
+        up_occ = up_states.loc[:, "n_occ_e"]
+        # print(list(up_dist_from_vbm))
+        ## dn
+        dn_states = state_df.loc[state_df["spin"] == "dn"]
+        dn_dist_from_vbm = dn_states["energy"] - (self.vbm + self.vacuum_locpot)
+        dn_dist_from_vbm = dn_dist_from_vbm.round(3)
+        dn_occ = dn_states.loc[:, "n_occ_e"]
+
+        d_df = pd.DataFrame(
+            [
+                {
+                    "up_from_vbm": list(up_dist_from_vbm),
+                    "up_occ": list(up_occ),
+                    "dn_from_vbm": list(dn_dist_from_vbm),
+                    "dn_occ": list(dn_occ),
+                }
+            ]
+        )
+        # highest_level_from_cbm = (self.cbm + self.vacuum_locpot) - highest_level
+        # lowest_level_from_vbm = lowest_level - (self.vbm + self.vacuum_locpot)
+        # highest_occupied_level_from_cbm = (self.cbm + self.vacuum_locpot) - highest_occupied_level
+        # highest_occupied_level_from_vbm = highest_occupied_level - (self.vbm + self.vacuum_locpot)
+        # d_df = pd.DataFrame([{"highest_from_cbm": highest_level_from_cbm,
+        #                       "lowest_from_vbm": lowest_level_from_vbm,
+        #                       "occ_level_from_cbm": highest_occupied_level_from_cbm,
+        #                       "occ_level_from_vbm": highest_occupied_level_from_vbm,
+        #                       }]).round(3)
+
+        return state_df, proj_state_df, d_df
 
     def get_degeneracy(self, threshold, energy_tolerence, kpoint=0):
         eigenvals = {"1": [], "-1": []}
