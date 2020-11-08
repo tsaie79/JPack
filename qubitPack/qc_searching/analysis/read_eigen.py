@@ -199,17 +199,17 @@ class DetermineDefectState:
         #     energy_range = [self.show_edges[0], self.show_edges[1]]
 
         try:
-            for i in self.eigenvals["1"][kpoint]:
+            for band_idx, i in enumerate(self.eigenvals["1"][kpoint]):
                 # (band_index, [energy, occupied])
                 if energy_range[1] > (i[0] - self.vacuum_locpot) > energy_range[0]:
-                    eigenvals["1"].append((self.eigenvals["1"][kpoint].index(i), i))
+                    eigenvals["1"].append((band_idx, i))
         except IndexError:
             print("Threshold of projection is too high!")
 
         try:
-            for i in self.eigenvals["-1"][kpoint]:
+            for band_idx, i in enumerate(self.eigenvals["-1"][kpoint]):
                 if energy_range[1] > (i[0] - self.vacuum_locpot) > energy_range[0]:
-                    eigenvals["-1"].append((self.eigenvals["-1"][kpoint].index(i), i))
+                    eigenvals["-1"].append((band_idx, i))
         except IndexError:
             print("Threshold of projection is too high!")
 
@@ -260,6 +260,7 @@ class DetermineDefectState:
             up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
         for i in promising_band["-1"]:
             dn[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
+
         sheet_up = defaultdict(list)
         sheet_up["band_index"] = list(up.keys())
         sheet_up["energy"] = [i[0] for i in up.values()]

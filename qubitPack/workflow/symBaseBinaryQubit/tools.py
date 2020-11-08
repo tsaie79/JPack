@@ -100,7 +100,7 @@ for e in list(es):
                 "dn_occ": d_df["dn_occ"][0]
             }
         )
-        # Criteria for formiing a good triplet defect center:
+        # Criteria for forming a good triplet defect center:
         # well-defined in-gap state: energetic difference of occupied states and vbm > 0.1
         sum_occ_up = 0
         for en_up, occ_up in zip(d_df["up_from_vbm"][0], d_df["up_occ"][0]):
@@ -186,14 +186,56 @@ df.to_clipboard("/t")
 #%% find structure
 from atomate.vasp.database import VaspCalcDb
 
+from pymatgen import Structure
+
 import numpy as np
 
 from matplotlib import pyplot as plt
 
+tid = 161
+host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
+db_host_json = os.path.join(host_path, "db.json")
 
-defect = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
-                                 'search_triplet_from_defect_db/db.json')
-defect.get_
+host = VaspCalcDb.from_db_file(db_host_json)
+e = host.collection.find_one({"task_id":tid})
+st = Structure.from_dict(e["input"]["structure"])
+formula = e["formula_pretty"]
+sym = e["c2db_info"]["spacegroup"]
+print(sym)
 
+st.to("poscar", os.path.join(host_path, "structures", "tid_{}_{}.vasp".format(tid, formula)))
+
+#%% print information for defect triplet in db
+from atomate.vasp.database import VaspCalcDb
+from pymatgen import Element
+import pandas as pd
+import os
+from collections import Counter
+import numpy as np
+from qubitPack.qc_searching.analysis.read_eigen import DetermineDefectState
+
+db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
+                             'search_triplet_from_defect_db/db.json')
+
+proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
+db_json = os.path.join(proj_path, "db.json")
+
+host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
+db_host_json = os.path.join(host_path, "db.json")
+
+es = db.collection.aggregate(
+    [
+        {"$match": {"task_label":"SCAN_scf", "chemsys":"Hf-S"}},
+        {"$group": {"_id":"$pc_from",
+                    "tid": {"$push": "$task_id"},
+                    "defect": {"$push": "$defect_entry.name"},
+                    "point_group": {"$push": "$output.spacegroup.point_group"},
+                    "mag": {"$push": "$calcs_reversed.output.outcar.total_magnetization"}
+                    }
+         },
+    ]
+)
+
+df = pd.DataFrame(es)
 
 

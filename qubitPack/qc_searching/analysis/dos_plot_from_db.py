@@ -81,7 +81,7 @@ class DosPlotDB:
                 self.e1["task_label"],
                 self.e1["task_id"]
             )), img_format="png")
-            plot.show()
+        plot.show()
 
         return plot
 

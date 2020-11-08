@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 from qubitPack.qc_searching.analysis.dos_plot_from_db import DB_CONFIG_PATH
 from glob import glob
 import os
+import pandas as pd
 import numpy as np
+from collections import Counter
 
 
-def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", locpot=None):
+def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", locpot=None, threshold=0.1):
     """
     When one is using "db_cori_tasks_local", one must set ssh-tunnel as following:
     "ssh -f tsaie79@cori.nersc.gov -L 2222:mongodb07.nersc.gov:27017 -N mongo -u 2DmaterialQuantumComputing_admin -p
@@ -19,10 +21,76 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
 
     tot, proj, d_df = can.get_candidates(
         0,
-        threshold=0.1,
+        threshold=threshold,
         select_up=None,
         select_dn=None
     )
+    e = {}
+    e.update(
+        {
+            "up_from_vbm": d_df["up_from_vbm"][0],
+            "up_occ": d_df["up_occ"][0],
+            "dn_from_vbm": d_df["dn_from_vbm"][0],
+            "dn_occ": d_df["dn_occ"][0]
+        }
+    )
+    # well-defined in-gap state: energetic difference of occupied states and vbm > 0.1
+    sum_occ_up = 0
+    for en_up, occ_up in zip(d_df["up_from_vbm"][0], d_df["up_occ"][0]):
+        if abs(en_up) > 0.1 and occ_up > 0.2:
+            sum_occ_up += occ_up
+    sum_occ_dn = 0
+    for en_dn, occ_dn in zip(d_df["dn_from_vbm"][0], d_df["dn_occ"][0]):
+        if abs(en_dn) > 0.1 and occ_dn > 0.2:
+            sum_occ_dn += occ_dn
+
+    e.update({"up_deg": list(Counter(np.around(e["up_from_vbm"], 2)).values()),
+              "dn_deg": list(Counter(np.around(e["dn_from_vbm"], 2)).values())})
+    if sum_occ_up > sum_occ_dn:
+        e.update({"triplet_from": "up"})
+    else:
+        e.update({"triplet_from": "dn"})
+
+    # Calculate plausible optical transition energy
+    for en_up, occ_up, idx in zip(d_df["up_from_vbm"][0], d_df["up_occ"][0], range(len(d_df["up_occ"][0]))):
+        if occ_up == 1 and idx != 0:
+            h_occ_en = en_up
+            l_unocc_en = d_df["up_from_vbm"][0][idx-1]
+            e.update({"up_tran_en": round(l_unocc_en - h_occ_en, 3)})
+            break
+        elif occ_up > 0 and idx != 0 and d_df["up_occ"][0][0] == 0:
+            h_occ_en = en_up
+            l_unocc_en = d_df["up_from_vbm"][0][idx-1]
+            e.update({"up_tran_en": round(l_unocc_en - h_occ_en, 3)})
+            break
+        elif occ_up > 0 and idx != 0 and d_df["up_occ"][0][0] != 0:
+            h_occ_en = d_df["up_from_vbm"][0][idx+1]
+            l_unocc_en = en_up
+            e.update({"up_tran_en": round(l_unocc_en - h_occ_en, 3)})
+            break
+        else:
+            e.update({"up_tran_en": 0})
+    for en_dn, occ_dn, idx in zip(d_df["dn_from_vbm"][0], d_df["dn_occ"][0], range(len(d_df["dn_occ"][0]))):
+
+        if occ_dn == 1 and idx != 0:
+            h_occ_en = en_dn
+            l_unocc_en = d_df["dn_from_vbm"][0][idx-1]
+            e.update({"dn_tran_en": round(l_unocc_en - h_occ_en, 3)})
+            break
+        elif occ_dn > 0 and idx != 0 and d_df["dn_occ"][0][0] == 0:
+            h_occ_en = en_dn
+            l_unocc_en = d_df["dn_from_vbm"][0][idx-1]
+            e.update({"dn_tran_en": round(l_unocc_en - h_occ_en, 3)})
+            break
+        elif occ_dn > 0 and idx != 0 and d_df["dn_occ"][0][0] != 0:
+            h_occ_en = d_df["dn_from_vbm"][0][idx+1]
+            l_unocc_en = en_dn
+            e.update({"dn_tran_en": round(l_unocc_en - h_occ_en, 3)})
+            break
+        else:
+            e.update({"dn_tran_en": 0})
+
+    d_df = pd.DataFrame([e])
     print(d_df)
     print("=="*20)
     print(proj)
@@ -30,6 +98,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
     print(tot)
     # print("=="*20)
     # print(d_df)
+
 
     if clipboard == "tot":
         tot.to_clipboard("\t")
@@ -52,7 +121,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
         print(dos_plot.nn)
         dos_plot.orbital_plot(dos_plot.nn[-1], 2, 2)
         plt.show()
-
+    return tot, proj, d_df
 
 if __name__ == '__main__':
     proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
@@ -70,12 +139,13 @@ if __name__ == '__main__':
     # p1 = os.path.join(db_json, "db_WSe2_like_Ef_from_C2DB.json")
     # p2 = os.path.join(db_json, "db_c2db_tmdc_bglg1.json")
 
-    main(
+    tot, proj, d_df = main(
         db_json,
-        {"task_id": 1004},
-        -2.261, -3.5,
-        proj_path,
+        {"task_id": 303},
+        0, -2.24,
+        None,
         True,
         "dist",
-        db_host_json
+        db_host_json,
+        0.05
     )
