@@ -154,7 +154,7 @@ class DetermineDefectState:
 
             db_host = VaspCalcDb.from_db_file(locpot)
             self.entry_host = db_host.collection.find_one({"task_id": int(self.entry["pc_from"].split("/")[-1])})
-            self.vacuum_locpot_host = max(self.entry_host["calcs_reversed"][2]["output"]["locpot"]["2"])
+            self.vacuum_locpot_host = max(self.entry_host["calcs_reversed"][0]["output"]["locpot"]["2"])
 
             self.cbm = self.entry_host["output"]["cbm"] - self.vacuum_locpot_host #A
             self.vbm = self.entry_host["output"]["vbm"] - self.vacuum_locpot_host
@@ -219,16 +219,26 @@ class DetermineDefectState:
         band_up_proj = []
         for band in eigenvals["1"]:
             total_proj = 0
+            adj_proj = 0
             for ion_idx in self.nn:
                 total_proj += sum(self.proj_eigenvals["1"][kpoint][band[0]][ion_idx])
+            for ion_adj_idx in self.nn[:-1]:
+                adj_proj += sum(self.proj_eigenvals["1"][kpoint][band[0]][ion_adj_idx])
+            antisite_proj = sum(self.proj_eigenvals["1"][kpoint][band[0]][self.nn[-1]])
             if total_proj >= threshold:
                 # print("band_index: {}".format(band[0]))
-                promising_band["1"].append((band[0], band[1], total_proj))
+                promising_band["1"].append((band[0], band[1], total_proj,
+                                            round(adj_proj/total_proj*100,2),
+                                            round(antisite_proj/total_proj*100,2)))
+
                 sheet_procar = defaultdict(list)
                 for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
                     test = {}
                     for ion_idx in self.nn:
-                        test.update({ion_idx: self.proj_eigenvals["1"][kpoint][band[0]][ion_idx][idx]})
+                        orbital_proj = self.proj_eigenvals["1"][kpoint][band[0]][ion_idx][idx]
+                        if orbital_proj < 1e-3:
+                            orbital_proj = None
+                        test.update({ion_idx: orbital_proj})
                     test.update({"band_index": band[0]}) #
                     test.update({"spin":"up"}) #
                     test.update({"orbital":o})
@@ -237,16 +247,25 @@ class DetermineDefectState:
         band_dn_proj = []
         for band in eigenvals["-1"]:
             total_proj = 0
+            adj_proj = 0
             for ion_idx in self.nn:
                 total_proj += sum(self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx])
+            for ion_adj_idx in self.nn[:-1]:
+                adj_proj += sum(self.proj_eigenvals["-1"][kpoint][band[0]][ion_adj_idx])
+            antisite_proj = sum(self.proj_eigenvals["-1"][kpoint][band[0]][self.nn[-1]])
             if total_proj >= threshold:
                 # print("band_index: {}".format(band[0]))
-                promising_band["-1"].append((band[0], band[1], total_proj))
+                promising_band["-1"].append((band[0], band[1], total_proj,
+                                            round(adj_proj/total_proj*100,2),
+                                            round(antisite_proj/total_proj*100,2)))
                 # sheet_procar = defaultdict(list)
                 for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
                     test = {}
                     for ion_idx in self.nn:
-                        test.update({ion_idx: self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx][idx]})
+                        orbital_proj = self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx][idx]
+                        if orbital_proj < 1e-3:
+                            orbital_proj = None
+                        test.update({ion_idx: orbital_proj})
                     test.update({"band_index": band[0]}) #
                     test.update({"spin":"dn"}) #
                     test.update({"orbital":o})
@@ -257,15 +276,17 @@ class DetermineDefectState:
         up = defaultdict(tuple)
         dn = defaultdict(tuple)
         for i in promising_band["1"]:
-            up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
+            up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
         for i in promising_band["-1"]:
-            dn[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.9, i[1][1], i[2]))
+            dn[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
 
         sheet_up = defaultdict(list)
         sheet_up["band_index"] = list(up.keys())
         sheet_up["energy"] = [i[0] for i in up.values()]
         sheet_up["occupied"] = [i[1][0] for i in up.values()]
         sheet_up["tot_proj"] = [i[1][2] for i in up.values()]
+        sheet_up["adj_proj"] = [i[1][3] for i in up.values()]
+        sheet_up["antisite_proj"] = [i[1][4] for i in up.values()]
         sheet_up["n_occ_e"] = [i[1][1] for i in up.values()]
         sheet_up["spin"] = ["up" for i in range(len(up.keys()))]
 
@@ -274,6 +295,8 @@ class DetermineDefectState:
         sheet_down["energy"] = [i[0] for i in dn.values()]
         sheet_down["occupied"] = [i[1][0] for i in dn.values()]
         sheet_down["tot_proj"] = [i[1][2] for i in dn.values()]
+        sheet_down["adj_proj"] = [i[1][3] for i in dn.values()]
+        sheet_down["antisite_proj"] = [i[1][4] for i in dn.values()]
         sheet_down["n_occ_e"] = [i[1][1] for i in dn.values()]
         sheet_down["spin"] = ["dn" for i in range(len(dn.keys()))]
 
@@ -310,11 +333,11 @@ class DetermineDefectState:
 
         if self.save_fig_path:
             fig.savefig(os.path.join(self.save_fig_path, "defect_states", "{}_{}_{}.defect_states.png".format(
-                self.entry["task_id"],
                 self.entry["formula_pretty"],
+                self.entry["task_id"],
                 self.entry["task_label"])))
 
-        state_df = pd.concat([up_channel, dn_channel], ignore_index=True)
+        state_df = pd.concat([up_channel, dn_channel], ignore_index=False)
         proj_state_df = pd.DataFrame(band_up_proj + band_dn_proj)
 
         # depict defate states
@@ -323,20 +346,25 @@ class DetermineDefectState:
         up_dist_from_vbm = up_states["energy"] - (self.vbm + self.vacuum_locpot)
         up_dist_from_vbm = up_dist_from_vbm.round(3)
         up_occ = up_states.loc[:, "n_occ_e"]
-        # print(list(up_dist_from_vbm))
+        up_band_index = up_states.index
+
         ## dn
         dn_states = state_df.loc[state_df["spin"] == "dn"]
         dn_dist_from_vbm = dn_states["energy"] - (self.vbm + self.vacuum_locpot)
         dn_dist_from_vbm = dn_dist_from_vbm.round(3)
         dn_occ = dn_states.loc[:, "n_occ_e"]
+        dn_band_index = dn_states.index
+
 
         d_df = pd.DataFrame(
             [
                 {
-                    "up_from_vbm": list(up_dist_from_vbm),
-                    "up_occ": list(up_occ),
-                    "dn_from_vbm": list(dn_dist_from_vbm),
-                    "dn_occ": list(dn_occ),
+                    "up_from_vbm": up_dist_from_vbm.to_list(),
+                    "up_occ": up_occ.to_list(),
+                    "dn_from_vbm": dn_dist_from_vbm.to_list(),
+                    "dn_occ": dn_occ.to_list(),
+                    "up_band_idx": up_band_index.to_list(),
+                    "dn_band_idx": dn_band_index.to_list()
                 }
             ]
         )
