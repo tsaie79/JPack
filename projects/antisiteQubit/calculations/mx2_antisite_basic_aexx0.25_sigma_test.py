@@ -8,7 +8,7 @@ host_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/mx2_antisi
 db_host_json = os.path.join(host_path, "db.json")
 
 perturb = None
-chem = "Se-W"
+chem = "Mo-S"
 tot, proj, d_df = get_defect_state(
     db_json,
     {"task_label":"HSE_scf", "chemsys":chem, "perturbed":perturb},
@@ -82,4 +82,7 @@ e = pd.concat([e1,e2], axis=1).round(3)
 e["dE"] = e["energy"] - e["energy_perturb"]
 # e1 = db1.find_one({"task_id": 4256})["output"]["energy"]
 # e2 = db2.find_one({"task_id": 481})["output"]["energy"]
-
+"""
+MoS2 has little splitting on x2-y2 and xy, and z2 is occupied. I don't think this is a ground state based on 
+large energetic difference between C3v and Ch.
+"""
