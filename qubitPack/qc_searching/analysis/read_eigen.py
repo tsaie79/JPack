@@ -300,10 +300,16 @@ class DetermineDefectState:
         sheet_down["n_occ_e"] = [i[1][1] for i in dn.values()]
         sheet_down["spin"] = ["dn" for i in range(len(dn.keys()))]
 
-        df_up = pd.DataFrame(sheet_up).set_index(["band_index"])
-        df_dn = pd.DataFrame(sheet_down).set_index(["band_index"])
-        df_up_proj = pd.DataFrame(band_up_proj).set_index(["band_index"])
-        df_dn_proj = pd.DataFrame(band_dn_proj).set_index(["band_index"])
+        df_up, df_up_proj = pd.DataFrame(sheet_up), pd.DataFrame(band_up_proj)
+        if len(sheet_up["band_index"]) != 0:
+            df_up = df_up.set_index(["band_index"])
+            df_up_proj = df_up_proj.set_index(["band_index"])
+
+        df_dn, df_dn_proj = pd.DataFrame(sheet_down), pd.DataFrame(band_dn_proj)
+        if len(sheet_down["band_index"]) != 0:
+            df_dn = df_dn.set_index(["band_index"])
+            df_dn_proj = df_dn_proj.set_index(["band_index"])
+
         if select_up and select_dn:
             up_channel = df_up.loc[select_up, :].sort_index(ascending=False)
             dn_channel = df_dn.loc[select_dn, :].sort_index(ascending=False)

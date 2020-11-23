@@ -15,9 +15,9 @@ perturb = 0.005
 chem = "S-W"
 tot, proj, d_df = get_defect_state(
     db_json,
-    {"task_label":"PBE_relax", "chemsys":chem, "perturbed":perturb},
+    {"task_label":"HSE_scf", "chemsys":chem, "perturbed":perturb},
     5,-5,
-    os.path.join(proj_path, chem),
+    None,#os.path.join(proj_path, chem),
     True,
     "dist",
     db_host_json,
@@ -41,7 +41,7 @@ db = VaspCalcDb.from_db_file(db_json)
 
 es = db.collection.aggregate(
     [
-        {"$match": {"task_label":"PBE_relax"}},
+        {"$match": {"task_label":"HSE_scf"}},
         {"$group": {"_id":"$output.spacegroup.point_group",
                     "tid": {"$push": "$task_id"},
                     "defect": {"$push": "$defect_entry.name"},
@@ -55,10 +55,11 @@ es = db.collection.aggregate(
 df = pd.DataFrame(es)
 df = df.transpose()
 
-mos2_473 = db.collection.find_one({"task_id":473})
-init = Structure.from_dict(mos2_473["input"]["structure"])
-final = Structure.from_dict(mos2_473["output"]["structure"])
-init.to("poscar", proj_path+"/{}_{}_init.vasp".format(mos2_473["formula_pretty"], mos2_473["task_id"]))
-final.to("poscar", proj_path+"/{}_{}_final.vasp".format(mos2_473["formula_pretty"], mos2_473["task_id"]))
-for idx in mos2_473["NN"][:-1]:
+e = db.collection.find_one({"task_id":481})
+init = Structure.from_dict(e["input"]["structure"])
+final = Structure.from_dict(e["output"]["structure"])
+init.to("poscar", proj_path+"/{}_{}_init.vasp".format(e["formula_pretty"], e["task_id"]))
+final.to("poscar", proj_path+"/{}_{}_final.vasp".format(e["formula_pretty"], e["task_id"]))
+for idx in e["NN"][:-1]:
     print(idx, init.get_distance(25, idx), final.get_distance(25,idx))
+print(e["output"]["energy"])

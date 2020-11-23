@@ -78,8 +78,8 @@ class DosPlotDB:
         if self.path_save_fig:
             plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.tdos.png".format(
                 self.e1["formula_pretty"],
+                self.e1["task_id"],
                 self.e1["task_label"],
-                self.e1["task_id"]
             )), img_format="png")
         plot.show()
 
@@ -132,13 +132,12 @@ class DosPlotDB:
             # plotly_plot = tls.mpl_to_plotly(fig)
             # plotly.offline.plot(plotly_plot, filename=os.path.join("procar.html"))
             plot.title(title+" site PDOS"+" Charge state:%d" % self.e1["charge_state"])
-
             if self.path_save_fig:
                 plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.pdos.png".format(
                     title,
                     self.e1["task_id"],
                     self.e1["task_label"])), img_format="png")
-
+            plot.show()
             return plot
 
         def spd_plots():
@@ -159,12 +158,13 @@ class DosPlotDB:
             plot.legend()
             plot.axvline(x=self.cbm_primitive, color="k", linestyle="--")
             plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
+            plot.show()
+            return plot
 
         if spd:
             spd_plots()
         else:
-            plot = sites_total_plots()
-            return plot
+            sites_total_plots()
 
 # def main():
 #     d = DosPlotDB(db1="db_w1te2_040752_local", db2=None, db0=None,

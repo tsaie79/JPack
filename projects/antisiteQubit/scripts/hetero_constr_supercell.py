@@ -118,5 +118,5 @@ for line in input:
 	
 	s=Structure.from_file('POSCAR')
 	Poscar(s).write_file('POSCAR')
-	os.chdir('../')
+	os.chdir('../../../qubitPack/')
 input.close()

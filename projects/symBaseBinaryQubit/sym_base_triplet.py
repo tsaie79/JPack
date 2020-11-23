@@ -1,4 +1,4 @@
-from qubitPack.workflow.tool_box import *
+from qubitPack.tool_box import *
 
 from fireworks import LaunchPad, Workflow
 
@@ -9,14 +9,13 @@ from atomate.vasp.powerups import (
     add_additional_fields_to_taskdocs,
     preserve_fworker,
     add_modify_incar,
-    add_modify_kpoints,
     set_queue_options,
     set_execution_options,
     clean_up_files
 )
 
 from pymatgen import Structure
-from pymatgen.io.vasp.sets import MPScanRelaxSet, MPHSERelaxSet
+from pymatgen.io.vasp.sets import MPScanRelaxSet
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 

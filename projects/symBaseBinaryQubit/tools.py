@@ -185,14 +185,14 @@ df.to_clipboard("/t")
 
 #%% find structure
 from atomate.vasp.database import VaspCalcDb
-
+import os
 from pymatgen import Structure
-
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 import numpy as np
 
 from matplotlib import pyplot as plt
 
-tid = 161
+tid = 54
 host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
 db_host_json = os.path.join(host_path, "db.json")
 
@@ -201,7 +201,7 @@ e = host.collection.find_one({"task_id":tid})
 st = Structure.from_dict(e["input"]["structure"])
 formula = e["formula_pretty"]
 sym = e["c2db_info"]["spacegroup"]
-print(sym)
+sym_data = SpacegroupAnalyzer(st).get_symmetry_dataset()
 
 st.to("poscar", os.path.join(host_path, "structures", "tid_{}_{}.vasp".format(tid, formula)))
 
@@ -217,15 +217,10 @@ from qubitPack.qc_searching.analysis.read_eigen import DetermineDefectState
 db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
                              'search_triplet_from_defect_db/db.json')
 
-proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
-db_json = os.path.join(proj_path, "db.json")
-
-host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
-db_host_json = os.path.join(host_path, "db.json")
 
 es = db.collection.aggregate(
     [
-        {"$match": {"task_label":"SCAN_scf", "chemsys":"Hf-S"}},
+        {"$match": {"task_label":"SCAN_scf", "chemsys":"S-W"}},
         {"$group": {"_id":"$pc_from",
                     "tid": {"$push": "$task_id"},
                     "defect": {"$push": "$defect_entry.name"},
@@ -237,5 +232,30 @@ es = db.collection.aggregate(
 )
 
 df = pd.DataFrame(es)
+df = df.transpose()
 
+
+
+#%% plot dos
+from pymatgen import Orbital
+from pymatgen.electronic_structure.plotter import DosPlotter
+import numpy as no
+
+db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
+                             'search_triplet_from_defect_db/db.json')
+
+comp_dos = db.get_dos(303)
+
+projection_d = dict(zip(["s", "xy", "yz", "z2", "xz", "x2-y2"],
+                      [comp_dos.get_site_orbital_dos(
+                          comp_dos.structure.sites[25], Orbital(j)) for j in [0]+ list(range(4, 9))]))
+
+projection_sp = dict(zip(["s", "y", "z", "x"],
+                      [comp_dos.get_site_orbital_dos(
+                          comp_dos.structure.sites[28], Orbital(j)) for j in range(0, 5)]))
+print(comp_dos.structure.sites[27])
+dos_plotter = DosPlotter(stack=False)
+dos_plotter.add_dos_dict(projection_d)
+plt = dos_plotter.get_plot([-8, 8])
+plt.show()
 

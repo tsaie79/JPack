@@ -9,7 +9,7 @@ import numpy as np
 from collections import Counter
 
 
-def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", locpot=None, threshold=0.1):
+def get_defect_state(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", locpot=None, threshold=0.1):
     """
     When one is using "db_cori_tasks_local", one must set ssh-tunnel as following:
     "ssh -f tsaie79@cori.nersc.gov -L 2222:mongodb07.nersc.gov:27017 -N mongo -u 2DmaterialQuantumComputing_admin -p
@@ -18,7 +18,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
 
     can = DetermineDefectState(db=db, db_filter=db_filter, cbm=cbm, vbm=vbm, show_edges="band_edges",
                                save_fig_path=path_save_fig, locpot=locpot)
-
+    # can.nn = [25, 26, 31, 30, 29, 49, 45]
     tot, proj, d_df = can.get_candidates(
         0,
         threshold=threshold,
@@ -28,8 +28,10 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
     e = {}
     e.update(
         {
+            "up_band_idx": d_df["up_band_idx"][0],
             "up_from_vbm": d_df["up_from_vbm"][0],
             "up_occ": d_df["up_occ"][0],
+            "dn_band_idx": d_df["dn_band_idx"][0],
             "dn_from_vbm": d_df["dn_from_vbm"][0],
             "dn_occ": d_df["dn_occ"][0]
         }
@@ -90,7 +92,7 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
         else:
             e.update({"dn_tran_en": 0})
 
-    d_df = pd.DataFrame([e])
+    d_df = pd.DataFrame([e]).transpose()
     print(d_df)
     print("=="*20)
     print(proj)
@@ -116,19 +118,32 @@ def main(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", loc
             cbm_set = cbm
             vbm_set = vbm
         dos_plot = DosPlotDB(db=db, db_filter=db_filter, cbm=cbm_set, vbm=vbm_set, path_save_fig=path_save_fig)
-        dos_plot.sites_plots(energy_upper_bound=2, energy_lower_bound=2)
+        # dos_plot.nn = [25, 26, 31, 30, 29, 49, 45]
         dos_plot.total_dos(energy_upper_bound=2, energy_lower_bound=2)
         print(dos_plot.nn)
+        dos_plot.sites_plots(energy_upper_bound=2, energy_lower_bound=2)
         dos_plot.orbital_plot(dos_plot.nn[-1], 2, 2)
-        plt.show()
+        # plt.show()
+
+        if path_save_fig:
+            for df, df_name in zip([tot, proj, d_df], ["tot", "proj", "d_state"]):
+                path = os.path.join(path_save_fig, "xlsx", "{}_{}_{}_{}.xlsx".format(
+                    can.entry["formula_pretty"],
+                    can.entry["task_id"],
+                    can.entry["task_label"],
+                    df_name
+                ))
+                df.to_excel(path)
+
     return tot, proj, d_df
 
 if __name__ == '__main__':
-    proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
-    save_path = os.path.join(proj_path)
+    # proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
+    proj_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/mx2_antisite_basic_aexx0.25_sigma_test"
     db_json = os.path.join(proj_path, "db.json")
 
-    host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
+    # host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
+    host_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/mx2_antisite_pc"
     db_host_json = os.path.join(host_path, "db.json")
 
     # for dir_name in ["defect_states", "structures", "xlsx"]:
@@ -139,13 +154,14 @@ if __name__ == '__main__':
     # p1 = os.path.join(db_json, "db_WSe2_like_Ef_from_C2DB.json")
     # p2 = os.path.join(db_json, "db_c2db_tmdc_bglg1.json")
 
-    tot, proj, d_df = main(
+    tot, proj, d_df = get_defect_state(
         db_json,
-        {"task_id": 303},
-        0, -2.24,
-        None,
+        {"task_id": 4261},
+        5,-5,
+        False,
         True,
         "dist",
         db_host_json,
-        0.05
+        0.1
     )
+    tot.to_clipboard()

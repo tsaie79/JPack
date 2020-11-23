@@ -1,25 +1,21 @@
-from qubitPack.workflow.tool_box import *
+from qubitPack.tool_box import *
 
 from fireworks import LaunchPad, Workflow
 
 from atomate.vasp.database import VaspCalcDb
-from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_hse, get_wf_full_scan
-from atomate.vasp.workflows.presets.core import wf_bandstructure
+from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_scan
 from atomate.vasp.fireworks.core import ScanOptimizeFW
 from atomate.vasp.powerups import (
     add_additional_fields_to_taskdocs,
     preserve_fworker,
     add_modify_incar,
-    add_modify_kpoints,
     set_queue_options,
     set_execution_options,
     clean_up_files
 )
 
 from pymatgen import Structure
-from pymatgen.io.vasp.inputs import Kpoints
 from pymatgen.io.vasp.sets import MPScanRelaxSet, MPRelaxSet
-from pymatgen.symmetry.bandstructure import HighSymmKpath
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 
@@ -61,7 +57,7 @@ def relax_pc():
             lpad.add_wf(wf)
 
 
-def binary_scan_defect(cat="binary_defect", impurity_on_nn=None): #BN_vac
+def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", impurity_on_nn=None): #BN_vac
     lpad = LaunchPad.from_file(
         os.path.join(
             os.path.expanduser("~"),
@@ -73,13 +69,13 @@ def binary_scan_defect(cat="binary_defect", impurity_on_nn=None): #BN_vac
 
     mx2s = col.find(
         {
-            "nsites": 3
+            "nsites": 4
         }
     )
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s[110:150]:
+    for mx2 in mx2s[:1]:
         pc = Structure.from_dict(mx2["output"]["structure"])
         if mx2["nsites"] == 2:
             geo_spec = {25*2: [20]}
@@ -104,15 +100,12 @@ def binary_scan_defect(cat="binary_defect", impurity_on_nn=None): #BN_vac
 
         print(good_sym_site_symbols)
         for good_sym_site_symbol in good_sym_site_symbols:
-            # defect_type = ("vacancies", "{}".format(good_sym_site_symbol))
-            defect_type = ("substitutions", "{}".format(good_sym_site_symbol))
+            # substitutions or vacancies
+            defect_type = (defect_choice, "{}".format(good_sym_site_symbol))
+
             for de_idx in range(len(defect[defect_type[0]])):
                 print(cation, anion)
 
-                # antisite
-                # if defect_type[1] == "_".join(defect[defect_type[0]][de_idx]["name"].split("_")[-1]):
-
-                # vacancy
                 if defect_type[1] == defect[defect_type[0]][de_idx]["name"].split("_")[-1]:
                     for na, thicks in geo_spec.items():
                         for thick in thicks:
@@ -129,19 +122,20 @@ def binary_scan_defect(cat="binary_defect", impurity_on_nn=None): #BN_vac
                                 # add charge state regarding nelect
                                 charge, nupdn = None, None
                                 if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
-                                    charge = [1,-1]#[1,-1, 0]
-                                    nupdn = [-1,-1]#[-1,-1,-1]
+                                    charge = [1,-1, 0]
+                                    nupdn = [-1,-1,-1]
                                     print(charge)
                                     # if odd nelect, it used to be charge=[0]
                                 else:
-                                    continue
-                                    # charge = [0]
-                                    # nupdn = [-1]
+                                    # continue
+                                    charge = [0]
+                                    nupdn = [-1]
 
                                 wf = get_wf_full_scan(
                                     structure=gen_defect.defect_st,
                                     charge_states=charge,
                                     gamma_only=False,
+                                    gamma_mesh=True,
                                     dos=True,
                                     nupdowns=nupdn,
                                     encut=enmax,
@@ -151,7 +145,9 @@ def binary_scan_defect(cat="binary_defect", impurity_on_nn=None): #BN_vac
                                         "NN_dist": gen_defect.nn_dist,
                                         "defect_entry": defect_data,
                                     },
-                                    wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick)
+                                    wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
+                                    task="scan_relax-scan_scf",
+                                    category=cat,
                                 )
 
                                 def kpoints(kpts):
