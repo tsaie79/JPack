@@ -8,7 +8,7 @@ host_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/mx2_antisi
 db_host_json = os.path.join(host_path, "db.json")
 
 perturb = None
-chem = "S-W"
+chem = "Se-W"
 tot, proj, d_df = get_defect_state(
     db_json,
     {"task_label":"HSE_scf", "chemsys":chem, "perturbed":perturb},
@@ -35,6 +35,9 @@ db1 = VaspCalcDb.from_db_file(os.path.join(p1, "db.json"))
 p2 = "/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/perturbed"
 db2 = VaspCalcDb.from_db_file(os.path.join(p2, "db.json"))
 
+p3 = "/Users/jeng-yuantsai/Research/project/qubit/calculations/mx2_antisite_basic_aexx0.25_final"
+db3 = VaspCalcDb.from_db_file(os.path.join(p3, "db.json"))
+
 e1 = db1.collection.aggregate(
     [
         {"$match": {"task_label":"HSE_scf"}},
@@ -42,6 +45,7 @@ e1 = db1.collection.aggregate(
             "_id":0,
             "energy": "$output.energy",
             "chem": "$chemsys",
+            "tid": "$task_id"
         },
         }
     ]
@@ -57,10 +61,24 @@ e2 = db2.collection.aggregate(
         }
     ]
 )
+e3 = db3.collection.aggregate(
+    [
+        {"$match": {"task_label":"HSE_scf", "nupdown_set":2}},
+        {"$project":{
+            "_id":0,
+            "energy_no_sigma": "$output.energy",
+            "chem": "$chemsys",
+        },
+        }
+    ]
+)
+
 
 e1 = pd.DataFrame(list(e1)).set_index("chem")
 e2 = pd.DataFrame(list(e2)).set_index("chem")
-e = pd.concat([e1,e2], axis=1)
+e3 = pd.DataFrame(list(e3)).set_index("chem")
+
+e = pd.concat([e1,e2], axis=1).round(3)
 e["dE"] = e["energy"] - e["energy_perturb"]
 # e1 = db1.find_one({"task_id": 4256})["output"]["energy"]
 # e2 = db2.find_one({"task_id": 481})["output"]["energy"]

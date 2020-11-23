@@ -140,7 +140,7 @@ class ProcarParse:
 
 
 class DetermineDefectState:
-    def __init__(self, show_edges, db, db_filter, cbm, vbm, save_fig_path, locpot=None):
+    def __init__(self, db, db_filter, cbm, vbm, save_fig_path, locpot=None):
         db = VaspCalcDb.from_db_file(db)
 
         self.save_fig_path = save_fig_path
@@ -182,7 +182,7 @@ class DetermineDefectState:
         self.nn = self.entry["NN"]
         self.proj_eigenvals = db.get_proj_eigenvals(self.entry["task_id"])
         self.eigenvals = db.get_eigenvals(self.entry["task_id"])
-        self.show_edges = show_edges
+
         print("total_mag:{:.3f}".format(self.entry["calcs_reversed"][0]["output"]["outcar"]["total_magnetization"]))
         print("cbm:{:.3f}, vbm:{:.3f}, efermi:{:.3f}".format(self.cbm+self.vacuum_locpot,
                                                             self.vbm+self.vacuum_locpot,
@@ -192,11 +192,7 @@ class DetermineDefectState:
     def get_candidates(self, kpoint=0, threshold=0.2, select_up=None, select_dn=None):
         # find promising eigenstates with (band_index, [energy, occupation])
         eigenvals = defaultdict(list)
-        energy_range = None
-        if self.show_edges == "band_edges":
-            energy_range = [self.vbm-0.1, self.cbm+0.1]
-        # elif self.show_edges == "band_edges":
-        #     energy_range = [self.show_edges[0], self.show_edges[1]]
+        energy_range = [self.vbm, self.cbm]
 
         try:
             for band_idx, i in enumerate(self.eigenvals["1"][kpoint]):
@@ -331,11 +327,10 @@ class DetermineDefectState:
             eng = EnergyLevel(up_levels, dn_levels)
             fig = None
 
-        if self.show_edges == "band_edges":
-            fig = eng.plotting(
-                round(self.vbm + self.vacuum_locpot, 3),
-                round(self.cbm + self.vacuum_locpot, 3)
-            )
+        fig = eng.plotting(
+            round(self.vbm + self.vacuum_locpot, 3),
+            round(self.cbm + self.vacuum_locpot, 3)
+        )
 
         if self.save_fig_path:
             fig.savefig(os.path.join(self.save_fig_path, "defect_states", "{}_{}_{}.defect_states.png".format(

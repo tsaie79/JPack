@@ -16,8 +16,7 @@ def get_defect_state(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboar
     tsaie79 localhost:2222/2DmaterialQuantumComputing"
     """
 
-    can = DetermineDefectState(db=db, db_filter=db_filter, cbm=cbm, vbm=vbm, show_edges="band_edges",
-                               save_fig_path=path_save_fig, locpot=locpot)
+    can = DetermineDefectState(db=db, db_filter=db_filter, cbm=cbm, vbm=vbm, save_fig_path=path_save_fig, locpot=locpot)
     # can.nn = [25, 26, 31, 30, 29, 49, 45]
     tot, proj, d_df = can.get_candidates(
         0,
