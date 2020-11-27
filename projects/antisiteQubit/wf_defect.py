@@ -1,9 +1,9 @@
 from fireworks import Workflow
 from fireworks import LaunchPad
 
-from atomate.vasp.powerups import add_namefile, add_additional_fields_to_taskdocs, preserve_fworker,\
-    add_modify_incar, add_modify_kpoints, set_queue_options, set_execution_options
+from atomate.vasp.powerups import *
 from atomate.vasp.fireworks.core import OptimizeFW, StaticFW, ScanOptimizeFW
+from atomate.vasp.fireworks.jcustom import *
 from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_hse
 from atomate.vasp.config import RELAX_MAX_FORCE
 from atomate.vasp.database import VaspCalcDb
@@ -21,9 +21,9 @@ from unfold import find_K_from_k
 import math
 from qubitPack.tool_box import *
 
-CATEGORY = "perturbed"
+CATEGORY = "mx2_antisite_basic_aexx0.25_cdft"
 LPAD = LaunchPad.from_file(
-    os.path.join(os.path.expanduser("~"), "config/project/antisiteQubit/{}/my_launchpad.yaml".format(CATEGORY)))
+    os.path.join(os.path.expanduser("~"), "config/category/{}/my_launchpad.yaml".format(CATEGORY)))
 
 
 class HostWF:
@@ -639,7 +639,6 @@ class DefectWF:
 
 class ZPLWF:
     def __init__(self, prev_calc_dir, spin_config):
-        self.lpad = LaunchPad.auto_load()
         self.prev_calc_dir = prev_calc_dir
         structure = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).structure
         if structure.site_properties["magmom"]:
@@ -648,9 +647,17 @@ class ZPLWF:
         self.nelect = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).nelect
         self.spin_config = spin_config
 
-    def cdft_hse_scf_or_relax_wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False,
-                                 read_structure_from=None, encut=320, up_band_occ=None, dn_band_occ=None,
-                                 selective_dyn=None):
+    def set_selective_sites(self, center_n, distance):
+        selective_dyn = []
+        for i in self.structure.get_sites_in_sphere(self.structure[center_n].coords, distance, include_image=True):
+            for idx, site in enumerate(self.structure.sites):
+                if np.allclose(i[0].frac_coords-i[2], site.frac_coords):
+                    selective_dyn.append(idx)
+        return selective_dyn
+
+    def wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False
+           , encut=320, selective_dyn=None):
+
         kpoint_setting = "G" if gamma_only else "R"
         user_kpoints_settings = Kpoints.gamma_automatic() if gamma_only else Kpoints.from_dict(
             {
@@ -677,32 +684,18 @@ class ZPLWF:
             "BMIX_MAG": 0.0001
         }
 
-        cdft_incar_part = {
-            "ISMEAR": -2,
-            "FERWE": up_occupation,
-            "FERDO": down_occupation,
-            "LDIAG": False,
-            "LSUBROT": False,
-            "TIME": 0.4,
-            "ALGO": "All"
-        }
-        if nbands:
-            cdft_incar_part.update({"NBANDS": nbands})
-
         uis_static = {
             "user_incar_settings":
                 {
                     "ENCUT": encut,
                     "ICHARG": 0,
                     "EDIFF": 1E-5,
-                    "ISMEAR": 0,
                     "LCHARG": False,
                     "LWAVE": False,
                     "ISTART": 1,
                     "NELM": 100,
                     "NELECT": self.nelect-charge,
                     "NSW": 0,
-                    "LASPH": True
                 },
             "user_kpoints_settings": user_kpoints_settings
         }
@@ -713,94 +706,53 @@ class ZPLWF:
                     "ENCUT": encut,
                     "ICHARG": 0,
                     "ISIF": 2,
-                    "EDIFF": 1E-5,
-                    "EDIFFG": -0.01,
-                    "ISMEAR": 0,
+                    "EDIFF": 1E-4,
+                    "EDIFFG": -0.02,
                     "LCHARG": False,
                     "LWAVE": False,
                     "ISTART": 1,
                     "NELM": 250,
                     "NELECT": self.nelect - charge,
                     "NSW": 240,
-                    "LASPH": True
                 },
             "user_kpoints_settings": user_kpoints_settings
         }
 
         wf = []
-        if task == "B":
+        if task == "test":
             uis = copy.deepcopy(uis_static)
             uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            cdft_B = HSEcDFTFW(
+            uis["user_incar_settings"].update({"LWAVE": True})
+            cdft_B = JHSEcDFTFW(
                 structure=self.structure,
-                read_structure_from=read_structure_from,
+                up_occupation=up_occupation,
+                down_occupation=down_occupation,
+                nbands=nbands,
                 prev_calc_dir=self.prev_calc_dir,
                 vasp_input_set_params=uis,
                 selective_dynamics=None,
                 name="CDFT-B-HSE_scf",
                 vasptodb_kwargs={
                     "additional_fields": {
-                        "task_type": "HSEcDFTFW-B"
+                        "task_type": "JHSEcDFTFW"
                     }
                 }
             )
-            wf.append(cdft_B)
 
-        elif task == "C":
             uis = copy.deepcopy(uis_relax)
             uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            uis["user_incar_settings"].update({"LCHARG": False})
-            cdft_C = HSEcDFTFW(
+            cdft_C = JHSEcDFTFW(
                 structure=self.structure,
+                up_occupation=up_occupation,
+                down_occupation=down_occupation,
+                nbands=nbands,
                 vasp_input_set_params=uis,
-                read_structure_from=read_structure_from,
-                prev_calc_dir=self.prev_calc_dir,
                 selective_dynamics=selective_dyn,
+                parents=cdft_B,
                 name="CDFT-C-HSE_relax",
                 vasptodb_kwargs={
                     "additional_fields": {
-                        "task_type": "HSEcDFTFW-C"
-                    }
-                }
-            )
-            wf.append(cdft_C)
-
-        elif task == "D":
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            cdft_D = HSEcDFTFW(
-                structure=self.structure,
-                read_structure_from=read_structure_from,
-                prev_calc_dir=self.prev_calc_dir,
-                auto_cdft=False,
-                vasp_input_set_params=uis,
-                name="CDFT-D-HSE_scf",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "HSEcDFTFW-D"
-                    }
-                }
-            )
-            wf.append(cdft_D)
-
-        elif task == "C-D":
-            uis = copy.deepcopy(uis_relax)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            uis["user_incar_settings"].update({"LCHARG": False})
-            cdft_C = HSEcDFTFW(
-                structure=self.structure,
-                vasp_input_set_params=uis,
-                read_structure_from=read_structure_from,
-                prev_calc_dir=self.prev_calc_dir,
-                selective_dynamics=selective_dyn,
-                name="CDFT-C-HSE_relax",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "HSEcDFTFW-C"
+                        "task_type": "JHSEcDFTFW"
                     }
                 }
             )
@@ -808,129 +760,55 @@ class ZPLWF:
             uis = copy.deepcopy(uis_static)
             uis["user_incar_settings"].update(hse_incar_part)
             uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
-            cdft_D = HSEStaticFW(
+            cdft_D = JHSEStaticFW(
                 structure=self.structure,
                 parents=cdft_C,
                 vasp_input_set_params=uis,
-                name="cdft-D-HSE_scf",
-                cp_chargcar=False,
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "HSEStaticFW-D"
-                    }
-                }
-            )
-
-            wf.append(cdft_C)
-            wf.append(cdft_D)
-
-        elif task == "all":
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            cdft_B = HSEcDFTFW(
-                structure=self.structure,
-                read_structure_from=read_structure_from,
-                prev_calc_dir=self.prev_calc_dir,
-                vasp_input_set_params=uis,
-                max_force_threshold=None,
-                name="CDFT-B-HSE_scf",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "HSEcDFTFW-B"
-                    }
-                }
-            )
-
-            uis = copy.deepcopy(uis_relax)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            uis["user_incar_settings"].update({"LCHARG": True})
-            cdft_C_prime = PBEcDFTRelaxFW(
-                structure=self.structure,
-                vasp_input_set_params=uis,
-                prev_calc_dir=self.prev_calc_dir,
-                name="CDFT-C-PBE_relax",
-                vasptodb_kwargs={
-                    "additional_fields":{
-                        "task_type": "PBEcDFTRelaxFW-C"
-                    }
-                }
-            )
-
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update({"LWAVE": True})
-            uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
-            cdft_C = HSEStaticFW(
-                    structure=self.structure,
-                    parents=cdft_C_prime,
-                    vasp_input_set_params=uis,
-                    name="CDFT-C-HSE_scf",
-                    cp_chargcar=True,
-                    vasptodb_kwargs={
-                        "additional_fields":{
-                            "task_type": "HSEStaticFW-C"
-                        }
-                    }
-                )
-
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            cdft_D = HSEcDFTFW(
-                structure=self.structure,
-                read_structure_from=read_structure_from,
-                prev_calc_dir=self.prev_calc_dir,
-                vasp_input_set_params=uis,
-                max_force_threshold=RELAX_MAX_FORCE,
                 name="CDFT-D-HSE_scf",
-                auto_cdft=True,
-                up_band_occ=up_band_occ,
-                dn_band_occ=dn_band_occ,
                 vasptodb_kwargs={
                     "additional_fields": {
-                        "task_type": "HSEcDFTFW-D"
+                        "task_type": "JHSEStaticFW"
                     }
                 }
             )
 
             wf.append(cdft_B)
-            wf.append(cdft_C_prime)
             wf.append(cdft_C)
             wf.append(cdft_D)
 
         elif task == "original":
             uis = copy.deepcopy(uis_static)
             uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            cdft_B = HSEcDFTFW(
+            cdft_B = JHSEcDFTFW(
                 structure=self.structure,
-                read_structure_from=read_structure_from,
+                up_occupation=up_occupation,
+                down_occupation=down_occupation,
+                nbands=nbands,
                 prev_calc_dir=self.prev_calc_dir,
                 vasp_input_set_params=uis,
                 selective_dynamics=None,
                 name="CDFT-B-HSE_scf",
                 vasptodb_kwargs={
                     "additional_fields": {
-                        "task_type": "HSEcDFTFW"
+                        "task_type": "JHSEcDFTFW"
                     }
                 }
             )
 
             uis = copy.deepcopy(uis_relax)
             uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update(cdft_incar_part)
-            uis["user_incar_settings"].update({"LCHARG": False})
-            cdft_C = HSEcDFTFW(
+            cdft_C = JHSEcDFTFW(
                 structure=self.structure,
+                up_occupation=up_occupation,
+                down_occupation=down_occupation,
+                nbands=nbands,
                 vasp_input_set_params=uis,
-                read_structure_from=read_structure_from,
                 prev_calc_dir=self.prev_calc_dir,
                 selective_dynamics=selective_dyn,
                 name="CDFT-C-HSE_relax",
                 vasptodb_kwargs={
                     "additional_fields": {
-                        "task_type": "HSEcDFTFW"
+                        "task_type": "JHSEcDFTFW"
                     }
                 }
             )
@@ -938,15 +816,14 @@ class ZPLWF:
             uis = copy.deepcopy(uis_static)
             uis["user_incar_settings"].update(hse_incar_part)
             uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
-            cdft_D = HSEStaticFW(
+            cdft_D = JHSEStaticFW(
                 structure=self.structure,
                 parents=cdft_C,
                 vasp_input_set_params=uis,
                 name="CDFT-D-HSE_scf",
-                cp_chargcar=False,
                 vasptodb_kwargs={
                     "additional_fields": {
-                        "task_type": "HSEStaticFW"
+                        "task_type": "JHSEStaticFW"
                     }
                 }
             )
@@ -960,7 +837,6 @@ class ZPLWF:
 
         wf = Workflow(wf, name="{}:{}:{}".format(self.structure.composition.reduced_formula,
                                                  self.spin_config, "{}CDFT".format(task)))
-        wf = add_modify_incar(wf)
         wf = add_namefile(wf)
 
         try:
@@ -981,152 +857,109 @@ class ZPLWF:
         )
         return wf
 
-    @classmethod
-    def wfs(cls):
-        def set_selective_sites(structure, center_n, distance):
-            selective_dyn = []
-            for i in structure.get_sites_in_sphere(structure[center_n].coords, distance, include_image=True):
-                for idx, site in enumerate(structure.sites):
-                    if np.allclose(i[0].frac_coords-i[2], site.frac_coords):
-                        selective_dyn.append(idx)
-            return selective_dyn
+    # def MoS2_se_antistie_triplet_ZPL(delta=6.5):
+    #     # aexx = 0.25
+    #     # anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic/block_2020-05-28-17-35-55-920859/"
+    #     #                      "launcher_2020-05-29-10-58-36-000880", "triplet")
+    #     # aexx = 0.35
+    #     anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic_aexx0.35/block_2020-05-31-04-07-39-660116/"
+    #                          "launcher_2020-05-31-12-07-11-464085", "triplet")
+    #     selective_dyn = set_selective_sites(anti_triplet.structure, 25, distance=delta)
+    #     print(selective_dyn)
+    #     # wf = anti_triplet.cdft_hse_scf_or_relax_wf(
+    #     #     "C", 0, up_occupation="303*1.0 1*0.0 1*1.0 150*0.0",
+    #     #     down_occupation="302*1.0 153*0.0", nbands=350, gamma_only=True, selective_dyn=selective_dyn
+    #     # )
+    #     wf = anti_triplet.cdft_hse_scf_or_relax_wf(
+    #         "C", 0, up_occupation="302*1.0 1*0.0 1*1.0 1*1.0 150*0.0",
+    #         down_occupation="302*1.0 153*0.0", nbands=350, gamma_only=True, selective_dyn=selective_dyn
+    #     )
+    #     wf = add_modify_incar(wf, {"incar_update":{"ENCUT": 320}})
+    #     wf = set_execution_options(wf, category="mx2_antisite_cdft")
+    #     wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-C-HSE_relax")
+    #     wf = set_queue_options(wf, "1:00:00", fw_name_constraint="cdft-B-HSE_scf")
+    #     wf = set_queue_options(wf, "1:00:00", fw_name_constraint="cdft-D-HSE_scf")
+    #     wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
+    #     wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
+    #     print(wf.name)
+    #     return wf
+    #
+    # def MoSe2_se_antistie_triplet_ZPL(delta=6.7):
+    #     anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic/block_2020-05-28-17-35-55-920859/"
+    #                          "launcher_2020-05-29-08-35-15-497636", "triplet")
+    #     selective_dyn = set_selective_sites(anti_triplet.structure, 25, delta)
+    #     wf = anti_triplet.cdft_hse_scf_or_relax_wf(
+    #         "original", 0, up_occupation="303*1.0 1*0.0 1*1.0 185*0.0",
+    #         down_occupation="302*1.0 188*0.0", nbands=455, gamma_only=True, selective_dyn=selective_dyn
+    #     )
+    #     wf = add_modify_incar(wf, {"incar_update":{"ENCUT": 320}})
+    #     wf = set_execution_options(wf, category="mx2_antisite_cdft")
+    #     wf = set_queue_options(wf, "6:00:00", fw_name_constraint="cdft-C-HSE_relax")
+    #     wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-B-HSE_scf")
+    #     wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-D-HSE_scf")
+    #     wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
+    #     wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
+    #     print(wf.name)
+    #     return wf
+    #
+    # def MoTe2_se_antistie_triplet_ZPL(delta=7.1):
+    #     anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic/block_2020-05-28-17-35-55-920859/"
+    #                          "launcher_2020-05-29-11-30-44-440092", "triplet")
+    #     selective_dyn = set_selective_sites(anti_triplet.structure, 74, delta)
+    #     wf = anti_triplet.cdft_hse_scf_or_relax_wf(
+    #         "C", 0, up_occupation="303*1.0 1*0.0 1*1.0 185*0.0",
+    #         down_occupation="302*1.0 188*0.0", nbands=455, gamma_only=True, selective_dyn=selective_dyn
+    #     )
+    #     wf = add_modify_incar(wf, {"incar_update": {"ENCUT": 320}})
+    #     wf = set_execution_options(wf, category="mx2_antisite_cdft")
+    #     wf = set_queue_options(wf, "04:00:00", fw_name_constraint="cdft-C-HSE_relax")
+    #     wf = set_queue_options(wf, "01:00:00", fw_name_constraint="cdft-B-HSE_scf")
+    #     wf = set_queue_options(wf, "01:00:00", fw_name_constraint="cdft-D-HSE_scf")
+    #     wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
+    #     wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
+    #     print(wf.name)
+    #     return wf
 
-        def MoS2_se_antistie_triplet_ZPL(delta=6.5):
-            # aexx = 0.25
-            # anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic/block_2020-05-28-17-35-55-920859/"
-            #                      "launcher_2020-05-29-10-58-36-000880", "triplet")
-            # aexx = 0.35
-            anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic_aexx0.35/block_2020-05-31-04-07-39-660116/"
-                                 "launcher_2020-05-31-12-07-11-464085", "triplet")
-            selective_dyn = set_selective_sites(anti_triplet.structure, 25, distance=delta)
-            print(selective_dyn)
-            # wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-            #     "C", 0, up_occupation="303*1.0 1*0.0 1*1.0 150*0.0",
-            #     down_occupation="302*1.0 153*0.0", nbands=350, gamma_only=True, selective_dyn=selective_dyn
-            # )
-            wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-                "C", 0, up_occupation="302*1.0 1*0.0 1*1.0 1*1.0 150*0.0",
-                down_occupation="302*1.0 153*0.0", nbands=350, gamma_only=True, selective_dyn=selective_dyn
-            )
-            wf = add_modify_incar(wf, {"incar_update":{"ENCUT": 320}})
-            wf = set_execution_options(wf, category="mx2_antisite_cdft")
-            wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-C-HSE_relax")
-            wf = set_queue_options(wf, "1:00:00", fw_name_constraint="cdft-B-HSE_scf")
-            wf = set_queue_options(wf, "1:00:00", fw_name_constraint="cdft-D-HSE_scf")
-            wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
-            wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
-            print(wf.name)
-            return wf
+    # def WSe2_se_antistie_triplet_ZPL(delta=6.63):
+    #     anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic_aexx0.35/block_2020-05-31-04-07-39-660116/"
+    #                          "launcher_2020-06-01-08-34-08-029886", "triplet")
+    #     selective_dyn = set_selective_sites(anti_triplet.structure, 25, delta)
+    #     print(selective_dyn)
+    #     wf = anti_triplet.cdft_hse_scf_or_relax_wf(
+    #         "original", 0, up_occupation="225*1.0 1*0.0 1*1.0 123*0.0",
+    #         down_occupation="224*1.0 126*0.0",
+    #         nbands=350,
+    #         selective_dyn=selective_dyn,
+    #         gamma_only=True)
+    #     wf = add_modify_incar(wf, {"incar_update":{"ENCUT": 320, "AEXX":0.35}})
+    #     wf = set_execution_options(wf, category="mx2_antisite_cdft_aexx0.35")
+    #     wf = set_queue_options(wf, "3:00:00", fw_name_constraint="cdft-C-HSE_relax")
+    #     wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-B-HSE_scf")
+    #     wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-D-HSE_scf")
+    #     wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
+    #     wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
+    #     print(wf.name)
+    #     return wf
 
-        def MoSe2_se_antistie_triplet_ZPL(delta=6.7):
-            anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic/block_2020-05-28-17-35-55-920859/"
-                                 "launcher_2020-05-29-08-35-15-497636", "triplet")
-            selective_dyn = set_selective_sites(anti_triplet.structure, 25, delta)
-            wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-                "original", 0, up_occupation="303*1.0 1*0.0 1*1.0 185*0.0",
-                down_occupation="302*1.0 188*0.0", nbands=455, gamma_only=True, selective_dyn=selective_dyn
-            )
-            wf = add_modify_incar(wf, {"incar_update":{"ENCUT": 320}})
-            wf = set_execution_options(wf, category="mx2_antisite_cdft")
-            wf = set_queue_options(wf, "6:00:00", fw_name_constraint="cdft-C-HSE_relax")
-            wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-B-HSE_scf")
-            wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-D-HSE_scf")
-            wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
-            wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
-            print(wf.name)
-            return wf
-
-        def MoTe2_se_antistie_triplet_ZPL(delta=7.1):
-            anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic/block_2020-05-28-17-35-55-920859/"
-                                 "launcher_2020-05-29-11-30-44-440092", "triplet")
-            selective_dyn = set_selective_sites(anti_triplet.structure, 74, delta)
-            wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-                "C", 0, up_occupation="303*1.0 1*0.0 1*1.0 185*0.0",
-                down_occupation="302*1.0 188*0.0", nbands=455, gamma_only=True, selective_dyn=selective_dyn
-            )
-            wf = add_modify_incar(wf, {"incar_update": {"ENCUT": 320}})
-            wf = set_execution_options(wf, category="mx2_antisite_cdft")
-            wf = set_queue_options(wf, "04:00:00", fw_name_constraint="cdft-C-HSE_relax")
-            wf = set_queue_options(wf, "01:00:00", fw_name_constraint="cdft-B-HSE_scf")
-            wf = set_queue_options(wf, "01:00:00", fw_name_constraint="cdft-D-HSE_scf")
-            wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
-            wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
-            print(wf.name)
-            return wf
-
-        def WSe2_se_antistie_triplet_ZPL(delta=6.63):
-            anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic_aexx0.35/block_2020-05-31-04-07-39-660116/"
-                                 "launcher_2020-06-01-08-34-08-029886", "triplet")
-            selective_dyn = set_selective_sites(anti_triplet.structure, 25, delta)
-            print(selective_dyn)
-            wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-                "original", 0, up_occupation="225*1.0 1*0.0 1*1.0 123*0.0",
-                down_occupation="224*1.0 126*0.0",
-                nbands=350,
-                selective_dyn=selective_dyn,
-                gamma_only=True)
-            wf = add_modify_incar(wf, {"incar_update":{"ENCUT": 320, "AEXX":0.35}})
-            wf = set_execution_options(wf, category="mx2_antisite_cdft_aexx0.35")
-            wf = set_queue_options(wf, "3:00:00", fw_name_constraint="cdft-C-HSE_relax")
-            wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-B-HSE_scf")
-            wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-D-HSE_scf")
-            wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
-            wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
-            print(wf.name)
-            return wf
-
-        def WS2_s_antistie_triplet_ZPL(delta=6.5, cat="mx2_antisite_basic_aexx0.25_cdft"): #6.5
-            lpad = LaunchPad.from_file(os.path.join(os.path.expanduser("~"),
-                                                    "config/category/{}/my_launchpad.yaml".format(cat)))
-            # anti_triplet = ZPLWF("/home/tug03990/work/mx2_antisite_basic_aexx0.25_final/WS2_enhenced_relax",
-            #                      "triplet")
-
-            anti_triplet = ZPLWF("/home/tug03990/work/mx2_antisite_basic_aexx0.25_final/WS2_enhenced_relax", "triplet")
-
-            # selective_dyn = set_selective_sites(anti_triplet.structure, 25, delta)
-            # selective_dyn = [49, 29, 30, 31, 26, 45, 0, 5, 6, 25] + [74, 54, 55, 56, 51, 70, 50]
-            # selective_dyn += [12, 7, 1, 11, 20, 10, 24, 4, 9]
-            # selective_dyn += [32, 57, 27, 52, 37, 62, 46, 71, 36, 61, 44, 69, 34, 59]
-            # wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-            #     "original", 0, up_occupation="224*1.0 1*0.5 1*0.5 1*1.0 123*0.0",
-            #     down_occupation="224*1.0 126*0.0", nbands=350, gamma_only=True, selective_dyn=selective_dyn
-            # )
-            wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-                "original", 0, up_occupation="225*1.0 1*0 1*1.0 133*0.0",
-                down_occupation="224*1.0 136*0.0", nbands=360, gamma_only=True, selective_dyn=None
-            )
-            wf = add_modify_incar(wf, {"incar_update": {"ENCUT": 320, "AEXX":0.25}})
-            wf = set_queue_options(wf, "24:00:00", fw_name_constraint="cdft-C-HSE_relax")
-            wf = set_queue_options(wf, "24:00:00", fw_name_constraint="cdft-B-HSE_scf")
-            wf = set_queue_options(wf, "24:00:00", fw_name_constraint="cdft-D-HSE_scf")
-            wf = set_execution_options(wf, category=cat)
-            wf = add_modify_incar(wf)
-            wf = preserve_fworker(wf)
-            # wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn, "defect_type":"no_AMIX"})
-            # wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
-            lpad.add_wf(wf)
-            print(wf.name)
-            return wf
-
-        def WTe2_se_antistie_triplet_ZPL(delta=7):
-            anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic_aexx0.35/block_2020-05-31-04-07-39-660116/"
-                                 "launcher_2020-06-01-09-13-17-628234", "triplet")
-            selective_dyn = set_selective_sites(anti_triplet.structure, 74, delta)
-            wf = anti_triplet.cdft_hse_scf_or_relax_wf(
-                "original", 0, up_occupation="225*1.0 1*0.0 1*1.0 123*0.0",
-                down_occupation="224*1.0 126*0.0", nbands=350, gamma_only=True, selective_dyn=selective_dyn
-            )
-            wf = add_modify_incar(wf, {"incar_update": {"ENCUT": 320, "AEXX":0.35}})
-            wf = set_execution_options(wf, category="mx2_antisite_cdft_aexx0.35")
-            wf = set_queue_options(wf, "3:00:00", fw_name_constraint="cdft-C-HSE_relax")
-            wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-B-HSE_scf")
-            wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-D-HSE_scf")
-            wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
-            wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
-            print(wf.name)
-            return wf
-
-        WS2_s_antistie_triplet_ZPL()
+    # def WTe2_se_antistie_triplet_ZPL(delta=7):
+    #     anti_triplet = ZPLWF("/gpfs/work/tug03990/mx2_antisite_basic_aexx0.35/block_2020-05-31-04-07-39-660116/"
+    #                          "launcher_2020-06-01-09-13-17-628234", "triplet")
+    #     selective_dyn = set_selective_sites(anti_triplet.structure, 74, delta)
+    #     wf = anti_triplet.cdft_hse_scf_or_relax_wf(
+    #         "original", 0, up_occupation="225*1.0 1*0.0 1*1.0 123*0.0",
+    #         down_occupation="224*1.0 126*0.0", nbands=350, gamma_only=True, selective_dyn=selective_dyn
+    #     )
+    #     wf = add_modify_incar(wf, {"incar_update": {"ENCUT": 320, "AEXX":0.35}})
+    #     wf = set_execution_options(wf, category="mx2_antisite_cdft_aexx0.35")
+    #     wf = set_queue_options(wf, "3:00:00", fw_name_constraint="cdft-C-HSE_relax")
+    #     wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-B-HSE_scf")
+    #     wf = set_queue_options(wf, "2:00:00", fw_name_constraint="cdft-D-HSE_scf")
+    #     wf = add_additional_fields_to_taskdocs(wf, {"selective_dynamics": selective_dyn})
+    #     wf.name = wf.name + ":delta{:.2f}".format(len(selective_dyn) / len(anti_triplet.structure.sites))
+    #     print(wf.name)
+    #     return wf
+    #
+    #     antistie_triplet_ZPL()
 
 
 
@@ -1389,70 +1222,83 @@ class Bilayer:
                 cls(st).bilayer_wf()
 
 class Sandwich:
-    def __init__(self, structure):
+    def __init__(self, structure, lpad, category):
         if "magmom" in structure.site_properties.keys():
             structure.remove_site_property("magmom")
         self.structure = structure
 
-    def wf(self):
-        lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/sandwich_Ws/my_launchpad.yaml")
-        # lpad = LaunchPad.auto_load()
-        opt = OptimizeFW(self.structure, name="optPBE-vdw_relax")
-        scf = StaticFW(
-            self.structure,
-            vasptodb_kwargs=dict(parse_dos=True, parse_eigenvalues=True,
-                                 additional_fields={"charge_state":0, "NN": [62,66,58,72]}),
-            name="HSE_scf"
-            # parents=opt
-        )
-        # vis_kpt = MPRelaxSet(self.structure, vdw="optPBE", force_gamma=True).kpoints.as_dict()
-        vis_kpt = Kpoints.gamma_automatic((2,2,1)).as_dict()
-        vis_kpt.pop('@module')
-        vis_kpt.pop('@class')
-        # fws = [opt, scf]
-        fws = [scf]
-        wf = Workflow(fws, name="{}:optPBE-vdw".format(self.structure.formula))
-        # wf = add_modify_incar(
-        #     wf,
-        #     {
-        #         "incar_update":{
-        #             'LUSE_VDW': True,
-        #             'AGGAC': 0.0,
-        #             'GGA': 'Or',
-        #             "ISMEAR":0,
-        #             "SIGMA":0.05,
-        #             "LASPH":True
-        #         }
-        #     },
-        #     "relax"
-        # )
-        #
-        # wf = add_modify_incar(wf, {"incar_update":{"NCORE":4,
-        #                                            "EDIFF":1E-4,
-        #                                            "EDIFFG":-0.02,
-        #                                            "ENCUT":520,
-        #                                            "LCHARG":False,
-        #                                            "LWAVE":False
-        #                                            }}, "relax")
+        self.lpad = lpad
+        self.category = category
 
-        hse_scf_incar = MPHSEBSSet(self.structure).incar
-        hse_scf_incar.update({
-                              "EDIFF":1E-5,
-                              "ENCUT":520,
-                              "EMAX":10,
-                              "EMIN":-10,
-                              "NEDOS":9000,
-                              "LCHARG":False,
-                              "LWAVE":False,
-                              "ISMEAR":0,
-                              "SIGMA":0.05,
-                              "LASPH":True
-                              })
+    def wf(self):
+        # hse_opt = JHSERelaxFW(self.structure, name="HSE-vdw_relax")
+        # hse_opt = JScanOptimizeFW(self.structure, name="SCAN_rvv10_relax",
+        #                           job_type="normal", max_force_threshold=False)
+        hse_opt = OptimizeFW(self.structure, job_type="normal", name="vdw-PBE_relax")
+
+        hse_scf = JHSEStaticFW(
+            self.structure,
+            vasptodb_kwargs=dict(additional_fields={
+                "charge_state":0,
+                "NN": [144, 126, 156, 162], #[67, 56, 62, 72],
+                "pc_from": "mx2_antisite_pc/4237",
+            }),
+            name="HSE_scf",
+            parents=hse_opt
+        )
+
+        # vis_kpt = MPRelaxSet(self.structure, vdw="optPBE", force_gamma=True).kpoints.as_dict()
+        # vis_kpt = Kpoints.gamma_automatic((2,2,1)).as_dict()
+        # vis_kpt.pop('@module')
+        # vis_kpt.pop('@class')
+
+        fws = [hse_opt, hse_scf]
+
+        wf = Workflow(fws, name="{}:optPBE-vdw".format(self.structure.formula))
+        wf = add_modify_incar(
+            wf,
+            {
+                "incar_update":{
+                    'LUSE_VDW': True,
+                    'AGGAC': 0.0,
+                    'GGA': 'Or',
+                    "LASPH": True,
+                    # "BPARAM": 15.7,#rvv10
+                    "ISMEAR":0,
+                    "SIGMA":0.05,
+                }
+            },
+            hse_opt.name
+        )
+
+        wf = add_modify_incar(wf, {"incar_update":{
+            "EDIFF":1E-4,
+            "EDIFFG":-0.02,
+            "ENCUT":520,
+            "LCHARG":False,
+            "LWAVE":False
+        }}, hse_opt.name)
+
+        hse_scf_incar = {
+            "ENCUT":520,
+            "EMAX":10,
+            "EMIN":-10,
+            "NEDOS":9000,
+            "LCHARG":False,
+            "LWAVE":False,
+            "ISMEAR":0,
+            "SIGMA":0.05,
+            "LASPH":True,
+            "LVHAR":True
+        }
+        wf = add_modify_incar(wf, {"incar_update": hse_scf_incar}, hse_scf.name)
+
+        wf = set_execution_options(wf, category=self.category)
+        wf = preserve_fworker(wf)
+        wf = add_additional_fields_to_taskdocs(wf, {"fws": [fw.name for fw in wf.fws]})
         wf = add_modify_incar(wf)
-        wf = add_modify_incar(wf, {"incar_update": hse_scf_incar})
-        wf = add_modify_kpoints(wf, {"kpoints_update":vis_kpt})
-        wf = set_execution_options(wf, category="sandwich_Ws")
-        lpad.add_wf(wf)
+
+        self.lpad.add_wf(wf)
 
 class Cluster:
     def __init__(self, structure):
@@ -1501,8 +1347,8 @@ if __name__ == '__main__':
     # Bilayer.wf()
     # bn = PBEDefectWF()
     # bn.bn_sub_wf([30])
-    # ZPLWF.wfs()
-    DefectWF.MX2_anion_antisite()
+    ZPLWF.antistie_triplet_ZPL()
+    # DefectWF.MX2_anion_antisite()
     # SPWflows.MX2_bandgap_hse()
     # Sandwich(Structure.from_file('/gpfs/work/tug03990/'
     #                              'sandwich_BN_mx2/block_2020-07-09-03-07-03-645928/'

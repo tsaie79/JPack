@@ -155,12 +155,12 @@ if __name__ == '__main__':
 
     tot, proj, d_df = get_defect_state(
         db_json,
-        {"task_id": 4261},
-        5,-5,
-        False,
+        {"task_id": 4228},
+        1.5,-0.581,
+        None,
         True,
         "dist",
-        db_host_json,
+        None,
         0.1
     )
     tot.to_clipboard()
