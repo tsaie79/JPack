@@ -1,3 +1,4 @@
+#%% WF
 from atomate.vasp.fireworks import OptimizeFW, StaticFW
 from atomate.vasp.fireworks.jcustom import JSelectiveOptFW
 from atomate.vasp.powerups import add_modify_incar, set_execution_options, add_additional_fields_to_taskdocs, \
@@ -113,3 +114,80 @@ def c_terminate_mgb2(cat="slab_dipol"):
 
 
 c_terminate_mgb2()
+
+#%% Build Structures
+from pymatgen import Structure
+import os
+
+from mpinterfaces.interface import Ligand, Interface
+from mpinterfaces.old_transformations import *
+from mpinterfaces.utils import *
+
+p = "/Users/jeng-yuantsai/Research/project/MgB2/model/new"
+
+sic = Structure.from_file("/Users/jeng-yuantsai/Research/project/MgB2/model/SiC_6H/SiC_mp-7631_computed.cif")
+sic.make_supercell([2,2,1])
+
+sic_slab = Interface(sic, hkl=[0,0,1], min_thick=10, min_vac=25, primitive=False, from_ase=True)
+
+# mgb2_slab = slab_from_file([0,0,1], "/Users/jeng-yuantsai/Research/project/MgB2/model/MgB2/MgB2_mp-763_computed.cif")
+# mgb2_slab = slab_from_file([0,0,1], '/Users/jeng-yuantsai/Research/project/MgB2/model/new/mgb2_112.vasp')
+mgb2 = Structure.from_file('/Users/jeng-yuantsai/Research/project/MgB2/model/new/mgb2_112.vasp')
+mgb2_slab = Interface(mgb2, hkl=[0,0,1], min_thick=1, min_vac=25, primitive=False, from_ase=True, scell_nmax=1)
+
+
+
+# mgb2_slab.to("poscar", os.path.join(p, "mgb2_slab.vasp"))
+# sic_slab.to("poscar", os.path.join(p, "sic_slab.vasp"))
+
+substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
+    sic_slab,
+    mgb2_slab,
+    max_area=200
+)
+
+substrate_slab_aligned.to("poscar", os.path.join(p, "subs.vasp"))
+mat2d_slab_aligned.to("poscar", os.path.join(p, "mat2d.vasp"))
+
+hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
+                                         nlayers_substrate=1, nlayers_2d=1, seperation=3)
+for idx, i in enumerate(hetero_interfaces):
+    i.to("poscar", os.path.join(p,"structures", "{}.vasp".format(idx)))
+
+#%%
+
+from mpinterfaces.interface import Ligand, Interface
+from pymatgen import Molecule, Structure
+
+bk_st = Structure.from_file("/Users/jeng-yuantsai/Research/project/MgB2/model/SiC_6H/SiC_mp-7631_computed.cif")
+bk_st.make_supercell([4,4,1], to_unit_cell=False)
+hkl = [0,0,1]
+min_thick = 10
+min_vac = 25
+
+surface_coverage = 0.12
+mgb2_mol = Molecule.from_file("/Users/jeng-yuantsai/Research/project/MgB2/model/new/mgb2_cluster.xyz")
+li = Ligand([mgb2_mol])
+x,y,z = 0,0,3
+
+adsorb_on_specie = "Si"
+adatom_on_ligand = "Mg"
+
+interface = Interface(
+    bk_st,
+    hkl=hkl,
+    min_thick=min_thick,
+    min_vac=min_vac,
+    ligand=li,
+    displacement=z,
+    adatom_on_lig=adatom_on_ligand,
+    adsorb_on_species=adsorb_on_specie,
+    surface_coverage=surface_coverage,
+    from_ase=True,
+    primitive=False,
+    supercell=[1,1,1]
+)
+
+interface.sort()
+interface.create_interface()
+# interface.to("poscar", "/Users/jeng-yuantsai/Research/project/MgB2/model/new/adsorb/0.vasp")

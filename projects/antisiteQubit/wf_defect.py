@@ -117,18 +117,6 @@ class PBEDefectWF:
 
 class DefectWF:
 
-    # def __init__(self, orig_st, natom, defect_type, substitution, distort=0, vacuum_thickness=None):
-        # self.orig_st = orig_st
-        # self.distort = distort
-        # self.defect_st, self.NN, self.defect_entry, self.defect_site_in_bulk_index = defect_from_primitive_cell(
-        #     orig_st=self.orig_st,
-        #     defect_type=defect_type,
-        #     natom=natom,
-        #     substitution=substitution,
-        #     distort=self.distort,
-        #     vacuum_thickness=vacuum_thickness
-        # )
-
     @classmethod
     def relax_pc(cls):
             # lpad = LaunchPad.from_file("/home/tug03990/config/my_launchpad.efrc.yaml")
@@ -187,7 +175,7 @@ class DefectWF:
                 lpad.add_wf(wf)
 
     @classmethod
-    def MX2_anion_antisite(cls):
+    def MX2_anion_antisite(cls, defect_type="substitutions", distorts=(0)):
             col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
             # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
             mx2s = col.find({"task_id":{"$in":[4236, 4235]}})
@@ -210,17 +198,17 @@ class DefectWF:
                 defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
                 cation, anion = find_cation_anion(pc)
 
-                for sub in range(len(defect["substitutions"])):
+                for sub in range(len(defect[defect_type])):
                     print(cation, anion)
                     # cation vacancy
-                    if "{}_on_{}".format(cation, anion) not in defect["substitutions"][sub]["name"]:
+                    if "{}_on_{}".format(cation, anion) not in defect[defect_type][sub]["name"]:
                         continue
                     for na, thicks in geo_spec.items():
                         for thick in thicks:
-                            for dtort in [0.005]:
+                            for dtort in list(distorts):
                                 se_antisite = GenDefect(
                                     orig_st=pc,
-                                    defect_type=("substitutions", sub),
+                                    defect_type=(defect_type, sub),
                                     natom=na,
                                     vacuum_thickness=thick,
                                     distort=dtort,
@@ -241,25 +229,6 @@ class DefectWF:
                                     category=CATEGORY,
                                 )
 
-                                def kpoints(kpts):
-                                    kpoints_kwarg = {
-                                        'comment': "mx2_antisite",
-                                        "style": "G",
-                                        "num_kpts": 0,
-                                        'kpts': [kpts],
-                                        'kpts_weights': None,
-                                        'kpts_shift': (0, 0, 0),
-                                        'coord_type': None,
-                                        'labels': None,
-                                        'tet_number': 0,
-                                        'tet_weight': 0,
-                                        'tet_connections': None
-                                    }
-                                    return kpoints_kwarg
-
-                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "PBE_relax")
-                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_relax")
-                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_scf")
                                 wf = add_additional_fields_to_taskdocs(
                                     wf,
                                     {
@@ -718,124 +687,75 @@ class ZPLWF:
             "user_kpoints_settings": user_kpoints_settings
         }
 
-        wf = []
-        if task == "test":
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update({"LWAVE": True})
-            cdft_B = JHSEcDFTFW(
-                structure=self.structure,
-                up_occupation=up_occupation,
-                down_occupation=down_occupation,
-                nbands=nbands,
-                prev_calc_dir=self.prev_calc_dir,
-                vasp_input_set_params=uis,
-                selective_dynamics=None,
-                name="CDFT-B-HSE_scf",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "JHSEcDFTFW"
-                    }
+        fws = []
+
+        uis = copy.deepcopy(uis_static)
+        uis["user_incar_settings"].update(hse_incar_part)
+        cdft_B = JHSEcDFTFW(
+            structure=self.structure,
+            up_occupation=up_occupation,
+            down_occupation=down_occupation,
+            nbands=nbands,
+            prev_calc_dir=self.prev_calc_dir,
+            vasp_input_set_params=uis,
+            selective_dynamics=None,
+            name="CDFT-B-HSE_scf",
+            vasptodb_kwargs={
+                "additional_fields": {
+                    "task_type": "JHSEcDFTFW"
                 }
-            )
+            }
+        )
 
-            uis = copy.deepcopy(uis_relax)
-            uis["user_incar_settings"].update(hse_incar_part)
-            cdft_C = JHSEcDFTFW(
-                structure=self.structure,
-                up_occupation=up_occupation,
-                down_occupation=down_occupation,
-                nbands=nbands,
-                vasp_input_set_params=uis,
-                selective_dynamics=selective_dyn,
-                parents=cdft_B,
-                name="CDFT-C-HSE_relax",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "JHSEcDFTFW"
-                    }
+        uis = copy.deepcopy(uis_relax)
+        uis["user_incar_settings"].update(hse_incar_part)
+        cdft_C = JHSEcDFTFW(
+            structure=self.structure,
+            up_occupation=up_occupation,
+            down_occupation=down_occupation,
+            nbands=nbands,
+            vasp_input_set_params=uis,
+            prev_calc_dir=self.prev_calc_dir,
+            selective_dynamics=selective_dyn,
+            name="CDFT-C-HSE_relax",
+            vasptodb_kwargs={
+                "additional_fields": {
+                    "task_type": "JHSEcDFTFW"
                 }
-            )
+            }
+        )
 
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
-            cdft_D = JHSEStaticFW(
-                structure=self.structure,
-                parents=cdft_C,
-                vasp_input_set_params=uis,
-                name="CDFT-D-HSE_scf",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "JHSEStaticFW"
-                    }
+        uis = copy.deepcopy(uis_static)
+        uis["user_incar_settings"].update(hse_incar_part)
+        uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
+        cdft_D = JHSEStaticFW(
+            structure=self.structure,
+            parents=cdft_C,
+            vasp_input_set_params=uis,
+            name="CDFT-D-HSE_scf",
+            vasptodb_kwargs={
+                "additional_fields": {
+                    "task_type": "JHSEStaticFW"
                 }
-            )
+            }
+        )
 
-            wf.append(cdft_B)
-            wf.append(cdft_C)
-            wf.append(cdft_D)
+        if task == "B":
+            fws.append(cdft_B)
+        elif task == "C":
+            fws.append(cdft_C)
+        elif task == "B-C":
+            fws.append(cdft_B)
+            fws.append(cdft_C)
+        elif task == "C-D":
+            fws.append(cdft_C)
+            fws.append(cdft_D)
+        elif task == "B-C-D":
+            fws.append(cdft_B)
+            fws.append(cdft_C)
+            fws.append(cdft_D)
 
-        elif task == "original":
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            cdft_B = JHSEcDFTFW(
-                structure=self.structure,
-                up_occupation=up_occupation,
-                down_occupation=down_occupation,
-                nbands=nbands,
-                prev_calc_dir=self.prev_calc_dir,
-                vasp_input_set_params=uis,
-                selective_dynamics=None,
-                name="CDFT-B-HSE_scf",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "JHSEcDFTFW"
-                    }
-                }
-            )
-
-            uis = copy.deepcopy(uis_relax)
-            uis["user_incar_settings"].update(hse_incar_part)
-            cdft_C = JHSEcDFTFW(
-                structure=self.structure,
-                up_occupation=up_occupation,
-                down_occupation=down_occupation,
-                nbands=nbands,
-                vasp_input_set_params=uis,
-                prev_calc_dir=self.prev_calc_dir,
-                selective_dynamics=selective_dyn,
-                name="CDFT-C-HSE_relax",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "JHSEcDFTFW"
-                    }
-                }
-            )
-
-            uis = copy.deepcopy(uis_static)
-            uis["user_incar_settings"].update(hse_incar_part)
-            uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
-            cdft_D = JHSEStaticFW(
-                structure=self.structure,
-                parents=cdft_C,
-                vasp_input_set_params=uis,
-                name="CDFT-D-HSE_scf",
-                vasptodb_kwargs={
-                    "additional_fields": {
-                        "task_type": "JHSEStaticFW"
-                    }
-                }
-            )
-
-            wf.append(cdft_B)
-            wf.append(cdft_C)
-            wf.append(cdft_D)
-
-        else:
-            print("error! Please insert scf, relax or scf_relax")
-
-        wf = Workflow(wf, name="{}:{}:{}".format(self.structure.composition.reduced_formula,
+        wf = Workflow(fws, name="{}:{}:{}".format(self.structure.composition.reduced_formula,
                                                  self.spin_config, "{}CDFT".format(task)))
         wf = add_namefile(wf)
 

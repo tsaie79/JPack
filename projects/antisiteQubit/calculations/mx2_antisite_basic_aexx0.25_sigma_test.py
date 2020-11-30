@@ -159,5 +159,97 @@ e1 = db1.collection.aggregate(
 e1 = list(e1)
 print(pd.DataFrame(e1).sort_values("chem"))
 
+#%% WF
+from atomate.vasp.database import VaspCalcDb
+from atomate.vasp.powerups import *
+from fireworks import LaunchPad
+from pycdt.core.defectsmaker import ChargedDefectsStructures
+from qubitPack.tool_box import find_cation_anion, GenDefect
+from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_hse
+import os
 
 
+CATEGORY = "mx2_antisite_basic_aexx0.25_sigma_test"
+LPAD = LaunchPad.from_file(
+    os.path.join(os.path.expanduser("~"), "config/category/{}/my_launchpad.yaml".format(CATEGORY)))
+
+
+def wf(defect_type="substitutions"):
+
+    col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
+    # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
+    mx2s = col.find({"task_id":{"$in":[4237]}})
+
+    geo_spec = {5* 5 * 3: [20]}
+    for mx2 in mx2s:
+        pc = Structure.from_dict(mx2["output"]["structure"])
+
+        defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
+        cation, anion = find_cation_anion(pc)
+
+        for sub in range(len(defect[defect_type])):
+            print(cation, anion)
+            # cation vacancy
+            if "{}_on_{}".format(cation, anion) not in defect[defect_type][sub]["name"]:
+                continue
+            for na, thicks in geo_spec.items():
+                for thick in thicks:
+                    for dtort in [0]:
+                        se_antisite = GenDefect(
+                            orig_st=pc,
+                            defect_type=(defect_type, sub),
+                            natom=na,
+                            vacuum_thickness=thick,
+                            distort=dtort,
+                        )
+
+                        wf = get_wf_full_hse(
+                            structure=se_antisite.defect_st,
+                            charge_states=[0],
+                            gamma_only=False,
+                            gamma_mesh=True,
+                            dos=True,
+                            nupdowns=[0],
+                            encut=320,
+                            task="hse_relax-hse_scf",
+                            vasptodb={"category": CATEGORY, "NN": se_antisite.NN,
+                                      "defect_entry": se_antisite.defect_entry},
+                            wf_addition_name="{}:{}".format(na, thick),
+                            category=CATEGORY,
+                        )
+
+                        wf = add_additional_fields_to_taskdocs(
+                            wf,
+                            {
+                                "lattice_constant": "HSE",
+                                "perturbed": se_antisite.distort,
+                                "sigma": 0.002,
+                                "pc_from": "mx2_antisite_pc/HSE_scf/{}".format(mx2["task_id"])
+                            }
+                        )
+
+                        wf = add_modify_incar(
+                            wf,
+                            {
+                                "incar_update": {
+                                    "EDIFFG":-0.02,
+                                    "NSW":150,
+                                    "SIGMA":0.002
+                            }
+                            },
+                            "HSE_relax"
+                        )
+                        wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True,
+                                                                    "SIGMA":0.002}}, "HSE_scf")
+
+                        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
+                        wf = set_queue_options(wf, "48:00:00", fw_name_constraint="HSE_relax")
+                        wf = set_queue_options(wf, "32:00:00", fw_name_constraint="HSE_scf")
+                        wf = add_modify_incar(wf)
+                        # related to directory
+                        wf = set_execution_options(wf, category=CATEGORY)
+                        wf = preserve_fworker(wf)
+                        wf.name = wf.name+":dx[{}]:singlet".format(se_antisite.distort)
+                        LPAD.add_wf(wf)
+
+wf()

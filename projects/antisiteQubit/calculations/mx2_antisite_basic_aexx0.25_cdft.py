@@ -23,7 +23,7 @@ r = db.collection.aggregate(
         {"$group":
              {"_id": "$tk",
               "tid": {"$push": "$tid"},
-                "src_dir": {"$push": "$src_dir"},
+              # "src_dir": {"$push": "$src_dir"},
               "en": {"$push": "$en"},
               "A": {"$push": "$A"},
 
@@ -35,10 +35,11 @@ r = db.collection.aggregate(
 df = pd.DataFrame(list(r)).set_index("_id")
 
 data = {}
-idx = 0
-data["A-B"] = [df.loc["CDFT-B-HSE_scf"]["en"][idx] - df.loc["CDFT-B-HSE_scf"]["A"][0]]
+idx = -1
+data["A-B"] = [df.loc["CDFT-B-HSE_scf"]["en"][idx] - df.loc["CDFT-B-HSE_scf"]["A"][idx]]
 data["B-C"] = [df.loc["CDFT-B-HSE_scf"]["en"][idx] - df.loc["CDFT-C-HSE_relax"]["en"][idx]]
 data["C-D"] = [df.loc["CDFT-C-HSE_relax"]["en"][idx] - df.loc["CDFT-D-HSE_scf"]["en"][idx]]
+data["D-A"] = [df.loc["CDFT-D-HSE_scf"]["en"][idx] - df.loc["CDFT-B-HSE_scf"]["A"][idx]]
 
 result = pd.DataFrame(data)
 
@@ -65,20 +66,21 @@ def antistie_triplet_ZPL(): #6.5
     print(len(moving_sites))
 
     wf = anti_triplet.wf(
-        "test", 0, up_occupation="302*1.0 1*0.5 1*0.5 1*1.0 175*0",#"303*1.0 1*0 1*1.0 175*0",
-        down_occupation="302*1.0 178*0.0", nbands=480, gamma_only=True, selective_dyn=moving_sites
+        "C", 0, up_occupation="302*1.0 1*0.5 1*0.5 1*1.0 175*0", #"303*1.0 1*0 1*1.0 175*0"
+        down_occupation="302*1.0 178*0.0", nbands=480, gamma_only=True, selective_dyn=None
     )
-    # wf = add_modify_incar(wf, {"incar_update": {"SIGMA": 0.05, "ENCUT": 320}})
-    wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
-    wf = set_queue_options(wf, "48:00:00", fw_name_constraint=wf.fws[1].name)
-    wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
+    wf = add_modify_incar(wf, {"incar_update": {"POTIM":0.125, "IBRION":1, "EDIFFG":-0.02, "EDIFF":1E-4}},
+                          fw_name_constraint=wf.fws[0].name)
+    # wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[1].name)
+    wf = set_queue_options(wf, "48:00:00", fw_name_constraint=wf.fws[0].name)
+    # wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
     wf = set_execution_options(wf, category=CATEGORY)
-    # wf = add_modify_incar(wf)
+    wf = add_modify_incar(wf)
     wf = preserve_fworker(wf)
-    # wf = clean_up_files(wf, files=["WAVECAR*"], task_name_constraint="VaspToDb")
-    wf = add_additional_fields_to_taskdocs(wf, {"defect_type":"read_B_wvfunc"})
+    wf = clean_up_files(wf, files=["WAVECAR*"], task_name_constraint="VaspToDb")
+    wf = add_additional_fields_to_taskdocs(wf, {"defect_type": "TIM0.125:IB1"})
     wf.name = wf.name + ":delta{:.2f}".format(len(moving_sites) / len(anti_triplet.structure.sites))
-    wf.name = wf.name + ":read_B_wvfunc"
+    wf.name = wf.name + ":TIM0.125:IB1"
     LPAD.add_wf(wf)
     print(wf.name)
 
