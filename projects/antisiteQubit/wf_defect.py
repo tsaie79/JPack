@@ -615,6 +615,7 @@ class ZPLWF:
         self.structure = structure
         self.nelect = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).nelect
         self.spin_config = spin_config
+        self.encut = 1.3*max([potcar.enmax for potcar in MPHSERelaxSet(self.structure).potcar])
 
     def set_selective_sites(self, center_n, distance):
         selective_dyn = []
@@ -624,8 +625,7 @@ class ZPLWF:
                     selective_dyn.append(idx)
         return selective_dyn
 
-    def wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False
-           , encut=320, selective_dyn=None):
+    def wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False, selective_dyn=None):
 
         kpoint_setting = "G" if gamma_only else "R"
         user_kpoints_settings = Kpoints.gamma_automatic() if gamma_only else Kpoints.from_dict(
@@ -656,7 +656,7 @@ class ZPLWF:
         uis_static = {
             "user_incar_settings":
                 {
-                    "ENCUT": encut,
+                    "ENCUT": self.encut,
                     "ICHARG": 0,
                     "EDIFF": 1E-5,
                     "LCHARG": False,
@@ -672,7 +672,7 @@ class ZPLWF:
         uis_relax = {
             "user_incar_settings":
                 {
-                    "ENCUT": encut,
+                    "ENCUT": self.encut,
                     "ICHARG": 0,
                     "ISIF": 2,
                     "EDIFF": 1E-4,
@@ -719,6 +719,8 @@ class ZPLWF:
             selective_dynamics=selective_dyn,
             name="CDFT-C-HSE_relax",
             vasptodb_kwargs={
+                "parse_eigenvalues": False,
+                "parse_dos": False,
                 "additional_fields": {
                     "task_type": "JHSEcDFTFW"
                 }
