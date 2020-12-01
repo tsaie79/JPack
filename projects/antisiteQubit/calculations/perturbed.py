@@ -32,6 +32,7 @@ Look at database
 from pymatgen import Structure
 from atomate.vasp.database import VaspCalcDb
 import pandas as pd
+import os
 
 proj_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/perturbed"
 db_json = os.path.join(proj_path, "db.json")
@@ -41,8 +42,9 @@ db = VaspCalcDb.from_db_file(db_json)
 
 es = db.collection.aggregate(
     [
-        {"$match": {"task_label":"HSE_scf"}},
+        {"$match": {"task_label":"HSE_scf", "chemsys":"Mo-S"}},
         {"$group": {"_id":"$output.spacegroup.point_group",
+                    "en": {"$push": "$output.energy"},
                     "tid": {"$push": "$task_id"},
                     "defect": {"$push": "$defect_entry.name"},
                     "chem": {"$push": "$chemsys"},

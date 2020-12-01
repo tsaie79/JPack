@@ -162,6 +162,7 @@ print(pd.DataFrame(e1).sort_values("chem"))
 #%% WF
 from atomate.vasp.database import VaspCalcDb
 from atomate.vasp.powerups import *
+from pymatgen.io.vasp.sets import MPHSERelaxSet
 from fireworks import LaunchPad
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 from qubitPack.tool_box import find_cation_anion, GenDefect
@@ -169,16 +170,16 @@ from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_hse
 import os
 
 
-CATEGORY = "mx2_antisite_basic_aexx0.25_sigma_test"
+CATEGORY = "mx2s_up_encut"
 LPAD = LaunchPad.from_file(
-    os.path.join(os.path.expanduser("~"), "config/category/{}/my_launchpad.yaml".format(CATEGORY)))
+    os.path.join(os.path.expanduser("~"), "config/project/antisiteQubit/{}/my_launchpad.yaml".format(CATEGORY)))
 
 
 def wf(defect_type="substitutions"):
 
     col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
     # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
-    mx2s = col.find({"task_id":{"$in":[4237]}})
+    mx2s = col.find({"task_id":{"$in":[4229]}})
 
     geo_spec = {5* 5 * 3: [20]}
     for mx2 in mx2s:
@@ -202,15 +203,13 @@ def wf(defect_type="substitutions"):
                             vacuum_thickness=thick,
                             distort=dtort,
                         )
-
                         wf = get_wf_full_hse(
                             structure=se_antisite.defect_st,
-                            charge_states=[0],
+                            charge_states=[0, 0],
                             gamma_only=False,
                             gamma_mesh=True,
                             dos=True,
-                            nupdowns=[0],
-                            encut=320,
+                            nupdowns=[2, 0],
                             task="hse_relax-hse_scf",
                             vasptodb={"category": CATEGORY, "NN": se_antisite.NN,
                                       "defect_entry": se_antisite.defect_entry},
@@ -249,7 +248,7 @@ def wf(defect_type="substitutions"):
                         # related to directory
                         wf = set_execution_options(wf, category=CATEGORY)
                         wf = preserve_fworker(wf)
-                        wf.name = wf.name+":dx[{}]:singlet".format(se_antisite.distort)
+                        wf.name = wf.name+":dx[{}]:triplet:en336".format(se_antisite.distort)
                         LPAD.add_wf(wf)
 
 wf()
