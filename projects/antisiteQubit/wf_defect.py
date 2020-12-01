@@ -669,7 +669,6 @@ class ZPLWF:
             "user_kpoints_settings": user_kpoints_settings
         }
 
-
         uis_relax = {
             "user_incar_settings":
                 {
