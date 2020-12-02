@@ -11,14 +11,20 @@ from pymatgen.io.vasp.sets import MPHSEBSSet
 from projects.antisiteQubit.wf_defect import Sandwich
 
 import os
+from monty.serialization import loadfn
 
 CATEGORY = "sandwich_Mos"
 LPAD = LaunchPad.from_file(
     os.path.join(os.path.expanduser("~"), "config/project/antisiteQubit/{}/my_launchpad.yaml".format(CATEGORY)))
 
-defect_st = Structure.from_file("/home/tug03990/work/antisiteQubit/sandwich_Mos/mo_s_331.vasp")
+defect_st = Structure.from_file("/home/tug03990/work/antisiteQubit/sandwich_Mos/heters_vacu_44_antisite.vasp")
 
-Sandwich(structure=defect_st, lpad=LPAD, category=CATEGORY).wf()
+wf = Sandwich(structure=defect_st).wf()
+
+wf = add_additional_fields_to_taskdocs(wf, {"NN": [56, 67, 62, 72], "defect_type": "dz=4.4"})
+
+wf = set_execution_options(wf, category=CATEGORY)
+wf = preserve_fworker(wf)
 
 
 
@@ -40,8 +46,8 @@ p = "/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/sand
 # bn = Structure.from_file(os.path.join(p, "structures", "BN_hse_relax_pc.vasp"))
 # mos2 = Structure.from_file(os.path.join(p, "structures", "Mo1 S2_4237.vasp"))
 
-bn = slab_from_file([0,0,1], os.path.join(p, "structures", "BN_hse_relax_pc.vasp"))
-mos2 = slab_from_file([0,0,1], os.path.join(p, "structures", "Mo1 S2_4237.vasp"))
+bn = slab_from_file([0,0,1],os.path.join(p, "modeling", "BN_hse_relax_pc.vasp"))
+mos2 = slab_from_file([0,0,1],os.path.join(p, "modeling", "Mo1 S2_4237.vasp"))
 
 substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
     mos2,
@@ -49,37 +55,87 @@ substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
     max_area=200
 )
 
-substrate_slab_aligned.to("poscar", os.path.join(p,"structures", "MoS2_exp.vasp"))
-mat2d_slab_aligned.to("poscar", os.path.join(p,"structures", "BN_exp.vasp"))
+# substrate_slab_aligned.to("poscar", os.path.join(p,"modeling", "MoS2_exp.vasp"))
+# mat2d_slab_aligned.to("poscar", os.path.join(p,"modeling", "BN_exp.vasp"))
 
 mis = get_mismatch(mat2d_slab_aligned.lattice.a, substrate_slab_aligned.lattice.a)
 
 
 hetero_interfaces = generate_all_configs(mat2d_slab_aligned,
                                          substrate_slab_aligned,
-                                         1, 1, 3.4)
-
+                                         1, 1, 4.4)
 
 for idx, i in enumerate(hetero_interfaces):
-    i.to("poscar", os.path.join(p,"structures", "{}.vasp".format(idx)))
+    i.to("poscar", os.path.join(p,"modeling", "{}.vasp".format(idx)))
 
 #%% above
 """
 make sandwich
 """
-bn_exp = slab_from_file([0,0,1], os.path.join(p,"structures", "BN_exp.vasp"))
-mos2_bn_exp = slab_from_file([0,0,1], os.path.join(p,"structures", "0.vasp"))
+# bn_exp = slab_from_file([0,0,1], os.path.join(p,"modeling", "BN_exp.vasp"))
+# mos2_bn_exp = slab_from_file([0,0,1], os.path.join(p,"modeling", "0.vasp"))
+
+bn = slab_from_file([0,0,1],os.path.join(p,"modeling", "BN_exp.vasp"))
+mos2_bn = slab_from_file([0,0,1],os.path.join(p,"modeling", "0.vasp"))
+# bn_exp = Interface(bn, hkl=[0,0,1], from_ase=False)
+# mos2_bn_exp = Interface(mos2_bn, hkl=[0,0,1], from_ase=False)
 
 substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
-    bn_exp,
-    mos2_bn_exp,
+    bn,
+    mos2_bn,
     max_area=200
 )
 
 hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
-                                         1, 1, 3.4)
+                                         1, 1, 4.4)
 
-hetero_interfaces[0].to("poscar", os.path.join(p,"structures", "heter_bn_mos2_bn.vasp"))
+
+for idx, i in enumerate(hetero_interfaces):
+    i.to("poscar", os.path.join(p, "structures", "{}.vasp".format(idx)))
+# hetero_interfaces[1].to("poscar", os.path.join(p,"structures", "heter_bn_mos2_bn.vasp"))
+
+#%% above
+"""
+make antisite structure
+"""
+import os
+from pymatgen import Structure
+from monty.serialization import dumpfn,loadfn
+
+p = "/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/sandwich_Mos/"
+
+host_pc = Structure.from_file(os.path.join(p, "structures","heters_vacu_44.vasp"))
+
+host_pc.make_supercell([2,2,1])
+host_sc = host_pc
+
+host_sc.to("poscar", os.path.join(p, "structures","heters_vacu_44_sc.vasp"))
+
+host_sc.replace(74, "Mo")
+old_antisite = host_sc[74]
+
+host_sc.sort()
+host_sc.to("poscar", os.path.join(p, "structures","heters_vacu_44_antisite.vasp"))
+
+nn_include_self = host_sc.get_sites_in_sphere(old_antisite.coords, 3, include_index=True, include_image=True)
+
+nn_idx = []
+self_idx = []
+for nn in nn_include_self:
+    if old_antisite == nn[0]:
+        self_idx += [nn[-2]]
+        continue
+    else:
+        nn_idx.append(nn[-2])
+    nn_idx += self_idx
+dumpfn(nn_idx, os.path.join(p, "structures", "nn.json"))
+
+
+
+
+
+
+
 
 #%% Read defect state
 
@@ -97,7 +153,7 @@ db_host_json = os.path.join(host_path, "db.json")
 
 
 perturb = None
-tid = 505
+tid = 502
 
 
 tot, proj, d_df = get_defect_state(
@@ -122,7 +178,7 @@ from pymatgen.electronic_structure.plotter import DosPlotter
 from pymatgen.io.vasp.inputs import Element
 
 db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/sandwich_Mos/db.json')
-dos = db.get_dos(502)
+dos = db.get_dos(503)
 dos_plt = DosPlotter(stack=False, sigma=0)
 # tdos = DosPlotter(stack=True, zero_at_efermi=False)
 # tdos.add_dos("tdos", dos)

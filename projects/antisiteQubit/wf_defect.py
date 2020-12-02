@@ -1146,25 +1146,25 @@ class Bilayer:
                 cls(st).bilayer_wf()
 
 class Sandwich:
-    def __init__(self, structure, lpad, category):
+    def __init__(self, structure):
         if "magmom" in structure.site_properties.keys():
             structure.remove_site_property("magmom")
         self.structure = structure
 
-        self.lpad = lpad
-        self.category = category
+        self.encut = 1.3*max([potcar.enmax for potcar in MPHSERelaxSet(structure).potcar])
 
     def wf(self):
         # hse_opt = JHSERelaxFW(self.structure, name="HSE-vdw_relax")
         # hse_opt = JScanOptimizeFW(self.structure, name="SCAN_rvv10_relax",
         #                           job_type="normal", max_force_threshold=False)
-        hse_opt = OptimizeFW(self.structure, job_type="normal", name="vdw-PBE_relax")
+        hse_opt = JHSERelaxFW(self.structure, job_type="normal", name="HSE_relax",
+                              vasptodb_kwargs={"parse_eigenvalues": False, "parse_dos": False}
+                              )
 
         hse_scf = JHSEStaticFW(
             self.structure,
             vasptodb_kwargs=dict(additional_fields={
                 "charge_state":0,
-                "NN": [144, 126, 156, 162], #[67, 56, 62, 72],
                 "pc_from": "mx2_antisite_pc/4237",
             }),
             name="HSE_scf",
@@ -1183,9 +1183,9 @@ class Sandwich:
             wf,
             {
                 "incar_update":{
-                    'LUSE_VDW': True,
-                    'AGGAC': 0.0,
-                    'GGA': 'Or',
+                    # 'LUSE_VDW': True,
+                    # 'AGGAC': 0.0,
+                    # 'GGA': 'Or',
                     "LASPH": True,
                     # "BPARAM": 15.7,#rvv10
                     "ISMEAR":0,
@@ -1198,13 +1198,11 @@ class Sandwich:
         wf = add_modify_incar(wf, {"incar_update":{
             "EDIFF":1E-4,
             "EDIFFG":-0.02,
-            "ENCUT":520,
             "LCHARG":False,
             "LWAVE":False
         }}, hse_opt.name)
 
         hse_scf_incar = {
-            "ENCUT":520,
             "EMAX":10,
             "EMIN":-10,
             "NEDOS":9000,
@@ -1217,12 +1215,12 @@ class Sandwich:
         }
         wf = add_modify_incar(wf, {"incar_update": hse_scf_incar}, hse_scf.name)
 
-        wf = set_execution_options(wf, category=self.category)
-        wf = preserve_fworker(wf)
+        wf = add_modify_incar(wf, {"incar_update": {"ENCUT": self.encut}})
+
         wf = add_additional_fields_to_taskdocs(wf, {"fws": [fw.name for fw in wf.fws]})
         wf = add_modify_incar(wf)
 
-        self.lpad.add_wf(wf)
+        return wf
 
 class Cluster:
     def __init__(self, structure):
