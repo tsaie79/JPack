@@ -650,7 +650,8 @@ class ZPLWF:
             "AMIX": 0.2,
             "AMIX_MAG": 0.8,
             "BMIX": 0.0001,
-            "BMIX_MAG": 0.0001
+            "BMIX_MAG": 0.0001,
+            "ISMEAR": 1, "SIGMA": 0.2 #metal setup
         }
 
         uis_static = {
@@ -1157,7 +1158,7 @@ class Sandwich:
         # hse_opt = JHSERelaxFW(self.structure, name="HSE-vdw_relax")
         # hse_opt = JScanOptimizeFW(self.structure, name="SCAN_rvv10_relax",
         #                           job_type="normal", max_force_threshold=False)
-        hse_opt = JHSERelaxFW(self.structure, job_type="normal", name="HSE_relax",
+        hse_opt = JOptimizeFW(self.structure, job_type="normal", name="PBE_VDW_relax",
                               vasptodb_kwargs={"parse_eigenvalues": False, "parse_dos": False}
                               )
 
@@ -1183,9 +1184,9 @@ class Sandwich:
             wf,
             {
                 "incar_update":{
-                    # 'LUSE_VDW': True,
-                    # 'AGGAC': 0.0,
-                    # 'GGA': 'Or',
+                    'LUSE_VDW': True,
+                    'AGGAC': 0.0,
+                    'GGA': 'Or',
                     "LASPH": True,
                     # "BPARAM": 15.7,#rvv10
                     "ISMEAR":0,
