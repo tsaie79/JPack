@@ -651,7 +651,6 @@ class ZPLWF:
             "AMIX_MAG": 0.8,
             "BMIX": 0.0001,
             "BMIX_MAG": 0.0001,
-            "ISMEAR": 1, "SIGMA": 0.2 #metal setup
         }
 
         uis_static = {
