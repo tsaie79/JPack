@@ -13,9 +13,9 @@ pc_db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/project/symBaseBi
 d = []
 
 filter = {
-    "$or":[{"calcs_reversed.output.outcar.total_magnetization":{"$gte":1.5}},
-           {"calcs_reversed.output.outcar.total_magnetization":{"$lte":-1.5}}],
-    "nsites":75,
+    "$or":[{"calcs_reversed.output.outcar.total_magnetization":{"$gte":1.5, "$lte":2.1}},
+           {"calcs_reversed.output.outcar.total_magnetization":{"$lte":-1.5, "$gte":-2.1}}],
+    # "nsites":75,
     "task_label":"SCAN_scf"
 }
 
@@ -41,7 +41,7 @@ for e in db.collection.find(filter):
 
 df = pd.DataFrame(d).sort_values(["sym_data"])# "group", "species"]) #"mag", "pc_from", "bandgap"])
 df = df.set_index("task_id")
-df.to_clipboard()
+# df.to_clipboard()
 
 #%% search for triplet and create sheets
 from atomate.vasp.database import VaspCalcDb
@@ -50,7 +50,7 @@ import pandas as pd
 import os
 from collections import Counter
 import numpy as np
-from qubitPack.qc_searching.analysis.read_eigen import DetermineDefectState
+from qubitPack.qc_searching.analysis.main import get_defect_state
 
 db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
                              'search_triplet_from_defect_db/db.json')
@@ -80,102 +80,42 @@ ess = []
 for e in list(es):
     els = [Element(e["elements"][0]).group, Element(e["elements"][1]).group]
     els.sort()
-    e.update({"group": "{}_{}".format(els[0], els[1])})
     try:
-        can = DetermineDefectState(db=db_json, db_filter={"task_id": e["task_id"]},
-                                   cbm=6, vbm=-2, show_edges="band_edges",
-                                   save_fig_path=proj_path, locpot=db_host_json)
-
-        tot, proj, d_df = can.get_candidates(
-            0,
-            threshold=0.1,
-            select_up=None,
-            select_dn=None
+        tot, proj, d_df = get_defect_state(
+            db_json,
+            {"task_id": e["task_id"]},
+            1.5,-0.581,
+            None,
+            False,
+            "dist",
+            db_host_json,
+            0.4 # this can affect the value of from_vbm
         )
-        e.update(
-            {
-                "up_from_vbm": d_df["up_from_vbm"][0],
-                "up_occ": d_df["up_occ"][0],
-                "dn_from_vbm": d_df["dn_from_vbm"][0],
-                "dn_occ": d_df["dn_occ"][0]
-            }
-        )
-        # Criteria for forming a good triplet defect center:
-        # well-defined in-gap state: energetic difference of occupied states and vbm > 0.1
-        sum_occ_up = 0
-        for en_up, occ_up in zip(d_df["up_from_vbm"][0], d_df["up_occ"][0]):
-            if abs(en_up) > 0.1 and occ_up > 0.2:
-                sum_occ_up += occ_up
-        sum_occ_dn = 0
-        for en_dn, occ_dn in zip(d_df["dn_from_vbm"][0], d_df["dn_occ"][0]):
-            if abs(en_dn) > 0.1 and occ_dn > 0.2:
-                sum_occ_dn += occ_dn
-        # triplet formed by well-defined triplet states
-        if round(abs(sum_occ_up - sum_occ_dn), 1) == 2:
-            e.update({"up_deg": list(Counter(np.around(e["up_from_vbm"], 2)).values()),
-                      "dn_deg": list(Counter(np.around(e["dn_from_vbm"], 2)).values())})
-            if sum_occ_up > sum_occ_dn:
-                e.update({"triplet_from": "up"})
-            else:
-                e.update({"triplet_from": "dn"})
+        if d_df.loc["triplet_from"][0] == "up" and d_df.loc["up_from_vbm"][0][-1] >= 0.4 and \
+                d_df.loc["up_tran_en"][0] < 0.5 and d_df.loc["up_tran_en"][0] >= 0.2:
+            e.update(d_df.to_dict()[0])
+            e.update({"group": "{}_{}".format(els[0], els[1])})
+        elif d_df.loc["triplet_from"][0] == "dn" and d_df.loc["dn_from_vbm"][0][-1] >= 0.4 and \
+                d_df.loc["dn_tran_en"][0] < 0.5 and d_df.loc["dn_tran_en"][0] >= 0.2:
+            e.update(d_df.to_dict()[0])
+            e.update({"group": "{}_{}".format(els[0], els[1])})
         else:
-            # e.update({"promising": False})
             continue
+        ess.append(e)
 
-        # Calculate plausible optical transition energy
-        for en_up, occ_up, idx in zip(d_df["up_from_vbm"][0], d_df["up_occ"][0], range(len(d_df["up_occ"][0]))):
-            if occ_up == 1 and idx != 0:
-                h_occ_en = en_up
-                l_unocc_en = d_df["up_from_vbm"][0][idx-1]
-                e.update({"up_tran_en": round(l_unocc_en - h_occ_en, 3)})
-                break
-            elif occ_up > 0 and idx != 0 and d_df["up_occ"][0][0] == 0:
-                h_occ_en = en_up
-                l_unocc_en = d_df["up_from_vbm"][0][idx-1]
-                e.update({"up_tran_en": round(l_unocc_en - h_occ_en, 3)})
-                break
-            elif occ_up > 0 and idx != 0 and d_df["up_occ"][0][0] != 0:
-                h_occ_en = d_df["up_from_vbm"][0][idx+1]
-                l_unocc_en = en_up
-                e.update({"up_tran_en": round(l_unocc_en - h_occ_en, 3)})
-                break
-            else:
-                e.update({"up_tran_en": 0})
-        for en_dn, occ_dn, idx in zip(d_df["dn_from_vbm"][0], d_df["dn_occ"][0], range(len(d_df["dn_occ"][0]))):
-
-            if occ_dn == 1 and idx != 0:
-                h_occ_en = en_dn
-                l_unocc_en = d_df["dn_from_vbm"][0][idx-1]
-                e.update({"dn_tran_en": round(l_unocc_en - h_occ_en, 3)})
-                break
-            elif occ_dn > 0 and idx != 0 and d_df["dn_occ"][0][0] == 0:
-                h_occ_en = en_dn
-                l_unocc_en = d_df["dn_from_vbm"][0][idx-1]
-                e.update({"dn_tran_en": round(l_unocc_en - h_occ_en, 3)})
-                break
-            elif occ_dn > 0 and idx != 0 and d_df["dn_occ"][0][0] != 0:
-                h_occ_en = d_df["dn_from_vbm"][0][idx+1]
-                l_unocc_en = en_dn
-                e.update({"dn_tran_en": round(l_unocc_en - h_occ_en, 3)})
-                break
-            else:
-                e.update({"dn_tran_en": 0})
-
-
-        print(tot)
     except Exception as er:
-        print(er)
-        e.update(
-            {
-                "up_from_vbm": None,
-                "up_occ": None,
-                "dn_from_vbm": None,
-                "dn_occ": None
-            }
-        )
+        # print(er)
+        # e.update(
+        #     {
+        #         "up_from_vbm": None,
+        #         "up_occ": None,
+        #         "dn_from_vbm": None,
+        #         "dn_occ": None
+        #     }
+        # )
         continue
     # e.pop("elements")
-    ess.append(e)
+
 df = pd.DataFrame(ess).sort_values(["group", "point_group", "charge_state"], inplace=False)
 df.to_clipboard("/t")
 
@@ -259,3 +199,24 @@ dos_plotter.add_dos_dict(projection_d)
 plt = dos_plotter.get_plot([-8, 8])
 plt.show()
 
+#%% look defect states in detail
+from qubitPack.qc_searching.analysis.main import get_defect_state
+import os
+
+proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
+db_json = os.path.join(proj_path, "db.json")
+
+host_path = "/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc"
+db_host_json = os.path.join(host_path, "db.json")
+
+
+tot, proj, d_df = get_defect_state(
+    db_json,
+    {"task_id": 322},
+    1.5,-0.581,
+    None,
+    True,
+    "dist",
+    db_host_json,
+    0.3
+)

@@ -165,18 +165,18 @@ db_host_json = os.path.join(host_path, "db.json")
 
 
 perturb = None
-tid = 502
+tid = 540
 
 
 tot, proj, d_df = get_defect_state(
     db_json,
     {"task_id": tid},
-    2.656,
-    -0.1,
-    proj_path,
+    0.2,
+    -2.5,
+    None,
     True,
     "dist",
-    db_host_json,
+    None,
     0.0
 )
 tot.to_clipboard()
@@ -189,9 +189,9 @@ from atomate.vasp.database import VaspCalcDb
 from pymatgen.electronic_structure.plotter import DosPlotter
 from pymatgen.io.vasp.inputs import Element
 
-db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/sandwich_Ws/db.json')
-dos = db.get_dos(534)
-dos_plt = DosPlotter(stack=False, sigma=0.05)
+db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/qubit/calculations/antisiteQubit/sandwich_Mos/db.json')
+dos = db.get_dos(540)
+dos_plt = DosPlotter(stack=False, sigma=0)
 # tdos = DosPlotter(stack=True, zero_at_efermi=False)
 # tdos.add_dos("tdos", dos)
 # fig2 = tdos.get_plot(xlim=[-5,5])

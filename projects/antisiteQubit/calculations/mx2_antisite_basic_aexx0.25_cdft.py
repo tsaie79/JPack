@@ -47,6 +47,7 @@ result = pd.DataFrame(data)
 """
 Run CDFT on MoS2 w/o perturbation
 """
+from pymatgen.io.vasp.inputs import Poscar
 from atomate.vasp.powerups import *
 from fireworks import LaunchPad
 from projects.antisiteQubit.wf_defect import ZPLWF
@@ -67,10 +68,11 @@ def antistie_triplet_ZPL(): #6.5
     #                      'block_2020-12-01-03-21-58-237215/launcher_2020-12-02-13-25-41-348623', 'triplet')
     # occ = ["302*1.0 1*0.5 1*0.5 1*1.0 115*0.0", "302*1.0 118*0.0"]
 
+
     #efrc
     anti_triplet = ZPLWF("/home/tug03990/work/mx2_antisite_basic_aexx0.25_sigma_test/"
                        "block_2020-11-16-00-55-05-740824/launcher_2020-11-23-05-01-59-204100", "triplet")
-    occ = ["302*1.0 1*0.5 1*0.5 1*1.0 175*0", "302*1.0 178*0.0"]
+    occ = ["302*1.0 1*0.5 1*0.5 1*1.0 215*0", "302*1.0 218*0.0"]
 
     # anti_triplet = ZPLWF('/home/tug03990/work/mx2_antisite_basic_aexx0.25_cdft/'
     #               'block_2020-07-27-19-52-24-555470/launcher_2020-11-29-20-24-21-823909', "triplet")
@@ -84,13 +86,17 @@ def antistie_triplet_ZPL(): #6.5
     sd_sites = anti_triplet.set_selective_sites(25, 5)
     # print(len(moving_sites))
 
-    def wf(potim, ibrion, ediffg, ediff, iopt,maxmove, moving_sites):
+    def wf(potim, ibrion, ediffg, ediff, iopt, maxmove, moving_sites):
         wf = anti_triplet.wf(
             "C", 0, up_occupation=occ[0], down_occupation=occ[1],
-            nbands=480, gamma_only=True, selective_dyn=moving_sites
+            nbands=520, gamma_only=True, selective_dyn=moving_sites,
+            specific_structure=Poscar.from_file(
+                '/home/tug03990/work/antisiteQubit/mos2_cdft_div/block_2020-11-30-17-05-10-860374/'
+                'launcher_2020-12-08-05-21-14-092530/mv_110.vasp'
+            )
         )
 
-        wf = add_modify_incar(wf, {"incar_update": {"ENCUT":320, "LASPH":True, "SIGMA":0.05}})
+        wf = add_modify_incar(wf, {"incar_update": {"ENCUT":320, "LASPH":True, "SIGMA":0.002}})
 
         wf = add_modify_incar(wf, {"incar_update": {
             # "IOPT": iopt, "MAXMOVE": maxmove,
@@ -110,7 +116,7 @@ def antistie_triplet_ZPL(): #6.5
 
         if moving_sites:
             wf.name = wf.name + ":delta{:.2f}".format(len(moving_sites) / len(anti_triplet.structure.sites))
-        wf.name = wf.name + ":TIM{}:IB{}:IOPT{}:{}:metal".format(potim, ibrion,iopt, maxmove)
+        wf.name = wf.name + ":TIM{}:IB{}:IOPT{}:{}".format(potim, ibrion,iopt, maxmove)
         LPAD.add_wf(wf)
         print(wf.name)
 
@@ -118,6 +124,7 @@ def antistie_triplet_ZPL(): #6.5
         for ib in [1]:
             for sd in [[]]:
                 wf(po,ib,-0.02, 1E-4, 7, 0.5, sd)
+
     # for po in [0]:
     #     for ib in [3]:
     #         for sd in [[]]:
@@ -234,6 +241,8 @@ for fw_id in fw_ids:
             e["EDIFF"] = incar.get("EDIFF")
             e["EDIFFG"] = incar.get("EDIFFG")
             e["LASPH"] = incar.get("LASPH")
+            e["ALGO"] = incar.get("ALGO")
+            e["NBANDS"] = incar.get("NBANDS")
 
             e["src"] = src
             e["hope"] = None
@@ -242,8 +251,75 @@ for fw_id in fw_ids:
             continue
 
 df = pd.DataFrame(data)
+df = df.set_index("fw_id")
 for idx in [1102, 1101, 1076]:
-    df.loc[df["fw_id"] == idx, ["hope"]] = True
-df.loc[df["fw_id"] == 1173, ["hope"]] = "FINAL"
-df.to_csv("~/efrc.csv")
+    df.loc[idx, "hope"] = True
+df.loc[1222, "hope"] = "ST USED"
+df.loc[1173, "hope"] = "FINAL"
+# df.to_csv("~/efrc.csv")
 
+#%%
+"""
+get displacements of antisites
+"""
+from pymatgen.io.vasp.outputs import Vasprun
+from fireworks import LaunchPad
+import os
+import pandas as pd
+from matplotlib import pyplot as plt
+
+
+CATEGORY = "mos2_cdft_div"
+LPAD = LaunchPad.from_file(
+    os.path.join(os.path.expanduser("~"), "config/project/antisiteQubit/{}/my_launchpad.yaml".format(CATEGORY)))
+
+fw_id = 1222
+p = LPAD.get_launchdir(fw_id)
+
+vr = Vasprun(os.path.join(p,"vasprun.xml.gz"))
+sts = vr.ionic_steps
+
+NN = [5,6,0,25]
+
+x0, y0, z0 = sts[0]["structure"].get_distance(25, 5), sts[0]["structure"].get_distance(25, 6), \
+             sts[0]["structure"].get_distance(25, 0)
+print(x0, y0, z0)
+data = []
+for st in sts:
+    e = {}
+    en = st["e_fr_energy"]
+    force = st["forces"][25]
+    pos = []
+    for nn in [5,6,0]:
+        d = st["structure"].get_distance(25, nn)
+        pos.append(d)
+    print(pos)
+    x, y, z = pos[0], pos[1], pos[2]
+    e["x"] = x - x0
+    e["y"] = y - y0
+    e["z"] = z - z0
+    print(e)
+    e["Fx"] = force[0]
+    e["Fy"] = force[1]
+    e["Fz"] = force[2]
+    e["E0"] = en
+    data.append(e)
+    print(data)
+df = pd.DataFrame(data)
+
+fig, axs = plt.subplots(5, sharex=True)
+axs[0].plot(df["x"], label="d5")
+axs[1].plot(df["y"], label="d6")
+axs[2].plot(df["z"], label="d0")
+
+
+# axs[3].plot(df["Fx"], label="Fx")
+# axs[4].plot(df["Fy"], label)
+axs[3].plot(df["Fz"], label="Fz")
+
+axs[4].plot(df["E0"], label="E0")
+
+for i in range(5):
+    axs[i].legend()
+
+plt.show()

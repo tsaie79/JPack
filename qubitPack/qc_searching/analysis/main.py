@@ -163,4 +163,3 @@ if __name__ == '__main__':
         None,
         0.1
     )
-    tot.to_clipboard()

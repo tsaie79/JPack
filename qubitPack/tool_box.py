@@ -57,12 +57,6 @@ def selective_dyn_site(structure, tgt_sites_idx):
     return modified_structure
 
 
-def modify_lattice(src_structure, tgt_structure):
-    tgt_lattice = tgt_structure.lattice
-    src_structure.modify_lattice(tgt_lattice)
-    return src_structure
-
-
 def defect_from_primitive_cell(orig_st, defect_type, natom, substitution=None, distort=0.002, vacuum_thickness=None):
     """
     defect_type: ["vacancies", 0] / ["substitutions", 0]

@@ -1,4 +1,0 @@
-# defectDBPack
-## Project: 
-  defectDB
-## Tools:

@@ -65,3 +65,57 @@ final.to("poscar", proj_path+"/{}_{}_final.vasp".format(e["formula_pretty"], e["
 for idx in e["NN"][:-1]:
     print(idx, init.get_distance(25, idx), final.get_distance(25,idx))
 print(e["output"]["energy"])
+
+#%%
+from atomate.vasp.powerups import *
+from fireworks import LaunchPad
+from projects.antisiteQubit.wf_defect import ZPLWF
+import os
+from glob import glob
+from pymatgen.io.vasp.inputs import Incar
+import pandas as pd
+
+CATEGORY = "perturbed"
+LPAD = LaunchPad.from_file(
+    os.path.join(os.path.expanduser("~"), "config/project/antisiteQubit/{}/my_launchpad.yaml".format(CATEGORY)))
+
+fw_ids = LPAD.get_fw_ids({"spec._category":CATEGORY, "state":{"$in":["RUNNING"]}})
+data = []
+for fw_id in fw_ids:
+    fw = LPAD.get_fw_by_id(fw_id)
+    fworker = fw.launches[-1].fworker.name
+    state = fw.launches[-1].state
+    cat = fw.spec["_category"]
+    # src = fw.spec["_tasks"][1].as_dict()["calc_dir"]
+    if fworker == "efrc":
+        dir_name = LPAD.get_launchdir(fw_id)
+        if dir_name:
+            e = {}
+
+            e["state"] = state
+            e["cat"] = cat
+            e["fw_id"] = fw_id
+
+            incar_path = glob(os.path.join(dir_name, "INCAR*"))[0]
+            incar = Incar.from_file(incar_path).as_dict()
+
+            e["IBRION"] = incar.get("IBRION")
+            e["POTIM"] = incar.get("POTIM")
+            e["IOPT"] = incar.get("IOPT", None)
+            e["MAXMOVE"] = incar.get("MAXMOVE", None)
+
+            e["ENCUT"] = incar.get("ENCUT")
+            e["SIGMA"] = incar.get("SIGMA")
+            e["EDIFF"] = incar.get("EDIFF")
+            e["EDIFFG"] = incar.get("EDIFFG")
+            e["LASPH"] = incar.get("LASPH")
+            e["ALGO"] = incar.get("ALGO")
+
+            data.append(e)
+        else:
+            continue
+
+df = pd.DataFrame(data)
+for idx in [1102, 1101, 1076]:
+    df.loc[df["fw_id"] == idx, ["hope"]] = True
+df.loc[df["fw_id"] == 1173, ["hope"]] = "FINAL"

@@ -625,7 +625,8 @@ class ZPLWF:
                     selective_dyn.append(idx)
         return selective_dyn
 
-    def wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False, selective_dyn=None):
+    def wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False, selective_dyn=None,
+           specific_structure=None):
 
         kpoint_setting = "G" if gamma_only else "R"
         user_kpoints_settings = Kpoints.gamma_automatic() if gamma_only else Kpoints.from_dict(
@@ -647,10 +648,10 @@ class ZPLWF:
         )
 
         hse_incar_part = {
-            "AMIX": 0.2,
-            "AMIX_MAG": 0.8,
-            "BMIX": 0.0001,
-            "BMIX_MAG": 0.0001,
+            # "AMIX": 0.2,
+            # "AMIX_MAG": 0.8,
+            # "BMIX": 0.0001,
+            # "BMIX_MAG": 0.0001,
         }
 
         uis_static = {
@@ -715,9 +716,10 @@ class ZPLWF:
             up_occupation=up_occupation,
             down_occupation=down_occupation,
             nbands=nbands,
-            job_type="double_relaxation_run",
+            job_type="normal",
             vasp_input_set_params=uis,
             prev_calc_dir=self.prev_calc_dir,
+            specific_structure=specific_structure,
             selective_dynamics=selective_dyn,
             name="CDFT-C-HSE_relax",
             vasptodb_kwargs={
