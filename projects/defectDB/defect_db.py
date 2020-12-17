@@ -15,6 +15,7 @@ from atomate.vasp.powerups import (
     clean_up_files
 )
 
+
 from pymatgen import Structure
 from pymatgen.io.vasp.sets import MPScanRelaxSet, MPRelaxSet
 
@@ -91,7 +92,10 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
 
         cation, anion = find_cation_anion(pc)
 
-        good_sym_site_symbols = list(dict.fromkeys(mx2["c2db_info"]["irreps"]))
+
+        combo = mx2["combo"]
+
+        good_sym_site_symbols = get_good_ir_specie(dict(combo.values()).keys(), dict(combo.values()).values())
 
         # Exclude those element in irrep
         # species = list(dict.fromkeys(mx2["sym_data"]["species"]))
@@ -171,6 +175,8 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
                                 wf = add_additional_fields_to_taskdocs(
                                     wf,
                                     {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
+                                     "pc_from_id": mx2["task_id"],
+                                     "combo": mx2["sym_data"]["combo"],
                                      "perturbed": gen_defect.distort}
                                 )
 
@@ -187,7 +193,7 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
                                                     task_name_constraint="VaspToDb")
 
                                 print(wf)
-                                lpad.add_wf(wf)
+                                # lpad.add_wf(wf)
 
 
 if __name__ == '__main__':
@@ -202,14 +208,15 @@ from atomate.vasp.database import VaspCalcDb
 import pandas as pd
 from phonopy.phonon.irreps import character_table
 
-db = VaspCalcDb.from_db_file("/qubitPack/database_profile/db_dk_local.json")
+db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/code/JPack/qubitPack/database_profile/db_dk_local.json")
 col = db.collection
 
 filter = {
     "gap_hse_nosoc":{"$gte":1},
     # "ehull":{"$lt":0.4},
     "nkinds":2,
-    "magstate": "NM"
+    "magstate": "NM",
+    "uid": "Ga2Cl6-TiCl3-NM"
 }
 show = {
     "formula":1,
@@ -275,8 +282,8 @@ for e in col.find(filter):
 df = pd.DataFrame(data)
 df = df.round(3).sort_values(["soc_intensity", "ehull"], ascending=True)
 df.set_index("uid", inplace=True)
-df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.json",
-           orient="index", indent=4, index=True)
+# df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.json",
+#            orient="index", indent=4, index=True)
 # df.to_excel("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.xlsx", index=False)
 
 #%%
@@ -301,22 +308,30 @@ df.to_json("cori_relax_lc.json", orient="records")
 
 
 #%% scan_relax_pc update
+from pymatgen import Structure
 from atomate.vasp.database import VaspCalcDb
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from qubitPack.tool_box import get_good_ir_sites
 
 db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc/db.json")
 
-for e in db.collection.find():
+for e in db.collection.find({}):
     st = Structure.from_dict(e["output"]["structure"])
-    sym = SpacegroupAnalyzer(st, symprec=1e-4).get_symmetry_dataset()
+    sym = SpacegroupAnalyzer(st, symprec=1e-1).get_symmetry_dataset()
     d = {}
     for k, v in sym.items():
         if type(v).__name__ == "ndarray":
             d[k] = v.tolist()
         else:
             d[k] = v
-    d.update({"symprec":1e-4})
-    d.update({"species": [str(sp) for sp in st.species]})
+    d.update({"symprec":1e-1})
+    species = [str(sp) for sp in st.species]
+    combine = dict(zip(d["wyckoffs"], zip(species, d["site_symmetry_symbols"])))
+    species, syms = get_good_ir_sites(dict(combine.values()).keys(), dict(combine.values()).values())
+    combine.update({"species": species, "syms": syms})
+
+    d.update({"combo": combine})
+    print(d)
     db.collection.update_one({"task_id": e["task_id"]}, {"$set":{"sym_data":d}})
 
 

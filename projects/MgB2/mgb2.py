@@ -393,7 +393,7 @@ CATEGORY = "ads"
 LPAD = LaunchPad.from_file(
     os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/my_launchpad.yaml".format(CATEGORY)))
 
-task_name = "vert"
+task_name = "hor"
 
 mol = Molecule.from_file("/home/tug03990/work/mgb2/ads/hydro_{}.xyz".format(task_name))
 slab = Structure.from_file("/home/tug03990/work/mgb2/ads/SiC_mp-7631_computed.cif")
@@ -415,9 +415,10 @@ wf = Workflow(fws, name="{}:{}".format(task_name, ads_slab.formula))
 encut = 1.3*max([potcar.enmax for potcar in MPRelaxSet(ads_slab).potcar])
 encut = encut if encut <= 520 else 520
 
-
-wf = add_modify_incar(wf, {"incar_update": {"ENCUT": encut,
-                                            "EDIFFG": -0.05, "EDIFF": 1E-4, "LCHARG": False, "ISPIN":1}}, opt_fw.name)
+wf.name = "mpincar:"+ wf.name
+mpslab = {"EDIFFG": -0.05, "ENAUG": 4000, "IBRION": 1, "POTIM": 1.0,"ISYM": 0}
+mpslab.update({"ENCUT": encut, "EDIFF": 1E-4, "LCHARG": False, "ISPIN":1})
+wf = add_modify_incar(wf, {"incar_update": mpslab}, opt_fw.name)
 wf = add_modify_incar(wf, {"incar_update": {"ENCUT": encut, "EDIFF": 1E-5, "LCHARG": False, "ISPIN":1}}, scf_fw.name)
 
 wf = add_additional_fields_to_taskdocs(wf, {"stack":task_name})
@@ -426,3 +427,16 @@ wf = set_execution_options(wf, category=CATEGORY)
 LPAD.add_wf(wf)
 
 
+#%% analyze resulting structures
+from pymatgen import Structure
+from atomate.vasp.database import VaspCalcDb
+import os
+
+p = "/Users/jeng-yuantsai/Research/project/MgB2/calculations/mgb2/ads"
+db = VaspCalcDb.from_db_file(os.path.join(p, "db.json"))
+
+
+for e in db.collection.find({"task_label":{"$regex":"opt"}}):
+
+    st = Structure.from_dict(e["orig_inputs"]["poscar"]["structure"])
+    st.to("poscar", os.path.join(p, "structures", "{}_{}_{}_input.vasp".format(e["formula_pretty"], e["task_id"], e["stack"])))

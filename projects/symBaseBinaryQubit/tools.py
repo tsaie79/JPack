@@ -160,7 +160,7 @@ db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinar
 
 es = db.collection.aggregate(
     [
-        {"$match": {"task_label":"SCAN_scf", "chemsys":"S-W"}},
+        {"$match": {"task_label":"SCAN_scf"}},
         {"$group": {"_id":"$pc_from",
                     "tid": {"$push": "$task_id"},
                     "defect": {"$push": "$defect_entry.name"},

@@ -6,6 +6,9 @@ import numpy as np
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 
+from phonopy.phonon.irreps import character_table
+
+
 
 def find_cation_anion(structure):
     cation, anion = None, None
@@ -282,3 +285,26 @@ class GenDefect:
         self.NN = [self.defect_st.index(nn) for nn in defect_sites_in_bulk]
         self.nn_dist["before"] = dict(zip([str(idx) for idx in self.NN], self.nn_dist["before"].values()))
 
+
+def get_good_ir_sites(species, site_syms):
+    good_ir_species = []
+    good_ir_syms = []
+    for specie, site_sym in zip(species, site_syms):
+        print(site_sym)
+        site_sym = [x for x in site_sym.split(".") if x][0]
+        if site_sym == "-4m2":
+            site_sym = "-42m"
+        if site_sym == "2mm" or site_sym == "m2m":
+            site_sym = "mm2"
+        if site_sym == "1":
+            continue
+
+        irreps = character_table[site_sym][0]["character_table"]
+        for irrep, char_vec in irreps.items():
+            print(char_vec)
+            if char_vec[0] >= 2:
+                good_ir_species.append((str(specie)))
+                good_ir_syms.append(site_sym)
+                break
+
+    return good_ir_species, good_ir_syms
