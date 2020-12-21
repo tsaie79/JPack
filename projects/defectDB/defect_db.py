@@ -77,7 +77,7 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s[30:40]:
+    for mx2 in mx2s[41:]:
         pc = Structure.from_dict(mx2["output"]["structure"])
         if mx2["nsites"] == 2:
             geo_spec = {25*2: [20]}
@@ -92,10 +92,9 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
 
         cation, anion = find_cation_anion(pc)
 
+        combo = mx2["sym_data"]["combo"]
 
-        combo = mx2["combo"]
-
-        good_sym_site_symbols = get_good_ir_specie(dict(combo.values()).keys(), dict(combo.values()).values())
+        good_sym_site_symbols = get_good_ir_sites(combo["species"], combo["syms"])
 
         # Exclude those element in irrep
         # species = list(dict.fromkeys(mx2["sym_data"]["species"]))
@@ -104,7 +103,7 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
         # good_sym_site_symbols = species
 
         print(good_sym_site_symbols)
-        for good_sym_site_symbol in good_sym_site_symbols:
+        for good_sym_site_symbol in good_sym_site_symbols[0]:
             # substitutions or vacancies
             defect_type = (defect_choice, "{}".format(good_sym_site_symbol))
 
@@ -193,7 +192,7 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
                                                     task_name_constraint="VaspToDb")
 
                                 print(wf)
-                                # lpad.add_wf(wf)
+                                lpad.add_wf(wf)
 
 
 if __name__ == '__main__':
@@ -201,6 +200,89 @@ if __name__ == '__main__':
     binary_scan_defect()
     # test_IR()
 
+#%% recalculate wavecar for successfull scan_scf's
+from qubitPack.tool_box import *
+
+from fireworks import LaunchPad, Workflow
+
+from atomate.vasp.database import VaspCalcDb
+from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_scan
+from atomate.vasp.fireworks.core import ScanOptimizeFW
+from atomate.vasp.powerups import (
+    add_additional_fields_to_taskdocs,
+    preserve_fworker,
+    add_modify_incar,
+    set_queue_options,
+    set_execution_options,
+    clean_up_files,
+    use_fake_vasp
+)
+from atomate.vasp.jpowerups import *
+
+
+from pymatgen import Structure
+from pymatgen.io.vasp.sets import MPScanRelaxSet, MPRelaxSet
+
+from pycdt.core.defectsmaker import ChargedDefectsStructures
+
+from monty.serialization import loadfn
+import os
+
+def binary_scan_defect_gen_wavecar(): #BN_vac
+    col = VaspCalcDb.from_db_file(
+            os.path.expanduser(os.path.join("~",
+            "config/project/defect_db/binary_defect/db.json"))).collection
+
+    mx2s = col.find(
+        {
+            "task_label": "SCAN_scf",
+            "dir_name": {"$regex": "efrc"},
+            "category": "binary_defect"
+        }
+    )
+    geo_spec = None
+    aexx = 0.25
+    test = []
+
+    for mx2 in list(mx2s)[1:149]: #max149
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/defect_db/{}/my_launchpad.yaml".format(mx2["category"])))
+        print(mx2["task_id"])
+        wf = get_wf_full_scan(
+            structure=Structure.from_dict(mx2["input"]["structure"]),
+            charge_states=[0],
+            gamma_only=False,
+            gamma_mesh=True,
+            dos=True,
+            nupdowns=[-1],
+            vasptodb={},
+            wf_addition_name=mx2["task_id"],
+            task="scan_scf",
+            category=mx2["category"],
+        )
+        wf = write_inputs_from_db(
+            wf,
+            db_file=os.path.expanduser(
+                os.path.join("~", "config/project/defect_db/binary_defect/db.json")),
+            task_id=mx2["task_id"],
+            modify_incar={"LWAVE":True, "LCHARG":False, "ICHARG":1}
+        )
+        wf = scp_files(wf, "/home/jengyuantsai/Research/projects/", "defect_db", mx2["dir_name"].split("/")[-1])
+        # related to directory
+        wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_scf")
+        wf = set_execution_options(wf, category=mx2["category"])
+        wf = preserve_fworker(wf)
+        # task_name_constraint=x meaning after x do powersup
+        wf = clean_up_files(wf, files=["CHGCAR"],
+                            task_name_constraint="RunVasp")
+        wf = clean_up_files(wf, files=["*"],
+                            task_name_constraint="PassCalcLocs")
+        print(wf)
+        lpad.add_wf(wf)
+
+binary_scan_defect_gen_wavecar()
 #%% looking for candidate hosts
 from pymatgen import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer

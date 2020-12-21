@@ -115,7 +115,7 @@ def c_terminate_mgb2(cat="slab_dipol"):
 
 c_terminate_mgb2()
 
-#%% Build Structures
+#%% heteros
 from pymatgen import Structure
 import os
 
