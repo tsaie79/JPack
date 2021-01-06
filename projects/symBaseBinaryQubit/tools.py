@@ -212,11 +212,24 @@ db_host_json = os.path.join(host_path, "db.json")
 
 tot, proj, d_df = get_defect_state(
     db_json,
-    {"task_id": 322},
-    1.5,-0.581,
+    {"task_id": 2183},
+    2,-2,
     None,
     True,
     "dist",
     db_host_json,
-    0.3
+    0.2
 )
+
+#%% plot dos
+from atomate.vasp.database import VaspCalcDb
+from pymatgen.electronic_structure.plotter import DosPlotter
+
+proj_path = '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/search_triplet_from_defect_db'
+db = VaspCalcDb.from_db_file(os.path.join(proj_path, "db.json"))
+
+dos = db.get_dos(2052)
+dsplot = DosPlotter(zero_at_efermi=True)
+dsplot.add_dos('tdos', dos)
+plt = dsplot.get_plot([-10,10])
+plt.show()

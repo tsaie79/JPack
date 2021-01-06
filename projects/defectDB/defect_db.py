@@ -1,6 +1,4 @@
-#%% WF
-from qubitPack.tool_box import *
-
+#%% IMPORT
 from fireworks import LaunchPad, Workflow
 
 from atomate.vasp.database import VaspCalcDb
@@ -12,30 +10,36 @@ from atomate.vasp.powerups import (
     add_modify_incar,
     set_queue_options,
     set_execution_options,
-    clean_up_files
+    clean_up_files,
+    add_modify_kpoints
 )
-
+from atomate.vasp.jpowerups import *
 
 from pymatgen import Structure
 from pymatgen.io.vasp.sets import MPScanRelaxSet, MPRelaxSet
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 
+from qubitPack.tool_box import *
+
 from monty.serialization import loadfn
 import os
+import pandas as pd
 
 
+#%%
 def relax_pc():
-    lpad = LaunchPad.from_file("/home/tug03990/atomate/example/config/project/"
-                               "symBaseBinaryQubit/scan_relax_pc/my_launchpad.yaml")
+    lpad = LaunchPad.from_file(os.path.expanduser(
+        os.path.join("~", "config/project/symBaseBinaryQubit/scan_relax_pc/my_launchpad.yaml")))
 
-    mx2s = loadfn("/home/tug03990/atomate/example/config/project/symBaseBinaryQubit/"
-                  "scan_relax_pc/gap_gt1-binary-NM.json")
+    mx2s = loadfn(os.path.expanduser(os.path.join("~", "config/project/symBaseBinaryQubit/"
+                  "scan_relax_pc/gap_gt1-binary-NM.json")))
 
     for mx2 in mx2s:
-        if mx2["irreps"] and mx2["formula"] == "Rh2Br6" and mx2["spacegroup"] == "P3":
+        # if mx2["irreps"] and mx2["formula"] == "Rh2Br6" and mx2["spacegroup"] == "P3":
+        if mx2["formula"] == "BN":
             pc = mx2["structure"]
-            pc = modify_vacuum(pc, 20)
+            pc = modify_vacuum(pc, 30)
             scan_opt = ScanOptimizeFW(structure=pc, name="SCAN_relax")
             wf = Workflow([scan_opt], name="{}:SCAN_opt".format(mx2["formula"]))
             wf = add_modify_incar(wf)
@@ -57,13 +61,11 @@ def relax_pc():
             wf = set_execution_options(wf, category="scan_relax_pc")
             wf = preserve_fworker(wf)
             lpad.add_wf(wf)
+relax_pc()
 
+#%%
+def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_vac
 
-def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", impurity_on_nn=None): #BN_vac
-    lpad = LaunchPad.from_file(
-        os.path.join(
-            os.path.expanduser("~"),
-            "config/project/defect_db/{}/my_launchpad.yaml".format(cat)))
     col = VaspCalcDb.from_db_file(
         os.path.join(
             os.path.expanduser("~"),
@@ -71,22 +73,39 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
 
     mx2s = col.find(
         {
-            "nsites": 4
+            "nsites": 8
         }
     )
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s[41:]:
+    for mx2 in mx2s[5:14]:
         pc = Structure.from_dict(mx2["output"]["structure"])
+        cat = None
+
+        if defect_choice == "substitutions":
+            cat = "binary_defect_antisite_"
+        elif defect_choice == "vacancies":
+            cat = "bincary_defect_vac_"
+
         if mx2["nsites"] == 2:
             geo_spec = {25*2: [20]}
+            cat += "AB"
         if mx2["nsites"] == 3:
             geo_spec = {25*3: [20]}
+            cat += "AB2"
         if mx2["nsites"] == 4:
             geo_spec = {25*4: [20]}
+            cat += "AB"
         if mx2["nsites"] == 8:
             geo_spec = {25*8: [20]}
+            cat += "AB3"
+
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/defect_db/{}/my_launchpad.yaml".format(cat)))
+        print(cat)
 
         defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
 
@@ -176,58 +195,33 @@ def binary_scan_defect(cat="binary_defect_vac_AB3", defect_choice="vacancies", i
                                     {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
                                      "pc_from_id": mx2["task_id"],
                                      "combo": mx2["sym_data"]["combo"],
+                                     "class": mx2["c2db_info"]["class"],
                                      "perturbed": gen_defect.distort}
                                 )
 
-                                wf = add_modify_incar(wf, {"incar_update": {"NSW":150}}, "SCAN_relax")
-                                wf = add_modify_incar(wf, {"incar_update": {"LWAVE": False}}, "SCAN_scf")
-                                wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_relax")
-                                wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_scf")
+                                wf = add_modify_incar(wf, {"incar_update": {"NSW":150, "LCHARG":False,
+                                                                            "LWAVE":False}}, "SCAN_relax")
+                                wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True, "LCHARG": False}}, "SCAN_scf")
+                                wf = set_queue_options(wf, "24:00:00")
                                 # related to directory
                                 wf = set_execution_options(wf, category=cat)
                                 wf = preserve_fworker(wf)
                                 wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
                                 # task_name_constraint=x meaning after x do powersup
-                                wf = clean_up_files(wf, files=["CHG*", "DOS*", "LOCPOT*"],
-                                                    task_name_constraint="VaspToDb")
+                                wf = scp_files(
+                                    wf,
+                                    "/home/jengyuantsai/Research/projects/defect_db",
+                                    fw_name_constraint="SCAN_scf",
+                                )
+                                wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
+                                                    fw_name_constraint="SCAN_scf")
 
                                 print(wf)
                                 lpad.add_wf(wf)
 
-
-if __name__ == '__main__':
-    # relax_pc()
-    binary_scan_defect()
-    # test_IR()
+binary_scan_defect()
 
 #%% recalculate wavecar for successfull scan_scf's
-from qubitPack.tool_box import *
-
-from fireworks import LaunchPad, Workflow
-
-from atomate.vasp.database import VaspCalcDb
-from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_scan
-from atomate.vasp.fireworks.core import ScanOptimizeFW
-from atomate.vasp.powerups import (
-    add_additional_fields_to_taskdocs,
-    preserve_fworker,
-    add_modify_incar,
-    set_queue_options,
-    set_execution_options,
-    clean_up_files,
-    use_fake_vasp
-)
-from atomate.vasp.jpowerups import *
-
-
-from pymatgen import Structure
-from pymatgen.io.vasp.sets import MPScanRelaxSet, MPRelaxSet
-
-from pycdt.core.defectsmaker import ChargedDefectsStructures
-
-from monty.serialization import loadfn
-import os
-
 def binary_scan_defect_gen_wavecar(): #BN_vac
     col = VaspCalcDb.from_db_file(
             os.path.expanduser(os.path.join("~",
@@ -236,15 +230,14 @@ def binary_scan_defect_gen_wavecar(): #BN_vac
     mx2s = col.find(
         {
             "task_label": "SCAN_scf",
-            "dir_name": {"$regex": "efrc"},
-            "category": "binary_defect"
-        }
+            # "category": "binary_defect_antisite_AB3"
+            "task_id": {"$in": [1190,1848, 2262, 2263, 2266, 2268, 2269, 2273, 2274, 2275]}}
     )
     geo_spec = None
     aexx = 0.25
     test = []
 
-    for mx2 in list(mx2s)[1:149]: #max149
+    for mx2 in list(mx2s)[:]: #max149
         lpad = LaunchPad.from_file(
             os.path.join(
                 os.path.expanduser("~"),
@@ -275,7 +268,7 @@ def binary_scan_defect_gen_wavecar(): #BN_vac
         wf = set_execution_options(wf, category=mx2["category"])
         wf = preserve_fworker(wf)
         # task_name_constraint=x meaning after x do powersup
-        wf = clean_up_files(wf, files=["CHGCAR"],
+        wf = clean_up_files(wf, files=["CHGCAR*"],
                             task_name_constraint="RunVasp")
         wf = clean_up_files(wf, files=["*"],
                             task_name_constraint="PassCalcLocs")
@@ -284,10 +277,6 @@ def binary_scan_defect_gen_wavecar(): #BN_vac
 
 binary_scan_defect_gen_wavecar()
 #%% looking for candidate hosts
-from pymatgen import Structure
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from atomate.vasp.database import VaspCalcDb
-import pandas as pd
 from phonopy.phonon.irreps import character_table
 
 db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/code/JPack/qubitPack/database_profile/db_dk_local.json")
@@ -369,9 +358,6 @@ df.set_index("uid", inplace=True)
 # df.to_excel("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.xlsx", index=False)
 
 #%%
-from atomate.vasp.database import VaspCalcDb
-import pandas as pd
-
 db = VaspCalcDb.from_db_file("/global/homes/t/tsaie79/code/qubitPack/database_profile/db_mongo_cori.json")
 col = db.collection
 data = []
@@ -390,11 +376,6 @@ df.to_json("cori_relax_lc.json", orient="records")
 
 
 #%% scan_relax_pc update
-from pymatgen import Structure
-from atomate.vasp.database import VaspCalcDb
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from qubitPack.tool_box import get_good_ir_sites
-
 db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc/db.json")
 
 for e in db.collection.find({}):
@@ -418,8 +399,6 @@ for e in db.collection.find({}):
 
 
 #%% get structure from SCAN_relax
-from atomate.vasp.database import VaspCalcDb
-from pymatgen import Structure
 
 db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
                              'scan_relax_pc/db.json')
