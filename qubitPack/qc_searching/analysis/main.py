@@ -113,10 +113,13 @@ def get_defect_state(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboar
         if locpot:
             cbm_set = can.cbm + can.vacuum_locpot
             vbm_set = can.vbm + can.vacuum_locpot
+            efermi = can.efermi + can.vacuum_locpot
         else:
             cbm_set = cbm
             vbm_set = vbm
-        dos_plot = DosPlotDB(db=db, db_filter=db_filter, cbm=cbm_set, vbm=vbm_set, path_save_fig=path_save_fig)
+            efermi = can.efermi
+
+        dos_plot = DosPlotDB(db=db, db_filter=db_filter, cbm=cbm_set, vbm=vbm_set, efermi=efermi, path_save_fig=path_save_fig)
         # dos_plot.nn = [25, 26, 31, 30, 29, 49, 45]
         dos_plot.total_dos(energy_upper_bound=2, energy_lower_bound=2)
         print(dos_plot.nn)

@@ -19,7 +19,7 @@ for db_config in glob(DB_CONFIG_PATH+"/*"):
 
 class DosPlotDB:
 
-    def __init__(self, db, db_filter, cbm, vbm, path_save_fig):
+    def __init__(self, db, db_filter, cbm, vbm, efermi, path_save_fig):
         self.path_save_fig = path_save_fig
         db1 = VaspCalcDb.from_db_file(db)
         self.e1 = db1.collection.find_one(filter=db_filter)
@@ -40,6 +40,7 @@ class DosPlotDB:
         self.complete_dos1 = db1.get_dos(self.e1["task_id"])
         self.cbm_primitive = cbm
         self.vbm_primitive = vbm
+        self.efermi = efermi
         self.cation = self.complete_dos1.structure.types_of_specie[0]
         self.anion = self.complete_dos1.structure.types_of_specie[1]
         self.nn = self.e1["NN"]
@@ -72,6 +73,7 @@ class DosPlotDB:
         plot.legend(loc=1)
         plot.axvline(x=self.cbm_primitive, color="k", linestyle="--")
         plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
+        plot.axvline(x=self.efermi+0.125, color="k", linestyle="-.")
         plot.legend(loc=1)
         plot.title(self.e1["formula_pretty"]+" total_dos")
 
@@ -98,6 +100,7 @@ class DosPlotDB:
         plot = plotter.get_plot(xlim=[self.vbm_primitive-energy_lower_bound, self.cbm_primitive+energy_upper_bound])
         plot.axvline(x=self.cbm_primitive, color="k", linestyle="--")
         plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
+        plot.axvline(x=self.efermi+0.125, color="k", linestyle="-.")
         plot.legend(loc=1)
         plot.title(self.e1["formula_pretty"] + " site%d %s" % (index, self.complete_dos1.structure.sites[index].specie))
 
@@ -128,6 +131,7 @@ class DosPlotDB:
             plot.legend(loc=1)
             plot.axvline(x=self.cbm_primitive, color="k", linestyle="--")
             plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
+            plot.axvline(x=self.efermi+0.125, color="k", linestyle="-.")
             # fig = plot.figure()
             # plotly_plot = tls.mpl_to_plotly(fig)
             # plotly.offline.plot(plotly_plot, filename=os.path.join("procar.html"))
@@ -158,6 +162,7 @@ class DosPlotDB:
             plot.legend()
             plot.axvline(x=self.cbm_primitive, color="k", linestyle="--")
             plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
+            plot.axvline(x=self.efermi+0.125, color="k", linestyle="-.")
             plot.show()
             return plot
 
