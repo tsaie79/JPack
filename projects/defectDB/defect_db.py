@@ -79,7 +79,7 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s[5:14]:
+    for mx2 in mx2s[14:34]:
         pc = Structure.from_dict(mx2["output"]["structure"])
         cat = None
 

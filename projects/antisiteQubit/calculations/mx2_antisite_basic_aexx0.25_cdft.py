@@ -150,8 +150,10 @@ LPAD = LaunchPad.from_file(
 
 def antistie_triplet_ZPL(): #6.5
     #efrc
-    anti_triplet = ZPLWF("/home/tug03990/work/antisiteQubit/perturbed/"
-                         "block_2020-11-21-04-37-28-746929/launcher_2020-11-23-22-19-31-039641", "triplet")
+    # anti_triplet = ZPLWF("/home/tug03990/work/antisiteQubit/perturbed/"
+    #                      "block_2020-11-21-04-37-28-746929/launcher_2020-11-23-22-19-31-039641", "triplet")
+    anti_triplet = ZPLWF("/home/jengyuantsai/Research/projects/single_photon_emitter/standard_defect/"
+                         "launcher_2021-01-13-04-09-57-563577", "triplet")
 
     sd_sites = anti_triplet.set_selective_sites(25, 5)
     sd_sites.sort()
@@ -159,7 +161,7 @@ def antistie_triplet_ZPL(): #6.5
 
     def wf(potim, ibrion, ediffg, ediff, moving_sites):
         wf = anti_triplet.wf(
-            "B-C-D", 0, up_occupation="302*1.0 1*0.5 1*0.5 1*1.0 155*0.0",#"303*1.0 1*0 1*1.0 175*0",
+            "B", 0, up_occupation="302*1.0 1*0.5 1*0.5 1*1.0 155*0.0",#"303*1.0 1*0 1*1.0 175*0",
             down_occupation="302*1.0 158*0.0", nbands=460, gamma_only=True, selective_dyn=moving_sites
         )
 
@@ -186,8 +188,8 @@ def antistie_triplet_ZPL(): #6.5
         if moving_sites:
             wf.name = wf.name + ":delta{:.2f}".format(len(moving_sites) / len(anti_triplet.structure.sites))
         wf.name = wf.name + ":TIM{}:IB{}".format(potim, ibrion)
-        # LPAD.add_wf(wf)
         print(wf.name)
+        LPAD.add_wf(wf)
 
     for po in [0]:
         for ib in [3]:

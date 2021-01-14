@@ -2,6 +2,7 @@ from fireworks import Workflow
 from fireworks import LaunchPad
 
 from atomate.vasp.powerups import *
+from atomate.vasp.jpowerups import *
 from atomate.vasp.fireworks.core import OptimizeFW, StaticFW, ScanOptimizeFW
 from atomate.vasp.fireworks.jcustom import *
 from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_hse
@@ -21,9 +22,9 @@ from unfold import find_K_from_k
 import math
 from qubitPack.tool_box import *
 
-CATEGORY = "mx2_antisite_basic_aexx0.25_cdft"
+CATEGORY = "pc"
 LPAD = LaunchPad.from_file(
-    os.path.join(os.path.expanduser("~"), "config/category/{}/my_launchpad.yaml".format(CATEGORY)))
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
 
 
 class HostWF:
@@ -31,23 +32,73 @@ class HostWF:
     def hse_scf_wf(cls):
         col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
         # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
-        mx2s = col.find({"task_id":{"$in":[3083, 3097, 3094, 3102]}})
+        mx2s = col.find({"task_id":{"$in":[3091]}})
 
         for mx2 in mx2s:
             pc = Structure.from_dict(mx2["output"]["structure"])
+            pc = modify_vacuum(pc, 20)
             scf_wf = get_wf_full_hse(
                 structure=pc,
                 charge_states=[0],
                 gamma_only=False,
                 gamma_mesh=True,
-                dos=True,
+                scf_dos=True,
                 nupdowns=[-1],
-                encut=320,
-                task="hse_scf",
-                category="mx2_antisite_pc",
+                task="hse_relax",
+                category="pc",
             )
             print(scf_wf)
-            LPAD.add_wf(scf_wf)
+
+            wf = add_modify_incar(scf_wf,
+                                  {
+                                      "incar_update":
+                                          {"LASPH": True, "EDIFF": 1E-7, "EDIFFG": -0.001, "ISIF": 3, "NSW": 250, "LCHARG":False, "LWAVE":False}})
+            LPAD.add_wf(wf)
+
+    @classmethod
+    def hse_band_structure(cls):
+        pc = Structure.from_dict({'@module': 'pymatgen.core.structure',
+                                  '@class': 'Structure',
+                                  'charge': None,
+                                  'lattice': {'matrix': [[3.1529358858637777, 1.0053975e-09, 0.0],
+                                                         [-1.5764674411892312, 2.730521508558374, 0.0],
+                                                         [0.0, 0.0, 20.0]],
+                                              'a': 3.1529358858637777,
+                                              'b': 3.1529347125859775,
+                                              'c': 20.0,
+                                              'alpha': 90.0,
+                                              'beta': 90.0,
+                                              'gamma': 120.00000176314633,
+                                              'volume': 172.18318506083142},
+                                  'sites': [{'species': [{'element': 'W', 'occu': 1}],
+                                             'abc': [0.0, 0.0, 0.5],
+                                             'xyz': [0.0, 0.0, 10.0],
+                                             'label': 'W',
+                                             'properties': {}},
+                                            {'species': [{'element': 'S', 'occu': 1}],
+                                             'abc': [0.6666669999999968, 0.3333330000000032, 0.5778428253948604],
+                                             'xyz': [1.5764696866472017, 0.9101729266825626, 11.556856507897209],
+                                             'label': 'S',
+                                             'properties': {}},
+                                            {'species': [{'element': 'S', 'occu': 1}],
+                                             'abc': [0.6666669999999968, 0.3333330000000032, 0.4221571746051396],
+                                             'xyz': [1.5764696866472017, 0.9101729266825626, 8.443143492102791],
+                                             'label': 'S',
+                                             'properties': {}}]}
+                                 )
+        bs_wf = get_wf_full_hse(
+            structure=pc,
+            charge_states=[0],
+            gamma_only=False,
+            gamma_mesh=True,
+            scf_dos=False,
+            nupdowns=[-1],
+            task="hse_scf-hse_bs",
+            category="pc",
+        )
+        bs_wf = add_modify_incar(bs_wf,{"incar_update": { "EDIFF": 1E-7, "LCHARG":True, "LWAVE":False}}, "HSE_scf")
+        bs_wf = add_modify_incar(bs_wf,{"incar_update": { "EDIFF": 1E-7, "LCHARG":False, "LWAVE":False}}, "HSE_bs")
+        LPAD.add_wf(bs_wf)
 
 class PBEDefectWF:
     def get_wf_point_defects(self, bulk_structure, defect_structure,
@@ -175,10 +226,10 @@ class DefectWF:
                 lpad.add_wf(wf)
 
     @classmethod
-    def MX2_anion_antisite(cls, defect_type="substitutions", distorts=(0)):
+    def MX2_anion_antisite(cls, defect_type="vacancies", distorts=(0)):
             col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
             # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
-            mx2s = col.find({"task_id":{"$in":[4236, 4235]}})
+            mx2s = col.find({"task_id":{"$in":[4237]}})
 
             # col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_basic_aexx0.25_final/db.json").collection
             # # mx2s = col.find({"task_id":{"$in":[3281, 3282, 3291, 3285]}}) #3281, 3282, 3281, 3291, 3285
@@ -201,7 +252,7 @@ class DefectWF:
                 for sub in range(len(defect[defect_type])):
                     print(cation, anion)
                     # cation vacancy
-                    if "{}_on_{}".format(cation, anion) not in defect[defect_type][sub]["name"]:
+                    if "vac_{}".format(anion) not in defect[defect_type][sub]["name"]:
                         continue
                     for na, thicks in geo_spec.items():
                         for thick in thicks:
@@ -212,6 +263,7 @@ class DefectWF:
                                     natom=na,
                                     vacuum_thickness=thick,
                                     distort=dtort,
+                                    sub_on_side="Re"
                                 )
 
                                 wf = get_wf_full_hse(
@@ -219,9 +271,8 @@ class DefectWF:
                                     charge_states=[0],
                                     gamma_only=False,
                                     gamma_mesh=True,
-                                    dos=True,
+                                    scf_dos=True,
                                     nupdowns=[-1],
-                                    encut=320,
                                     task="opt-hse_relax-hse_scf",
                                     vasptodb={"category": CATEGORY, "NN": se_antisite.NN,
                                               "defect_entry": se_antisite.defect_entry},
@@ -234,17 +285,16 @@ class DefectWF:
                                     {
                                         "lattice_constant": "HSE",
                                         "perturbed": se_antisite.distort,
-                                        "sigma": 0.002,
                                         "pc_from": "mx2_antisite_pc/HSE_scf/{}".format(mx2["task_id"])
                                     }
                                 )
-
-                                wf = add_modify_incar(wf, {"incar_update": {"NSW":150, "SIGMA":0.002}}, "PBE_relax")
-                                wf = add_modify_incar(wf, {"incar_update": {"EDIFFG":-0.02,
-                                                                            "AEXX":aexx,
-                                                                            "NSW":150, "SIGMA":0.002}}, "HSE_relax")
-                                wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True, "AEXX":aexx,
-                                                                            "SIGMA":0.002}}, "HSE_scf")
+                                wf = scp_files(
+                                    wf,
+                                    "/home/jengyuantsai/Research/projects/single_photon_emitter/standard_defect",
+                                    fw_name_constraint="HSE_scf",
+                                )
+                                wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
+                                                    fw_name_constraint="HSE_scf")
                                 wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
                                 wf = set_queue_options(wf, "48:00:00", fw_name_constraint="HSE_relax")
                                 wf = set_queue_options(wf, "32:00:00", fw_name_constraint="HSE_scf")
@@ -676,8 +726,8 @@ class ZPLWF:
                     "ENCUT": self.encut,
                     "ICHARG": 0,
                     "ISIF": 2,
-                    "EDIFF": 1E-4,
-                    "EDIFFG": -0.02,
+                    "EDIFF": 1E-5,
+                    "EDIFFG": -0.01,
                     "LCHARG": False,
                     "LWAVE": False,
                     "ISTART": 1,
@@ -699,13 +749,16 @@ class ZPLWF:
             nbands=nbands,
             job_type="normal",
             prev_calc_dir=self.prev_calc_dir,
+            specific_structure=specific_structure,
             vasp_input_set_params=uis,
             selective_dynamics=None,
             name="CDFT-B-HSE_scf",
             vasptodb_kwargs={
                 "additional_fields": {
                     "task_type": "JHSEcDFTFW"
-                }
+                },
+                "parse_eigenvalues": False,
+                "parse_dos": False
             }
         )
 
@@ -723,11 +776,11 @@ class ZPLWF:
             selective_dynamics=selective_dyn,
             name="CDFT-C-HSE_relax",
             vasptodb_kwargs={
-                "parse_eigenvalues": False,
-                "parse_dos": False,
                 "additional_fields": {
                     "task_type": "JHSEcDFTFW"
-                }
+                },
+                "parse_eigenvalues": False,
+                "parse_dos": False,
             }
         )
 
@@ -742,7 +795,9 @@ class ZPLWF:
             vasptodb_kwargs={
                 "additional_fields": {
                     "task_type": "JHSEStaticFW"
-                }
+                },
+                "parse_eigenvalues": False,
+                "parse_dos": False,
             }
         )
 
@@ -1268,17 +1323,6 @@ class Cluster:
 
 
 if __name__ == '__main__':
-    # Bilayer.wf()
-    # bn = PBEDefectWF()
-    # bn.bn_sub_wf([30])
-    ZPLWF.antistie_triplet_ZPL()
-    # DefectWF.MX2_anion_antisite()
-    # SPWflows.MX2_bandgap_hse()
-    # Sandwich(Structure.from_file('/gpfs/work/tug03990/'
-    #                              'sandwich_BN_mx2/block_2020-07-09-03-07-03-645928/'
-    #                              'launcher_2020-07-22-03-02-48-675084/CONTCAR.relax2.gz')).wf()
-    # for i in glob("/home/tug03990/work/cluster/raw_st/*"):
-    #     Cluster(Structure.from_file(i)).wf()
-    # HostWF.hse_scf_wf()
+    HostWF.hse_band_structure()
 
 
