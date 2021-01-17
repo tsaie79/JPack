@@ -21,29 +21,28 @@ class DosPlotDB:
 
     def __init__(self, db, db_filter, cbm, vbm, efermi, path_save_fig):
         self.path_save_fig = path_save_fig
-        db1 = VaspCalcDb.from_db_file(db)
-        self.e1 = db1.collection.find_one(filter=db_filter)
+        self.e = db.collection.find_one(filter=db_filter)
         if self.path_save_fig:
-            Structure.from_dict(self.e1["output"]["structure"]).to(
+            Structure.from_dict(self.e["output"]["structure"]).to(
                 "POSCAR",
                 os.path.join(
                     self.path_save_fig,
                     "structures", "{}_{}_{}.vasp".format(
-                        self.e1["formula_pretty"],
-                        self.e1["task_id"],
-                        self.e1["task_label"]
+                        self.e["formula_pretty"],
+                        self.e["task_id"],
+                        self.e["task_label"]
                     )
                 )
             )
 
-        print("dos_1:%s" % self.e1["task_id"])
-        self.complete_dos1 = db1.get_dos(self.e1["task_id"])
+        print("dos_1:%s" % self.e["task_id"])
+        self.complete_dos1 = db.get_dos(self.e["task_id"])
         self.cbm_primitive = cbm
         self.vbm_primitive = vbm
         self.efermi = efermi
         self.cation = self.complete_dos1.structure.types_of_specie[0]
         self.anion = self.complete_dos1.structure.types_of_specie[1]
-        self.nn = self.e1["NN"]
+        self.nn = self.e["NN"]
 
 
     def band_gap(self):
@@ -75,13 +74,13 @@ class DosPlotDB:
         plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
         plot.axvline(x=self.efermi+0.125, color="k", linestyle="-.")
         plot.legend(loc=1)
-        plot.title(self.e1["formula_pretty"]+" total_dos")
+        plot.title(self.e["formula_pretty"]+" total_dos")
 
         if self.path_save_fig:
             plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.tdos.png".format(
-                self.e1["formula_pretty"],
-                self.e1["task_id"],
-                self.e1["task_label"],
+                self.e["formula_pretty"],
+                self.e["task_id"],
+                self.e["task_label"],
             )), img_format="png")
         plot.show()
 
@@ -102,13 +101,13 @@ class DosPlotDB:
         plot.axvline(x=self.vbm_primitive, color="k", linestyle="--")
         plot.axvline(x=self.efermi+0.125, color="k", linestyle="-.")
         plot.legend(loc=1)
-        plot.title(self.e1["formula_pretty"] + " site%d %s" % (index, self.complete_dos1.structure.sites[index].specie))
+        plot.title(self.e["formula_pretty"] + " site%d %s" % (index, self.complete_dos1.structure.sites[index].specie))
 
         if self.path_save_fig:
             plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}.{}_idx{}.orbital_dos.png".format(
-                self.e1["formula_pretty"],
-                self.e1["task_id"],
-                self.e1["task_label"],
+                self.e["formula_pretty"],
+                self.e["task_id"],
+                self.e["task_label"],
                 index
             )), img_format="png")
 
@@ -119,7 +118,7 @@ class DosPlotDB:
         return plot
 
     def sites_plots(self, energy_upper_bound, energy_lower_bound, spd=False):
-        title = self.e1["formula_pretty"]
+        title = self.e["formula_pretty"]
 
         def sites_total_plots():
             dosplot = DosPlotter(zero_at_efermi=False, stack=True)
@@ -135,19 +134,19 @@ class DosPlotDB:
             # fig = plot.figure()
             # plotly_plot = tls.mpl_to_plotly(fig)
             # plotly.offline.plot(plotly_plot, filename=os.path.join("procar.html"))
-            plot.title(title+" site PDOS"+" Charge state:%d" % self.e1["charge_state"])
+            plot.title(title+" site PDOS"+" Charge state:%d" % self.e["charge_state"])
             if self.path_save_fig:
                 plot.savefig(os.path.join(self.path_save_fig, "defect_states", "{}_{}_{}.pdos.png".format(
                     title,
-                    self.e1["task_id"],
-                    self.e1["task_label"])), img_format="png")
+                    self.e["task_id"],
+                    self.e["task_label"])), img_format="png")
             plot.show()
             return plot
 
         def spd_plots():
             dosplot = DosPlotter(zero_at_efermi=False)
             dos_dict = defaultdict(object)
-            for site in self.e1["NN"]:
+            for site in self.e["NN"]:
                 for i in [0,1,2]:
                     dos_dict[
                         self.complete_dos1.structure.as_dict()["sites"][site]["label"]+str(site)+str(OrbitalType(i))

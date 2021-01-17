@@ -141,7 +141,6 @@ class ProcarParse:
 
 class DetermineDefectState:
     def __init__(self, db, db_filter, cbm, vbm, save_fig_path, locpot=None):
-        db = VaspCalcDb.from_db_file(db)
 
         self.save_fig_path = save_fig_path
 
@@ -152,7 +151,7 @@ class DetermineDefectState:
         if locpot:
             self.vacuum_locpot = max(self.entry["calcs_reversed"][0]["output"]["locpot"]["2"])
 
-            db_host = VaspCalcDb.from_db_file(locpot)
+            db_host = locpot
             self.entry_host = db_host.collection.find_one({"task_id": int(self.entry["pc_from"].split("/")[-1])})
             self.vacuum_locpot_host = max(self.entry_host["calcs_reversed"][0]["output"]["locpot"]["2"])
 

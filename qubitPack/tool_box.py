@@ -1,8 +1,11 @@
 from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen.io.vasp.inputs import Poscar
+from pymatgen.io.vasp.inputs import Poscar, Structure
 from pymatgen.analysis.local_env import CrystalNN
 
 import numpy as np
+import os
+
+from monty.serialization import loadfn, dumpfn
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
 
@@ -308,3 +311,41 @@ def get_good_ir_sites(species, site_syms):
                 break
 
     return good_ir_species, good_ir_syms
+
+
+def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir=None):
+    '''
+    atomic unit is adopted
+    '''
+    # A. Alkauskas, Q. Yan, and C. G. Van de Walle, Physical Review B 90, 27 (2014)
+    struct_i, sorted_symbols = i_st, i_st.symbol_set
+    struct_f, sorted_symbols = f_st, f_st.symbol_set
+    delta_R = struct_f.frac_coords - struct_i.frac_coords
+    delta_R = (delta_R + 0.5) % 1 - 0.5
+
+    lattice = struct_i.lattice.matrix #[None,:,:]
+    delta_R = np.dot(delta_R, lattice)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Poscar(struct_i).write_file('disp_dir/POSCAR_i'.format(output_dir))
+    # Poscar(struct_f).write_file('disp_dir/POSCAR_f'.format(output_dir))
+
+
+    masses = np.array([spc.atomic_mass for spc in struct_i.species])
+    delta_Q2 = masses[:,None] * delta_R ** 2
+    delta_R2 = delta_R**2
+
+    print('Delta_Q: {:3}'.format(np.sqrt(delta_Q2.sum())/0.529))
+    print('Delta_R: {:3}'.format(np.sqrt(delta_R2.sum())/0.529))
+    print('M: {:3}'.format(np.sqrt(delta_Q2.sum()/delta_R2.sum())))
+    info = {"Delta_Q":np.sqrt(delta_Q2.sum())/0.529, "Delta_R": np.sqrt(delta_R2.sum())/0.529,
+            "M":np.sqrt(delta_Q2.sum()/delta_R2.sum()), "unit":"atomic unit"}
+    dumpfn(info, os.path.join(output_dir, "info.json"))
+
+    for frac in disp_range:
+        disp = frac * delta_R
+        struct = Structure(struct_i.lattice, struct_i.species,
+                           struct_i.cart_coords + disp,
+                           coords_are_cartesian=True)
+        struct.to("vasp", '{0}/POSCAR_{1:03d}.vasp'.format(output_dir, int(np.rint(frac*10))))
