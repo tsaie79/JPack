@@ -660,8 +660,10 @@ class ZPLWF:
     def __init__(self, prev_calc_dir, spin_config):
         self.prev_calc_dir = prev_calc_dir
         structure = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).structure
-        if structure.site_properties["magmom"]:
+
+        if "magmom" in structure.site_properties.keys():
             structure.remove_site_property("magmom")
+
         self.structure = structure
         self.nelect = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).nelect
         self.spin_config = spin_config
@@ -786,18 +788,27 @@ class ZPLWF:
 
         uis = copy.deepcopy(uis_static)
         uis["user_incar_settings"].update(hse_incar_part)
-        uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
+        if self.spin_config:
+            uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
+
+        parent = cdft_C
+        if specific_structure:
+            self.structure = Structure.from_str(specific_structure.get_string(), fmt="poscar")
+            parent = None
+        elif task == "D":
+            parent = None
+
         cdft_D = JHSEStaticFW(
             structure=self.structure,
-            parents=cdft_C,
+            parents=parent,
             vasp_input_set_params=uis,
             name="CDFT-D-HSE_scf",
             vasptodb_kwargs={
                 "additional_fields": {
                     "task_type": "JHSEStaticFW"
                 },
-                "parse_eigenvalues": False,
-                "parse_dos": False,
+                "parse_eigenvalues": True,
+                "parse_dos": True,
             }
         )
 
@@ -805,6 +816,8 @@ class ZPLWF:
             fws.append(cdft_B)
         elif task == "C":
             fws.append(cdft_C)
+        elif task == "D":
+            fws.append(cdft_D)
         elif task == "B-C":
             fws.append(cdft_B)
             fws.append(cdft_C)

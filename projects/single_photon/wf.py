@@ -2,6 +2,7 @@
 from fireworks import Workflow
 from fireworks import LaunchPad
 
+from atomate.vasp.jpowerups import *
 from atomate.vasp.powerups import *
 from atomate.vasp.fireworks.core import OptimizeFW, StaticFW, ScanOptimizeFW
 from atomate.vasp.fireworks.jcustom import *
@@ -22,6 +23,7 @@ from unfold import find_K_from_k
 import math
 from qubitPack.tool_box import *
 from atomate.vasp.jpowerups import scp_files
+from projects.antisiteQubit.wf_defect import ZPLWF
 
 
 #%% calculate pristine WS2 and determine band gap
@@ -96,21 +98,20 @@ def hse_band_structure():
     LPAD.add_wf(bs_wf)
 
 #%% make standard defect calc
-CATEGORY = "standard_defect"
+CATEGORY = "soc_standard_defect"
 LPAD = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
 
-def ws2_anion_antisite(defect_type="vacancies", dtort=0): #1e-4
+def ws2_anion_antisite(defect_type="substitutions", dtort=0): #1e-4
     col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
     # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
-
+    #
     # col = VaspCalcDb.from_db_file(os.path.expanduser(os.path.join(
     #     "~", "config/project", "single_photon_emitter/pc", "db.json"))).collection
 
-    mx2s = col.find({"task_id":{"$in":[4237]}}) #WS2
+    mx2s = col.find({"task_id":{"$in":[4229]}}) #WS2
 
     geo_spec = {5* 5 * 3: [20]}
-    aexx = 0.25
     for mx2 in mx2s:
         pc = Structure.from_dict(mx2["output"]["structure"])
         defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
@@ -119,7 +120,7 @@ def ws2_anion_antisite(defect_type="vacancies", dtort=0): #1e-4
         for sub in range(len(defect[defect_type])):
             print(cation, anion)
             # cation vacancy
-            if "vac_2_{}".format(anion) not in defect[defect_type][sub]["name"]:
+            if "as_1_{}_on_{}".format(cation,anion) not in defect[defect_type][sub]["name"]:
                 continue
             for na, thicks in geo_spec.items():
                 for thick in thicks:
@@ -129,22 +130,29 @@ def ws2_anion_antisite(defect_type="vacancies", dtort=0): #1e-4
                         natom=na,
                         vacuum_thickness=thick,
                         distort=dtort,
-                        sub_on_side=[Element("Re")]
+                        sub_on_side=None
                     )
+                    ###
+                    scf_dir = "/home/tug03990/work/single_photon_emitter/cdft/A/WS2_enhenced_relax"
+                    st = Structure.from_file(os.path.join(scf_dir, "CONTCAR"))
+
 
                     wf = get_wf_full_hse(
-                        structure=se_antisite.defect_st,
+                        structure=st,
+                        task_arg=None,
                         charge_states=[0],
                         gamma_only=False,
                         gamma_mesh=True,
                         scf_dos=True,
                         nupdowns=[-1],
-                        task="opt-hse_relax-hse_scf",
+                        task="hse_scf-hse_soc",
                         vasptodb={"category": CATEGORY, "NN": se_antisite.NN,
-                                  "defect_entry": se_antisite.defect_entry},
+                                  "defect_entry": se_antisite.defect_entry,
+                                  },
                         wf_addition_name="{}:{}".format(na, thick),
                         category=CATEGORY,
                     )
+                    wf = add_modify_incar(wf, {"incar_update":{"LAECHG":False}})
 
                     wf = add_additional_fields_to_taskdocs(
                         wf,
@@ -152,23 +160,24 @@ def ws2_anion_antisite(defect_type="vacancies", dtort=0): #1e-4
                             "lattice_constant": "HSE",
                             "perturbed": se_antisite.distort,
                             # "pc_from": "single_photon_emitter/pc/HSE_scf/{}".format(mx2["task_id"])
-                            "pc_from": "mx2_antisite_pc/HSE_scf/{}".format(mx2["task_id"])
+                            "pc_from": "mx2_antisite_pc/HSE_scf/{}".format(mx2["task_id"]),
+                            "sym": "C_3v_in_paper"
                         }
                     )
 
-                    # wf = add_modify_incar(wf, {"incar_update": {"LWAVE":False, "LCHARG": True}}, fw_name_constraint="HSE_scf")
-
                     wf = scp_files(
                         wf,
-                        "/home/jengyuantsai/Research/projects/single_photon_emitter/standard_defect",
-                        fw_name_constraint="HSE_scf",
+                        "/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(CATEGORY),
+                        fw_name_constraint=wf.fws[-1].name,
                     )
-                    wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
-                                        fw_name_constraint="HSE_scf")
+                    # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
+                    #                     fw_name_constraint="HSE_scf")
+                    wf = clear_to_db(wf, fw_name_constraint=wf.fws[0].name)
 
-                    wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
-                    wf = set_queue_options(wf, "48:00:00", fw_name_constraint="HSE_relax")
+                    # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
+                    # wf = set_queue_options(wf, "48:00:00", fw_name_constraint="HSE_relax")
                     wf = set_queue_options(wf, "32:00:00", fw_name_constraint="HSE_scf")
+                    wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_soc")
                     wf = add_modify_incar(wf)
                     # related to directory
                     wf = preserve_fworker(wf)
@@ -183,15 +192,16 @@ Run CDFT on MoS2 w/ perturbation
 """
 from atomate.vasp.powerups import *
 from fireworks import LaunchPad
-from projects.antisiteQubit.wf_defect import ZPLWF
-import os
+from pymatgen.io.vasp import Poscar
+import os, glob
+from monty.serialization import loadfn
 
 CATEGORY = "cdft"
 LPAD = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
 
 
-def antistie_triplet_ZPL(): #6.5
+def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
     #efrc
     # anti_triplet = ZPLWF("/home/tug03990/work/antisiteQubit/perturbed/"
     #                      "block_2020-11-21-04-37-28-746929/launcher_2020-11-23-22-19-31-039641", "triplet")
@@ -200,31 +210,180 @@ def antistie_triplet_ZPL(): #6.5
     # sd_sites = anti_triplet.set_selective_sites(25, 5)
     # sd_sites.sort()
     # print(sd_sites)
+    process = None
+    if state == "ground_state":
+        process = "D"
+    elif state == "excited_state":
+        process = "B"
+    else:
+        return
 
-    for poscar in glob.glob("/home/tug03990/work/single_photon_emitter/cdft/interpolate_st/*"):
-        st = Structure.from_file(poscar)
+
+    info = loadfn(os.path.join(sts_path, "{}/info.json".format(state)))
+
+    for poscar in glob.glob(os.path.join(sts_path, "{}/*010.vasp".format(state))):
+
+        st = Poscar.from_file(poscar)
+        """
+        WS2_c3v: 
+            FERDO = 328*1.0 147*0.0
+            FERWE = 328*1.0 1*0.5 1*0.5 1*1.0 144*0.0
+            NBANDS = 475
+            ENCUT = 336
+            NCORE = 4
+            A = /home/tug03990/work/single_photon_emitter/cdft/A/launcher_2021-01-13-04-09-57-563577
+        WS2_c3v_in_paper:
+            ENCUT = 320
+            FERDO = 224*1.0 151*0.0
+            FERWE = 224*1.0 1*0.5 1*0.5 1*1.0 148*0.0
+            NBANDS = 375
+            NCORE = 4
+            A = "/home/tug03990/work/single_photon_emitter/cdft/A/WS2_enhenced_relax"
+        WS2_ch_in_paper:
+            ENCUT = 320
+            FERDO = 224*1.0 151*0.0
+            FERWE = 224*1.0 1*0.5 1*0.5 1*1.0 148*0.0
+            NBANDS = 375
+            A = "/home/tug03990/work/single_photon_emitter/cdft/A/WS2_ch_in_paper"
+        V_s_c3v:
+            ENCUT = 336
+            FERWE = 321*1.0 1*0 1*0.5 1*0.5 151*0.0
+            FERDO = 322*1.0 153*0.0
+            NBANDS = 475
+            A='/home/tug03990/work/single_photon_emitter/standard_defect/block_2021-01-12-17-28-08-335869/launcher_2021-01-16-02-46-39-229067'
+        """
+
         wf = anti_triplet.wf(
-            "B", 0, up_occupation="328*1.0 1*0.5 1*0.5 1*1.0 144*0.0",#"303*1.0 1*0 1*1.0 175*0",
-            down_occupation="328*1.0 147*0.0", nbands=475, gamma_only=True, selective_dyn=None, specific_structure=st
+            "C", 0, up_occupation="321*1.0 1*0 1*0.5 1*0.5 151*0.0",
+            down_occupation="322*1.0 153*0.0", nbands=475, gamma_only=True, selective_dyn=None, specific_structure=None
         )
+        # wf = jmodify_to_soc(wf, nbands=575, structure=Structure.from_str(st.get_string(), "poscar"))
 
         wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
-        wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[1].name)
-        wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
+        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[1].name)
+        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
+
+        wf = add_modify_incar(wf, {"incar_update":{"ENCUT":336}})
 
         wf = add_modify_incar(wf)
-        wf = clean_up_files(wf, files=["WAVECAR*"], task_name_constraint="VaspToDb")
-        wf = add_additional_fields_to_taskdocs(wf, {"cdft_info": "C3V", "interpolate_st_idx":poscar})
+        wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_info": "{}_C3V_soc".format(state),
+                                                    "interpolate_st_idx":poscar.split("/")[-1], "sts_info": info})
 
         wf = set_execution_options(wf, category=CATEGORY)
         wf = preserve_fworker(wf)
-
-        # if moving_sites:
-        #     wf.name = wf.name + ":delta{:.2f}".format(len(moving_sites) / len(anti_triplet.structure.sites))
-        print(wf.name)
         LPAD.add_wf(wf)
-
-
-
 antistie_triplet_ZPL()
+#%%
 
+CATEGORY = "soc_standard_defect"
+LPAD = LaunchPad.from_file(
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+
+scf_dir = "/home/tug03990/work/single_photon_emitter/cdft/A/WS2_C3V"
+
+st = Structure.from_file(os.path.join(scf_dir, "POSCAR.gz"))
+
+magmom = [[0,0,mag_z] for mag_z in MPRelaxSet(st).incar.get("MAGMOM", None)]
+
+wf = get_wf_full_hse(
+    structure=st,
+    task_arg={"prev_calc_dir": scf_dir},
+    charge_states=[0],
+    gamma_only=False,
+    gamma_mesh=True,
+    scf_dos=True,
+    nupdowns=[-1],
+    task="hse_soc",
+    vasptodb={"category": CATEGORY, "NN": se_antisite.NN,
+              "defect_entry": se_antisite.defect_entry},
+    wf_addition_name="{}:{}".format(na, thick),
+    category=CATEGORY,
+    )
+
+wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
+
+wf = add_modify_incar(wf, {"incar_update":{"LCHARG":False, "LWAVE":False}})
+
+wf = add_modify_incar(wf)
+
+wf = clear_to_db(wf)
+
+# wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
+
+wf = set_execution_options(wf, category=CATEGORY)
+wf = preserve_fworker(wf)
+
+
+LPAD.add_wf(wf)
+
+#%% standard cdft
+CATEGORY = "soc_cdft"
+LPAD = LaunchPad.from_file(
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+"""
+V_s_c3v:
+    ENCUT = 336
+    FERWE = 321*1.0 1*0 1*0.5 1*0.5 151*0.0
+    FERDO = 322*1.0 153*0.0
+    NBANDS = 475
+    A='/home/tug03990/work/single_photon_emitter/standard_defect/block_2021-01-12-17-28-08-335869/launcher_2021-01-16-02-46-39-229067'
+"""
+
+anti_triplet = ZPLWF("/home/tug03990/work/single_photon_emitter/standard_defect/block_2021-01-12-17-28-08-335869/"
+                     "launcher_2021-01-16-02-46-39-229067", "triplet")
+
+wf = anti_triplet.wf(
+    "D", 0, up_occupation="321*1.0 1*0 1*0.5 1*0.5 151*0.0",
+    down_occupation="322*1.0 153*0.0", nbands=475, gamma_only=True, selective_dyn=None, specific_structure=None
+)
+
+wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
+# wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[1].name)
+# wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
+
+# wf = add_modify_incar(wf, {"incar_update":{"ENCUT":336}})
+
+wf = add_modify_incar(wf)
+wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
+
+wf = set_execution_options(wf, category=CATEGORY)
+wf = preserve_fworker(wf)
+LPAD.add_wf(wf)
+
+#%% soc cdft
+CATEGORY = "soc_cdft"
+LPAD = LaunchPad.from_file(
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+"""
+Ws_c3v:
+    ENCUT = 336
+    FERWE = 321*1.0 1*0 1*0.5 1*0.5 151*0.0
+    FERDO = 322*1.0 153*0.0
+    NBANDS = 475
+    A='/home/tug03990/work/single_photon_emitter/standard_defect/block_2021-01-12-17-28-08-335869/launcher_2021-01-16-02-46-39-229067'
+"""
+
+anti_triplet = ZPLWF("/home/tug03990/work/single_photon_emitter/soc_standard_defect/block_2021-01-17-04-46-01-108825/"
+                     "launcher_2021-01-17-05-03-04-839545", None)
+
+wf = anti_triplet.wf(
+    "D", 0, up_occupation="657*1.0 1*0 1*1 291*0.0",
+    down_occupation=None, nbands=950, gamma_only=True, selective_dyn=None, specific_structure=None
+)
+
+wf = jmodify_to_soc(wf, structure=anti_triplet.structure, nbands=950)
+
+wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
+# wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[1].name)
+# wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
+
+# wf = add_modify_incar(wf, {"incar_update":{"ENCUT":336}})
+
+wf = add_modify_incar(wf)
+wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
+# wf = clear_to_db(wf)
+
+wf = set_execution_options(wf, category=CATEGORY)
+wf = preserve_fworker(wf)
+LPAD.add_wf(wf)

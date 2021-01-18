@@ -35,42 +35,80 @@ E_bc = c["output"]["energy"] - b["output"]["energy"]
 E_cd = d["output"]["energy"] - c["output"]["energy"]
 E_da = d["output"]["energy"] - d["source"]["total_energy"]
 
+#%% WS2_C3V_IN_PAPER
+from pymatgen import Structure
+
+col = db("mx2_antisite_basic_aexx0.25_cdft").collection
+
+b = col.find_one({"task_id": 4179})
+c = col.find_one({"task_id": 4180})
+d = col.find_one({"task_id": 4181})
+
+
+b_st = Structure.from_dict(b["input"]["structure"])
+c_st = Structure.from_dict(c["output"]["structure"])
+
+E_ab = b["output"]["energy"] - b["source"]["total_energy"]
+E_bc = c["output"]["energy"] - b["output"]["energy"]
+E_cd = d["output"]["energy"] - c["output"]["energy"]
+E_da = d["output"]["energy"] - d["source"]["total_energy"]
+
+#%%
+from pymatgen import Structure
+
+col = db("Ws_Ch_CDFT").collection
+
+b = col.find_one({"task_id": 365})
+c = col.find_one({"task_id": 366})
+d = col.find_one({"task_id": 367})
+
+
+b_st = Structure.from_dict(b["input"]["structure"])
+c_st = Structure.from_dict(c["output"]["structure"])
+
+E_ab = b["output"]["energy"] - b["source"]["total_energy"]
+E_bc = c["output"]["energy"] - b["output"]["energy"]
+E_cd = d["output"]["energy"] - c["output"]["energy"]
+E_da = d["output"]["energy"] - d["source"]["total_energy"]
 #%% interpolate bewteen excited eq and ground eq
+from qubitPack.tool_box import get_interpolate_sts
+from pymatgen import Structure
 import numpy as np
-import os
 
-def get_init_fin(i_st, f_st, disp_range=np.linspace(0, 1, 11), output_dir=None):
-    '''
-    '''
-    # A. Alkauskas, Q. Yan, and C. G. Van de Walle, Physical Review B 90, 27 (2014)
-    struct_i, sorted_symbols = i_st, i_st.symbol_set
-    struct_f, sorted_symbols = f_st, f_st.symbol_set
-    delta_R = struct_f.frac_coords - struct_i.frac_coords
-    delta_R = (delta_R + 0.5) % 1 - 0.5
+cdft = db("cdft").collection
+standard_defect = db("standard_defect").collection
 
-    lattice = struct_i.lattice.matrix #[None,:,:]
-    delta_R = np.dot(delta_R, lattice)
+a_st = Structure.from_dict(standard_defect.find_one({"task_id":68})["output"]["structure"])
+c_st = Structure.from_dict(cdft.find_one({"task_id":69})["output"]["structure"])
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # Poscar(struct_i).write_file('disp_dir/POSCAR_i'.format(output_dir))
-    # Poscar(struct_f).write_file('disp_dir/POSCAR_f'.format(output_dir))
+dx = np.linspace(-1,1,11)
+get_interpolate_sts(a_st, c_st, output_dir='/Users/jeng-yuantsai/Research/project/single_photon/calculations/cdft/Vs_c3v/interpolate_st/ground_state')
 
 
-    masses = np.array([spc.atomic_mass for spc in struct_i.species])
-    delta_Q2 = masses[:,None] * delta_R ** 2
+#%%
 
-    print('Delta_Q^2: {:3}'.format(np.sqrt(delta_Q2.sum())))
+import pandas as pd
+es = db("cdft").collection.aggregate([
+    {"$match": {"cdft_info": "excited_state_C3V_in_paper"}},
+    {"$project": {"energy": "$output.energy", "idx": "$interpolate_st_idx", "_id":0}}
+])
 
-    # print(delta_Q2.shape)
-    # print(struct_i.lattice, struct_i.species, struct_i.cart_coords, )
+df = pd.DataFrame(es)
+df = df.sort_values("idx")
+df.to_clipboard()
 
-    for frac in disp_range:
-        disp = frac * delta_R
-        struct = Structure(struct_i.lattice, struct_i.species,
-                           struct_i.cart_coords + disp,
-                           coords_are_cartesian=True)
-        struct.to("vasp", '{0}/POSCAR_{1:03d}.vasp'.format(output_dir, int(np.rint(frac*10))))
+#%%
+from qubitPack.qc_searching.analysis.main import get_defect_state
 
-get_init_fin(b_st, c_st, output_dir='/Users/jeng-yuantsai/Research/project/single_photon/calculations/cdft/WS2_c3v/interpolate_st')
+cdft = db("standard_defect")
+
+tot, proj, d_df = get_defect_state(
+    cdft,
+    {"task_id": 22},
+    1,-3,
+    None,
+    True,
+    "dist",
+    None,
+    0.1
+)
