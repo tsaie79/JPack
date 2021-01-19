@@ -120,45 +120,38 @@ WARNING: the bond lengths are wrong!
 Correct bond lengths by changing lattice constants (here, change only lattice vector C)
 """
 import supercell_core as sc
+import numpy as np
 
-# Defining unit cell of graphene
-# graphene = sc.lattice()
-# graphene.set_vectors([2.13, -1.23], [2.13, 1.23])
-# # "C" (carbon) atoms in the unit cell in either
-# # angstrom or direct coordinates
-# graphene.add_atom("C", (0, 0, 0)).add_atom("C", (2/3, 2/3, 0),unit=sc.Unit.Crystal)
-# graphene.save_POSCAR("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/test/gr.vasp")
-# Combining graphene layers
-graphene = sc.read_POSCAR("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/WSe2_c2db.vasp")
-graphene.save_POSCAR("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/t.vasp")
+# graphene = sc.read_POSCAR("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/WSe2_c2db.vasp")
+graphene = sc.read_POSCAR("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/Bi2Se3/layer.vasp")
+
 h = sc.heterostructure().set_substrate(graphene).add_layer(graphene)
 
-import numpy as np
-# Optimise with theta as a free parameter
-res = h.opt(max_el=20, thetas=[[3.89*sc.DEGREE]])
+# res = h.opt(max_el=20, thetas=[np.arange(0.1*sc.DEGREE, 30*sc.DEGREE, 0.1*sc.DEGREE)])
+res = h.opt(max_el=20, thetas=[[5.1*sc.DEGREE]]) #5.1
 print("{}, {}".format(res.thetas()[0]*1/sc.DEGREE, res.max_strain()))
 
 # Save supercell to VASP POSCAR
-res.superlattice().save_POSCAR("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/test/POSCAR.vasp")
+res.superlattice().save_POSCAR("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/Bi2Se3/test/POSCAR_1.vasp")
 
 
 
 #%% setup interlayer separation and vacuum
 from pymatgen import Structure
 from qubitPack.tool_box import modify_vacuum
-dx = 1.46
-rot = Structure.from_file("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/contraction_bond/good.vasp")
+dx = 1.64
+rot = Structure.from_file("/Users/jeng-yuantsai/Research/project/twisted/calculations/model/Bi2Se3/test/2.vasp")
 sites = []
 for idx, i in enumerate(rot.cart_coords):
     print(i)
-    if i[2] < 25.9 and i[2] > 22.5:
+    if i[2] < 31.12 and i[2] > 24:
         sites.append(idx)
 print(sites)
 
-rot.translate_sites(sites, [0,0,dx], frac_coords=False)
+rot.translate_sites(sites, [0,0,-dx], frac_coords=False)
 # st = Structure(rot.lattice, rot.species, sites)
 # rot = modify_vacuum(rot, 40)
-rot.to("poscar", "/Users/jeng-yuantsai/Research/project/twisted/calculations/model/contraction_bond/POSCAR_shift.vasp")
+rot.to("poscar", "/Users/jeng-yuantsai/Research/project/twisted/calculations/model/Bi2Se3/test/2_sh.vasp")
 
-#%%
+#%% Bi2Se3
 
