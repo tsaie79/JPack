@@ -56,13 +56,16 @@ E_da = d["output"]["energy"] - d["source"]["total_energy"]
 #%%
 from pymatgen import Structure
 
-col = db("Ws_Ch_CDFT").collection
+col = db("soc_standard_defect").collection
+a = col.find_one({"task_id": 70})
 
-b = col.find_one({"task_id": 365})
-c = col.find_one({"task_id": 366})
-d = col.find_one({"task_id": 367})
+col = db("soc_cdft").collection
 
+b = col.find_one({"task_id": 73})
+c = col.find_one({"task_id": 76})
+d = col.find_one({"task_id": 75})
 
+a_st = Structure.from_dict(b["input"]["structure"])
 b_st = Structure.from_dict(b["input"]["structure"])
 c_st = Structure.from_dict(c["output"]["structure"])
 
@@ -70,19 +73,14 @@ E_ab = b["output"]["energy"] - b["source"]["total_energy"]
 E_bc = c["output"]["energy"] - b["output"]["energy"]
 E_cd = d["output"]["energy"] - c["output"]["energy"]
 E_da = d["output"]["energy"] - d["source"]["total_energy"]
+
 #%% interpolate bewteen excited eq and ground eq
 from qubitPack.tool_box import get_interpolate_sts
 from pymatgen import Structure
 import numpy as np
 
-cdft = db("cdft").collection
-standard_defect = db("standard_defect").collection
-
-a_st = Structure.from_dict(standard_defect.find_one({"task_id":68})["output"]["structure"])
-c_st = Structure.from_dict(cdft.find_one({"task_id":69})["output"]["structure"])
-
-dx = np.linspace(-1,1,11)
-get_interpolate_sts(a_st, c_st, output_dir='/Users/jeng-yuantsai/Research/project/single_photon/calculations/cdft/Vs_c3v/interpolate_st/ground_state')
+dx = np.linspace(0,2,11)
+get_interpolate_sts(a_st, c_st, disp_range=dx, output_dir='/Users/jeng-yuantsai/Research/project/single_photon/calculations/soc_cdft/Ws_c3v/interpolate_st/excited_state')
 
 
 #%%

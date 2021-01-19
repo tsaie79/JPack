@@ -60,7 +60,7 @@ def ML_bs_wf(cat="Bi2Se3"):
     lpad = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/twisted/{}/my_launchpad.yaml".format(cat))))
 
-    st = Structure.from_file("/home/tug03990/work/twisted/Bi2Se3/Bi2Se3_5_10.vasp")
+    st = Structure.from_file("/home/tug03990/scratch/twisted/Bi2Se3/Bi2Se3_5_10.vasp")
     wf = bs_fws(st)
 
     encut = 1.3*max([potcar.enmax for potcar in MPRelaxSet(st).potcar])

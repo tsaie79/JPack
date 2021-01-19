@@ -387,3 +387,60 @@ wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
 wf = set_execution_options(wf, category=CATEGORY)
 wf = preserve_fworker(wf)
 LPAD.add_wf(wf)
+
+#%% soc parabola
+Ws_c3v_A_owls = "/home/tug03990/scratch/single_photon_emitter/soc_cdft/Ws_c3v/A/launcher_2021-01-17-05-03-04-839545"
+
+CATEGORY = "soc_cdft"
+LPAD = LaunchPad.from_file(
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+"""
+soc_Ws_c3v:
+    ENCUT = 336
+    FERWE = 657*1.0 1*0 1*1 291*0.0
+    NBANDS = 950
+    A="/home/tug03990/work/single_photon_emitter/soc_standard_defect/block_2021-01-17-04-46-01-108825/launcher_2021-01-17-05-03-04-839545"
+"""
+def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
+    #efrc
+
+    anti_triplet = ZPLWF(Ws_c3v_A_owls, None)
+
+    # sd_sites = anti_triplet.set_selective_sites(25, 5)
+    # sd_sites.sort()
+    # print(sd_sites)
+    process = None
+    if state == "ground_state":
+        process = "D"
+    elif state == "excited_state":
+        process = "B"
+    else:
+        return
+
+
+    info = loadfn(os.path.join(sts_path, "{}/info.json".format(state)))
+
+    for poscar in glob.glob(os.path.join(sts_path, "{}/*.vasp".format(state))):
+
+        st = Poscar.from_file(poscar)
+
+        wf = anti_triplet.wf(
+            process, 0, up_occupation="657*1.0 1*0 1*1 291*0.0",
+            down_occupation=None, nbands=950, gamma_only=True, selective_dyn=None, specific_structure=poscar
+        )
+        wf = jmodify_to_soc(wf, nbands=950, structure=st)
+
+        wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
+        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[1].name)
+        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
+
+        wf = add_modify_incar(wf)
+        # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_info": "{}_Ws_c3v_soc".format(state),
+                                                    "interpolate_st_idx":poscar.split("/")[-1], "sts_info": info})
+
+        wf = set_execution_options(wf, category=CATEGORY)
+        wf = preserve_fworker(wf)
+        LPAD.add_wf(wf)
+
+antistie_triplet_ZPL(sts_path="/home/tug03990/scratch/single_photon_emitter/soc_cdft/Ws_c3v/interpolate_st")
