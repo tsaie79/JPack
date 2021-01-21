@@ -79,7 +79,7 @@ def dp(structure):
     return {"IDIPOL":3, "LDIPOL": True, "DIPOL": center_of_mass}
 
 
-uis = {"ISIF": 2, "EDIFFG":-0.02}
+uis = {"ISIF": 2, "EDIFFG":-0.01}
 uis.update(dp(heter))
 
 opt_vdw = OptimizeFW(heter, override_default_vasp_params={"user_incar_settings": uis})
@@ -91,7 +91,7 @@ hetero_fws = [opt_vdw, static]
 wf = Workflow(hetero_fws, name=terminate)
 
 add_additional_fields_to_taskdocs(wf, {"terminate": terminate})
-wf = add_modify_incar(wf, {"incar_update": dict(NUPDOWN=0, MAGMOM=MPRelaxSet(heter).incar.get("MAGMOM"))})
+wf = add_modify_incar(wf, {"incar_update": dict(ISPIN=1, MAGMOM=MPRelaxSet(heter).incar.get("MAGMOM"))})
 wf = preserve_fworker(wf)
 wf = set_execution_options(wf, category=CATEGORY)
 
@@ -125,10 +125,13 @@ for st in [sic]:
 from atomate.vasp.database import VaspCalcDb
 from matplotlib import pyplot as plt
 import os
+from qubitPack.tool_box import get_db
 
 CATEGORY = "hetero"
-DB = VaspCalcDb.from_db_file(
-    os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/db.json".format(CATEGORY)))
+# DB = VaspCalcDb.from_db_file(
+#     os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/db.json".format(CATEGORY)))
+DB = get_db("mgb2", "hetero")
+print(DB.collection.find_one())
 
 def locpot(tid):
     e = DB.collection.find_one({"task_id":tid})
@@ -152,3 +155,19 @@ def energy(tids):
 
 
 locpot(136)
+
+#%% get dos
+from qubitPack.tool_box import get_db
+from pymatgen.electronic_structure.plotter import DosPlotter
+from pymatgen import Element
+
+mgb2 = get_db("mgb2", "hetero")
+
+dos = mgb2.get_dos(150)
+
+pdos = dos.get_element_dos()
+
+dos_plotter = DosPlotter()
+dos_plotter.add_dos_dict({"Si": pdos[Element("Si")], "C": pdos[Element("C")]})
+plt = dos_plotter.get_plot(xlim=[-5,5])
+plt.show()

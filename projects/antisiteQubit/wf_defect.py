@@ -807,8 +807,8 @@ class ZPLWF:
                 "additional_fields": {
                     "task_type": "JHSEStaticFW"
                 },
-                "parse_eigenvalues": True,
-                "parse_dos": True,
+                "parse_eigenvalues": False,
+                "parse_dos": False,
             }
         )
 
