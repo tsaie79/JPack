@@ -11,7 +11,12 @@ from pycdt.core.defectsmaker import ChargedDefectsStructures
 
 from phonopy.phonon.irreps import character_table
 
+from atomate.vasp.database import VaspCalcDb
 
+
+def get_db(db_name, collection_name, user="Jeng_ro", password="qimin", port=1234):
+    return VaspCalcDb(host="localhost", port=port, database=db_name,
+                      collection=collection_name, user=user, password=password, authsource=db_name)
 
 def find_cation_anion(structure):
     cation, anion = None, None

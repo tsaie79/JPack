@@ -24,7 +24,7 @@ LPAD.add_wf(wf)
 #%%
 #%% WF
 import numpy as np
-from pymatgen.io.vasp.sets import MPRelaxSet
+from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet
 from atomate.vasp.fireworks import OptimizeFW, StaticFW
 from atomate.vasp.powerups import *
 from fireworks import Workflow, LaunchPad, FileTransferTask
@@ -38,7 +38,7 @@ CATEGORY = "hetero"
 LPAD = LaunchPad.from_file(
     os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/my_launchpad.yaml".format(CATEGORY)))
 
-terminate = "c_terminate"
+terminate = "si_terminate"
 st_p = "/home/tug03990/work/mgb2/hetero"
 
 heter = Structure.from_file(os.path.join(st_p, terminate, "0.vasp"))
@@ -76,25 +76,29 @@ print(wf)
 
 for st in [heter]:
     fws = []
-    uis = {"EDIFF":1E-5, "EDIFFG":-0.01, "ISIF":2}
-    uis.update(dp(st))
-    opt = OptimizeFW(st, override_default_vasp_params={"user_incar_settings":uis})
 
-    uis = {"EDIFF":1E-6}
-    uis.update(dp(st))
+    opt = OptimizeFW(st, override_default_vasp_params={"user_incar_settings":uis}, vasp_input_set=MPMetalRelaxSet(st))
+
     static = StaticFW(st, parents=opt, vasp_input_set_params={"user_incar_settings": uis},
                       vasptodb_kwargs={
                           "parse_eigenvalues": False,
                           "parse_dos": False
                       })
 
-    bs = NonSCFFW(parents=static, mode="uniform")
+    bs = NonSCFFW(parents=static, mode="uniform", input_set_overrides=dict(reciprocal_density=250, nedos=9000), structure=st)
 
     fws.extend([static, opt, bs])
     wf = Workflow(fws, name=terminate+":{}".format(st.formula))
-    wf = add_modify_incar(wf, {"incar_update": {"NEDOS":9000, "ENMAX":10, "ENMIN":-10}}, fw_name_constraint=wf.fws[-1].name)
 
-    add_additional_fields_to_taskdocs(wf, {"terminate": terminate})
+    wf = add_additional_fields_to_taskdocs(wf, {"terminate": terminate, "metal":True})
+
+    uis = {"EDIFF":1E-5, "EDIFFG":-0.01, "ISIF":2}
+    uis.update(dp(st))
+
+    wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[0].name)
+    uis.update({"EDIFF":1E-6})
+    wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[1].name)
+    wf = add_modify_incar(wf, {"incar_update": {"ENMAX":-15, "ENMAX":15}},fw_name_constraint=fws[-1].name)
     wf = add_modify_incar(wf, {"incar_update": dict(ISPIN=1, MAGMOM=MPRelaxSet(st).incar.get("MAGMOM"))})
     wf = preserve_fworker(wf)
     wf = set_execution_options(wf, category=CATEGORY)

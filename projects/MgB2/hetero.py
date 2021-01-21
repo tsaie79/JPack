@@ -163,11 +163,12 @@ from pymatgen import Element
 
 mgb2 = get_db("mgb2", "hetero")
 
-dos = mgb2.get_dos(150)
+dos = mgb2.get_dos(155)
 
 pdos = dos.get_element_dos()
 
-dos_plotter = DosPlotter()
-dos_plotter.add_dos_dict({"Si": pdos[Element("Si")], "C": pdos[Element("C")]})
-plt = dos_plotter.get_plot(xlim=[-5,5])
+dos_plotter = DosPlotter(sigma=0.1)
+dos_plotter.add_dos_dict({"C": pdos[Element("C")], "Si": pdos[Element("Si")]})
+# dos_plotter.add_dos_dict(pdos)
+plt = dos_plotter.get_plot(xlim=[-15, 15])
 plt.show()

@@ -26,14 +26,14 @@ def ML_bs_wf(cat="Bi2Se3"):
 
     def bs_fws(structure):
         # opt = OptimizeFW(structure=structure)
-        static_fw = StaticFW(structure=structure)
+        static_fw = StaticFW(structure=structure, vasptodb_kwargs={"parse_chgcar":True})
         line_fw = NonSCFFW(structure=structure,
                            mode="line",
                            parents=static_fw,
                            input_set_overrides={"other_params": {"two_d_kpoints": True}}
                            )
 
-        wf = Workflow([static_fw, line_fw], name="{}:pbe_bs".format(structure.formula))
+        wf = Workflow([static_fw], name="{}:pbe_bs".format(structure.formula))
 
         updates = {
             # "ADDGRID": True,
@@ -51,16 +51,16 @@ def ML_bs_wf(cat="Bi2Se3"):
         # wf = add_modify_incar(wf, {"incar_update": {"LCHARG":False, "ISIF":2, "EDIFFG":-0.01, "EDIFF":1E-4}}, opt.name)
         wf = add_modify_incar(wf, {"incar_update": {"LCHARG":True, "LVHAR":True, "LWAVE":False, "NEDOS":9000,
                                                     "EMIN":-10, "EMAX":10}}, static_fw.name)
-        wf = add_modify_incar(wf, {"incar_update": {"LWAVE":False, "LCHARG":False}}, line_fw.name)
-        wf = clean_up_files(wf, files=["CHG*", "DOS*", "LOCPOT*"], fw_name_constraint=line_fw.name,
-                            task_name_constraint="VaspToDb")
+        # wf = add_modify_incar(wf, {"incar_update": {"LWAVE":False, "LCHARG":False}}, line_fw.name)
+        # wf = clean_up_files(wf, files=["CHG*", "DOS*", "LOCPOT*"], fw_name_constraint=line_fw.name,
+        #                     task_name_constraint="VaspToDb")
         return wf
 
 
     lpad = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/twisted/{}/my_launchpad.yaml".format(cat))))
 
-    st = Structure.from_file("/home/tug03990/scratch/twisted/Bi2Se3/Bi2Se3_5_10.vasp")
+    st = Structure.from_file("/home/tug03990/scratch/twisted/Bi2Se3/Bi2Se3_3_89.vasp")
     wf = bs_fws(st)
 
     encut = 1.3*max([potcar.enmax for potcar in MPRelaxSet(st).potcar])
@@ -69,9 +69,34 @@ def ML_bs_wf(cat="Bi2Se3"):
     wf = add_modify_incar(wf)
     wf = set_execution_options(wf, category=cat)
     wf = preserve_fworker(wf)
-    wf = add_additional_fields_to_taskdocs(wf, {"twisted_angle":5.1})
+    wf = add_additional_fields_to_taskdocs(wf, {"twisted_angle":3.89})
 
     lpad.add_wf(wf)
     print(wf.name)
 
 ML_bs_wf()
+
+#%% read CHGCAR from SCF and run BS
+updates = {
+    # "ADDGRID": True,
+    # "LASPH": True,
+    # "LDAU": False,
+    # "LMIXTAU": True,
+    # "METAGGA": "SCAN",
+    "NELM": 200,
+    "EDIFF": 1E-5,
+    "ISPIN": 1,
+    "LAECHG": False,
+}
+
+bi2se3_5_10 = "/project/projectdirs/m2663/tsai/twisted/Bi2Se3/launcher_2021-01-18-23-39-44-400815"
+
+line_fw = NonSCFFW(structure=Structure.from_file(os.path.join(bi2se3_5_10,"POSCAR.gz")),
+                   mode="line",
+                   prev_calc_dir=bi2se3_5_10,
+                   input_set_overrides={"other_params": {"two_d_kpoints": True}}
+                   )
+
+wf = Workflow([line_fw])
+
+wf = add_modify_incar(wf, {"incar_update": updates})

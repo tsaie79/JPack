@@ -23,7 +23,7 @@ from unfold import find_K_from_k
 import math
 from qubitPack.tool_box import *
 from atomate.vasp.jpowerups import scp_files
-from projects.antisiteQubit.wf_defect import ZPLWF
+import glob
 
 
 #%% calculate pristine WS2 and determine band gap
@@ -195,17 +195,19 @@ from fireworks import LaunchPad
 from pymatgen.io.vasp import Poscar
 import os, glob
 from monty.serialization import loadfn
+from projects.antisiteQubit.wf_defect import ZPLWF
+
 
 CATEGORY = "cdft"
 LPAD = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
 
 
-def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
+def antistie_triplet_ZPL(sts_path, state="ground_state"): #6.5
     #efrc
     # anti_triplet = ZPLWF("/home/tug03990/work/antisiteQubit/perturbed/"
     #                      "block_2020-11-21-04-37-28-746929/launcher_2020-11-23-22-19-31-039641", "triplet")
-    anti_triplet = ZPLWF("/home/tug03990/work/single_photon_emitter/cdft/A/launcher_2021-01-13-04-09-57-563577", "triplet")
+    anti_triplet = ZPLWF("/home/tug03990/scratch/single_photon_emitter/cdft/WS2_C3V", "triplet")
 
     # sd_sites = anti_triplet.set_selective_sites(25, 5)
     # sd_sites.sort()
@@ -219,9 +221,9 @@ def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
         return
 
 
-    info = loadfn(os.path.join(sts_path, "{}/info.json".format(state)))
+    info = loadfn(os.path.join(sts_path, "info.json".format(state)))
 
-    for poscar in glob.glob(os.path.join(sts_path, "{}/*010.vasp".format(state))):
+    for poscar in glob.glob(os.path.join(sts_path, "*010.vasp".format(state))):
 
         st = Poscar.from_file(poscar)
         """
@@ -231,7 +233,7 @@ def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
             NBANDS = 475
             ENCUT = 336
             NCORE = 4
-            A = /home/tug03990/work/single_photon_emitter/cdft/A/launcher_2021-01-13-04-09-57-563577
+            A = /home/tug03990/work/single_photon_emitter/cdft/A/WS2_C3V
         WS2_c3v_in_paper:
             ENCUT = 320
             FERDO = 224*1.0 151*0.0
@@ -254,8 +256,8 @@ def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
         """
 
         wf = anti_triplet.wf(
-            "C", 0, up_occupation="321*1.0 1*0 1*0.5 1*0.5 151*0.0",
-            down_occupation="322*1.0 153*0.0", nbands=475, gamma_only=True, selective_dyn=None, specific_structure=None
+            process, 0, up_occupation="328*1.0 1*0.5 1*0.5 1*1.0 144*0.0",
+            down_occupation="328*1.0 147*0.0", nbands=475, gamma_only=True, selective_dyn=None, specific_structure=Poscar.from_file(poscar)
         )
         # wf = jmodify_to_soc(wf, nbands=575, structure=Structure.from_str(st.get_string(), "poscar"))
 
@@ -267,15 +269,17 @@ def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
 
         wf = add_modify_incar(wf)
         wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
-        wf = add_additional_fields_to_taskdocs(wf, {"cdft_info": "{}_C3V_soc".format(state),
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_info": "{}_C3V".format(state),
                                                     "interpolate_st_idx":poscar.split("/")[-1], "sts_info": info})
 
         wf = set_execution_options(wf, category=CATEGORY)
         wf = preserve_fworker(wf)
         LPAD.add_wf(wf)
-antistie_triplet_ZPL()
-#%%
 
+antistie_triplet_ZPL("/home/tug03990/scratch/single_photon_emitter/cdft/interpolate_st/ground_state/extra")
+
+
+#%%
 CATEGORY = "soc_standard_defect"
 LPAD = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
@@ -389,7 +393,11 @@ wf = preserve_fworker(wf)
 LPAD.add_wf(wf)
 
 #%% soc parabola
-Ws_c3v_A_owls = "/home/tug03990/scratch/single_photon_emitter/soc_cdft/Ws_c3v/A/launcher_2021-01-17-05-03-04-839545"
+import glob
+from projects.antisiteQubit.wf_defect import ZPLWF
+
+
+# Ws_c3v_A_owls = "/home/tug03990/scratch/single_photon_emitter/soc_cdft/Ws_c3v/A/launcher_2021-01-17-05-03-04-839545"
 
 CATEGORY = "soc_cdft"
 LPAD = LaunchPad.from_file(
@@ -404,7 +412,8 @@ soc_Ws_c3v:
 def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
     #efrc
 
-    anti_triplet = ZPLWF(Ws_c3v_A_owls, None)
+    anti_triplet = ZPLWF("/home/tug03990/work/single_photon_emitter/soc_standard_defect/"
+                         "block_2021-01-17-04-46-01-108825/launcher_2021-01-17-05-03-04-839545", None)
 
     # sd_sites = anti_triplet.set_selective_sites(25, 5)
     # sd_sites.sort()
@@ -422,11 +431,11 @@ def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
 
     for poscar in glob.glob(os.path.join(sts_path, "{}/*.vasp".format(state))):
 
-        st = Poscar.from_file(poscar)
+        st = Structure.from_file(poscar)
 
         wf = anti_triplet.wf(
-            process, 0, up_occupation="657*1.0 1*0 1*1 291*0.0",
-            down_occupation=None, nbands=950, gamma_only=True, selective_dyn=None, specific_structure=poscar
+            process, 0, up_occupation="657*1.0 1*0 1*1 301*0.0",
+            down_occupation=None, nbands=950, gamma_only=True, selective_dyn=None, specific_structure=Poscar.from_file(poscar)
         )
         wf = jmodify_to_soc(wf, nbands=950, structure=st)
 
@@ -437,10 +446,62 @@ def antistie_triplet_ZPL(sts_path, state="excited_state"): #6.5
         wf = add_modify_incar(wf)
         # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
         wf = add_additional_fields_to_taskdocs(wf, {"cdft_info": "{}_Ws_c3v_soc".format(state),
-                                                    "interpolate_st_idx":poscar.split("/")[-1], "sts_info": info})
-
+                                                    "interpolate_st_idx":poscar.split("/")[-1], "sts_info": info,
+                                                    "poscar_idx": poscar.split("/")[-1]
+                                                    })
+        wf.name = wf.name+":{}".format(poscar.split("/")[-1])
         wf = set_execution_options(wf, category=CATEGORY)
         wf = preserve_fworker(wf)
         LPAD.add_wf(wf)
 
-antistie_triplet_ZPL(sts_path="/home/tug03990/scratch/single_photon_emitter/soc_cdft/Ws_c3v/interpolate_st")
+antistie_triplet_ZPL(sts_path="/home/tug03990/work/single_photon_emitter/soc_cdft/interpolate_st/")
+
+#%% soc parabola point D (Ws_c3v_soc)
+CATEGORY = "soc_cdft"
+LPAD = LaunchPad.from_file(
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+
+scf_dir = "/home/tug03990/work/single_photon_emitter/cdft/A/WS2_C3V"
+
+state = "ground_state"
+
+sts_path = "/home/tug03990/work/single_photon_emitter/soc_cdft/interpolate_st/"
+
+info = loadfn(os.path.join(sts_path, "{}/info.json".format(state)))
+
+for poscar in glob.glob(os.path.join(sts_path, "{}/*.vasp".format(state))):
+
+    st = Structure.from_file(poscar)
+
+    wf = get_wf_full_hse(
+        structure=st,
+        task_arg={"prev_calc_dir": scf_dir},
+        charge_states=[0],
+        gamma_only=False,
+        gamma_mesh=True,
+        scf_dos=False,
+        nupdowns=[-1],
+        task="hse_soc",
+        vasptodb={"cdft_info": "{}_Ws_c3v_soc".format(state),
+                  "interpolate_st_idx":poscar.split("/")[-1], "sts_info": info,
+                  "poscar_idx": float(poscar.split("/")[-1].split("_")[-1].split(".")[0])/10
+                  },
+        wf_addition_name="{}".format(poscar.split("/")[-1]),
+        category=CATEGORY,
+    )
+
+    wf = write_PMGObjects(wf, dict(poscar=Poscar.from_file(poscar)))
+
+    wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
+
+    wf = add_modify_incar(wf, {"incar_update":{"LCHARG":False, "LWAVE":False, "LAECHG":False}})
+
+    wf = add_modify_incar(wf)
+
+    wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
+
+    wf = set_execution_options(wf, category=CATEGORY)
+    wf = preserve_fworker(wf)
+
+
+    LPAD.add_wf(wf)

@@ -1,26 +1,8 @@
-#%% IMPORT
-from atomate.vasp.database import VaspCalcDb
-
-db_dict = {
-    "host": "localhost",
-    "port": 1234,
-    "database": "single_photon_emitter",
-    "collection": "standard_defect",
-    "admin_user": "Jeng",
-    "admin_password": "qimin",
-    "readonly_user": "Jeng_ro",
-    "readonly_password": "qimin",
-    "aliases": {}
-}
-def db(collection):
-    return VaspCalcDb(host="localhost", port=1234, database="single_photon_emitter",
-                collection=collection, user="Jeng_ro", password="qimin", authsource="single_photon_emitter")
-
-
 #%% WS2 with C3V
+from qubitPack.tool_box import get_db
 from pymatgen import Structure
 
-col = db("cdft").collection
+col = get_db("single_photon_emitter","cdft").collection
 
 b = col.find_one({"task_id": 23})
 c = col.find_one({"task_id": 24})
@@ -54,12 +36,13 @@ E_cd = d["output"]["energy"] - c["output"]["energy"]
 E_da = d["output"]["energy"] - d["source"]["total_energy"]
 
 #%%
+from qubitPack.tool_box import get_db
 from pymatgen import Structure
 
-col = db("soc_standard_defect").collection
+col = get_db("single_photon_emitter","soc_standard_defect").collection
 a = col.find_one({"task_id": 70})
 
-col = db("soc_cdft").collection
+col = get_db("single_photon_emitter","soc_cdft").collection
 
 b = col.find_one({"task_id": 73})
 c = col.find_one({"task_id": 76})
@@ -79,20 +62,24 @@ from qubitPack.tool_box import get_interpolate_sts
 from pymatgen import Structure
 import numpy as np
 
-dx = np.linspace(0,2,11)
-get_interpolate_sts(a_st, c_st, disp_range=dx, output_dir='/Users/jeng-yuantsai/Research/project/single_photon/calculations/soc_cdft/Ws_c3v/interpolate_st/excited_state')
+dx = np.linspace(-1,-21,5)
+get_interpolate_sts(b_st,
+                    c_st,
+                    disp_range=dx,
+                    output_dir='/Users/jeng-yuantsai/Research/project/single_photon/calculations/'
+                               'cdft/WS2_c3v/interpolate_st/ground_state/extra/')
 
 
 #%%
-
+from qubitPack.tool_box import get_db
 import pandas as pd
-es = db("cdft").collection.aggregate([
-    {"$match": {"cdft_info": "excited_state_C3V_in_paper"}},
-    {"$project": {"energy": "$output.energy", "idx": "$interpolate_st_idx", "_id":0}}
+es = get_db("single_photon_emitter", "soc_cdft", port=1234).collection.aggregate([
+    {"$match": {"cdft_info": "ground_state_Ws_c3v_soc", "poscar_idx": {"$exists":True}}},
+    {"$project": {"energy": "$output.energy", "poscar_idx":1, "task_id":1, "_id":0, "d":"$calcs_reversed.dir_name"}}
 ])
 
 df = pd.DataFrame(es)
-df = df.sort_values("idx")
+# df = df.sort_values("poscar_idx")
 df.to_clipboard()
 
 #%%
