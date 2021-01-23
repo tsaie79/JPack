@@ -27,10 +27,17 @@ import glob
 
 
 #%% calculate pristine WS2 and determine band gap
+from qubitPack.tool_box import get_db
+
 def hse_scf_wf():
-    col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
+    CATEGORY = "pc"
+    LPAD = LaunchPad.from_file(
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+
+    db_name, col_name = "owls", "mx2_antisite_pc"
+    col = get_db(db_name, col_name, user="Jeng", password="qimin", port=12345).collection
     # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
-    mx2s = col.find({"task_id":{"$in":[3091]}})
+    mx2s = col.find({"task_id":{"$in":[3083, 3093]}})
 
     for mx2 in mx2s:
         pc = Structure.from_dict(mx2["output"]["structure"])
@@ -40,7 +47,7 @@ def hse_scf_wf():
             charge_states=[0],
             gamma_only=False,
             gamma_mesh=True,
-            scf_dos=True,
+            scf_dos=False,
             nupdowns=[-1],
             task="hse_relax",
             category="pc",
@@ -51,6 +58,12 @@ def hse_scf_wf():
                               {
                                   "incar_update":
                                       {"LASPH": True, "EDIFF": 1E-7, "EDIFFG": -0.001, "ISIF": 3, "NSW": 250, "LCHARG":False, "LWAVE":False}})
+
+        wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
+
+        wf = add_modify_incar(wf)
+        wf = set_execution_options(wf, category=CATEGORY)
+        wf = preserve_fworker(wf)
         LPAD.add_wf(wf)
 
 def hse_band_structure():
@@ -96,6 +109,7 @@ def hse_band_structure():
     bs_wf = add_modify_incar(bs_wf,{"incar_update": { "EDIFF": 1E-7, "LCHARG":True, "LWAVE":False}}, "HSE_scf")
     bs_wf = add_modify_incar(bs_wf,{"incar_update": { "EDIFF": 1E-7, "LCHARG":False, "LWAVE":False}}, "HSE_bs")
     LPAD.add_wf(bs_wf)
+hse_scf_wf()
 
 #%% make standard defect calc
 CATEGORY = "soc_standard_defect"

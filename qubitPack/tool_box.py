@@ -330,8 +330,7 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
 
     lattice = struct_i.lattice.matrix #[None,:,:]
     delta_R = np.dot(delta_R, lattice)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+
 
     # Poscar(struct_i).write_file('disp_dir/POSCAR_i'.format(output_dir))
     # Poscar(struct_f).write_file('disp_dir/POSCAR_f'.format(output_dir))
@@ -346,11 +345,18 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
     print('M: {:3}'.format(np.sqrt(delta_Q2.sum()/delta_R2.sum())))
     info = {"Delta_Q":np.sqrt(delta_Q2.sum())/0.529, "Delta_R": np.sqrt(delta_R2.sum())/0.529,
             "M":np.sqrt(delta_Q2.sum()/delta_R2.sum()), "unit":"atomic unit"}
-    dumpfn(info, os.path.join(output_dir, "info.json"))
 
+    resulting_sts = []
     for frac in disp_range:
         disp = frac * delta_R
         struct = Structure(struct_i.lattice, struct_i.species,
                            struct_i.cart_coords + disp,
                            coords_are_cartesian=True)
-        struct.to("vasp", '{0}/POSCAR_{1:03d}.vasp'.format(output_dir, int(np.rint(frac*10))))
+        if output_dir:
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            dumpfn(info, os.path.join(output_dir, "info.json"))
+            struct.to("vasp", '{0}/POSCAR_{1:03d}.vasp'.format(output_dir, int(np.rint(frac*10))))
+        resulting_sts.append((frac, struct))
+    resulting_sts = dict(resulting_sts)
+    return resulting_sts, info
