@@ -678,7 +678,7 @@ class ZPLWF:
         return selective_dyn
 
     def wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False, selective_dyn=None,
-           specific_structure=None):
+           specific_structure=None, nonsoc_prev_dir=None):
 
         kpoint_setting = "G" if gamma_only else "R"
         user_kpoints_settings = Kpoints.gamma_automatic() if gamma_only else Kpoints.from_dict(
@@ -802,6 +802,7 @@ class ZPLWF:
             structure=self.structure,
             parents=parent,
             vasp_input_set_params=uis,
+            prev_calc_dir=nonsoc_prev_dir,
             name="CDFT-D-HSE_scf",
             vasptodb_kwargs={
                 "additional_fields": {
