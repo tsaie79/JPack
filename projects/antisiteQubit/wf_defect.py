@@ -669,6 +669,31 @@ class ZPLWF:
         self.spin_config = spin_config
         self.encut = 1.3*max([potcar.enmax for potcar in MPHSERelaxSet(self.structure).potcar])
 
+    def get_lowest_unocc_band_idx(self, task_id, db_obj, nbands):
+
+        eig = db_obj.get_eigenvals(task_id)
+        spins = list(eig.keys())
+
+        lowest_unocc_band_idx = []
+        for spin in spins:
+            band_idx = 0
+            while eig[spin][0][band_idx][1] == 1:
+                band_idx += 1
+            lowest_unocc_band_idx.append(band_idx+1)
+        lowest_unocc_band_idx = dict(zip(spins, lowest_unocc_band_idx))
+
+
+        occu_configs = {}
+        maj_spin = max(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
+        low_band_idx = lowest_unocc_band_idx[maj_spin]
+        occu_configs[maj_spin] = "{}*1 1*0 1*1 {}*0".format(low_band_idx-2, nbands-low_band_idx)
+        if len(spins) == 2:
+            minor_spin = min(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
+            low_band_idx = lowest_unocc_band_idx[minor_spin]
+            occu_configs[minor_spin] = "{}*1 {}*0".format(low_band_idx-1, nbands-low_band_idx+1)
+
+        return occu_configs
+
     def set_selective_sites(self, center_n, distance):
         selective_dyn = []
         for i in self.structure.get_sites_in_sphere(self.structure[center_n].coords, distance, include_image=True):
@@ -680,7 +705,6 @@ class ZPLWF:
     def wf(self, task, charge, up_occupation, down_occupation, nbands, gamma_only=False, selective_dyn=None,
            specific_structure=None, nonsoc_prev_dir=None):
 
-        kpoint_setting = "G" if gamma_only else "R"
         user_kpoints_settings = Kpoints.gamma_automatic() if gamma_only else Kpoints.from_dict(
             {
                 'comment': 'Automatic kpoint scheme',
