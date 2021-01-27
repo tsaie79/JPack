@@ -360,3 +360,32 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
         resulting_sts.append((frac, struct))
     resulting_sts = dict(resulting_sts)
     return resulting_sts, info
+
+
+def delete_entry_in_db(task_id, db_name, col_name, user="Jeng", delete_fs_only=False):
+    """
+    remove entry and all Gridfs files in db
+
+    """
+    db = get_db(db_name, col_name)
+    entry = db.collection.find_one({"task_id":task_id})
+
+    remove_dict = {}
+    for i in list(entry["calcs_reversed"][0].keys()):
+        if "fs" in i:
+            chunks = i.rsplit("_", 1)[0] + ".chunks"
+            remove_dict[chunks] = entry["calcs_reversed"][0][i]
+            files = i.rsplit("_", 1)[0] + ".files"
+            remove_dict[files] = entry["calcs_reversed"][0][i]
+
+    for k,v in remove_dict.items():
+        d = get_db(db_name, k, user=user)
+        try:
+            d.collection.delete_one({"_id": v})
+        except Exception as err:
+            print(err)
+            continue
+
+    if not delete_fs_only:
+        db.collection.delete_one({"task_id":task_id})
+
