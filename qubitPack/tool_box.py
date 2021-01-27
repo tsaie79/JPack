@@ -362,12 +362,12 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
     return resulting_sts, info
 
 
-def delete_entry_in_db(task_id, db_name, col_name, user="Jeng", delete_fs_only=False):
+def delete_entry_in_db(task_id, db_name, col_name, auth_user="Jeng", delete_fs_only=False):
     """
     remove entry and all Gridfs files in db
 
     """
-    db = get_db(db_name, col_name)
+    db = get_db(db_name, col_name, user=auth_user)
     entry = db.collection.find_one({"task_id":task_id})
 
     remove_dict = {}
@@ -379,7 +379,7 @@ def delete_entry_in_db(task_id, db_name, col_name, user="Jeng", delete_fs_only=F
             remove_dict[files] = entry["calcs_reversed"][0][i]
 
     for k,v in remove_dict.items():
-        d = get_db(db_name, k, user=user)
+        d = get_db(db_name, k, user=auth_user)
         try:
             d.collection.delete_one({"_id": v})
         except Exception as err:
