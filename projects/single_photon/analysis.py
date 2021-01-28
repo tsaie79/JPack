@@ -73,27 +73,44 @@ get_interpolate_sts(b_st,
 #%%
 from qubitPack.tool_box import get_db
 import pandas as pd
-es = get_db("single_photon_emitter", "soc_cdft", port=1234).collection.aggregate([
-    {"$match": {"cdft_info": "ground_state_Ws_c3v_soc", "poscar_idx": {"$exists":True}}},
-    {"$project": {"energy": "$output.energy", "poscar_idx":1, "task_id":1, "_id":0, "d":"$calcs_reversed.dir_name"}}
+es = get_db("single_photon_emitter", "cdft", port=1234).collection.aggregate([
+    {"$match": {"cdft_info": "ground_state_C3V", "poscar_idx": {"$exists":False}}},
+    {"$project": {"energy": "$output.energy", "poscar_idx":"$interpolate_st_idx", "task_id":1, "_id":0}}
 ])
 
 df = pd.DataFrame(es)
-# df = df.sort_values("poscar_idx")
+df = df.sort_values("poscar_idx")
 df.to_clipboard()
 
 #%%
 from qubitPack.qc_searching.analysis.main import get_defect_state
+from qubitPack.tool_box import get_db
+from pymatgen.electronic_structure.plotter import DosPlotter
 
-cdft = db("standard_defect")
+cdft = get_db("single_photon_emitter", "soc_standard_defect")
 
-tot, proj, d_df = get_defect_state(
-    cdft,
-    {"task_id": 22},
-    1,-3,
-    None,
-    True,
-    "dist",
-    None,
-    0.1
-)
+dos = cdft.get_dos(70)
+ds_plotter = DosPlotter()
+ds_plotter.add_dos("t", dos)
+plt = ds_plotter.get_plot(xlim=[-5,5])
+plt.show()
+# tot, proj, d_df = get_defect_state(
+#     cdft,
+#     {"task_id": 72},
+#     1,-3,
+#     None,
+#     True,
+#     "dist",
+#     None,
+#     0.1
+
+#%%
+from qubitPack.tool_box import get_db
+soc = get_db("single_photon_emitter", "soc_standard_defect")
+nosoc = get_db("single_photon_emitter", "standard_defect")
+
+chemsys = "S-W"
+
+en_soc = soc.collection.find_one({"chemsys":chemsys, "task_label":"HSE_soc",
+                                  "output.spacegroup.symbol":"P3m1"})["output"]["energy"]
+en_nosoc = nosoc.collection.find_one({"chemsys":chemsys, "task_label":"HSE_scf"})["output"]["energy"]

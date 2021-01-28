@@ -237,16 +237,18 @@ WS2:
     soc=/home/tug03990/work/single_photon_emitter/soc_standard_defect/block_2021-01-17-04-46-01-108825/launcher_2021-01-27-03-41-44-622947
     nonsoc = '/home/tug03990/work/single_photon_emitter/soc_standard_defect/block_2021-01-17-04-46-01-108825/launcher_2021-01-26-23-58-04-516424'
 """
-tk_id = 22
+tk_id = 268# 267te, 268s, 269se
+nbands = 960
 
-db_a = get_db("single_photon_emitter", "soc_standard_defect")
+db_a = get_db("single_photon_emitter", "soc_standard_defect", port=12345)
 entry_a = db_a.collection.find_one({"task_id":tk_id})
 a_path = entry_a["dir_name"].split("/")[-1]
 
-nonsoc_a_entry = entry_a["pc_from"].split("/")
-nonsoc_a_path = get_db(nonsoc_a_entry[0], nonsoc_a_entry[1]).collection.find_one({"task_id":nonsoc_a_entry[-1]})["dir_name"].split("/")[-1]
+nonsoc_a_entry = entry_a["nonsoc_from"].split("/")
+db_nonsoc_a = get_db(nonsoc_a_entry[0], nonsoc_a_entry[1], port=12345)
+nonsoc_a_path = db_nonsoc_a.collection.find_one({"task_id":int(nonsoc_a_entry[-1])})["dir_name"].split("/")[-1]
 
-nbands = 960
+
 anti_triplet = ZPLWF(os.path.join("/home/tug03990/work/single_photon_emitter/soc_standard_defect/"
                      "block_2021-01-17-04-46-01-108825/", a_path), None)
 

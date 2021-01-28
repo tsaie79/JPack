@@ -163,12 +163,60 @@ from pymatgen import Element
 
 mgb2 = get_db("mgb2", "hetero")
 
-dos = mgb2.get_dos(155)
-
-pdos = dos.get_element_dos()
+c_term = mgb2.get_dos(155)
+si_term = mgb2.get_dos(158)
+c_term.energies
+# pdos = dos.get_element_dos()
 
 dos_plotter = DosPlotter(sigma=0.1)
-dos_plotter.add_dos_dict({"C": pdos[Element("C")], "Si": pdos[Element("Si")]})
-# dos_plotter.add_dos_dict(pdos)
+# dos_plotter.add_dos_dict({"C": pdos[Element("C")], "Si": pdos[Element("Si")]})
+dos_plotter.add_dos("C_terminated", c_term)
+dos_plotter.add_dos("Si_terminate", si_term)
 plt = dos_plotter.get_plot(xlim=[-15, 15])
+title = "Si-terminated"
 plt.show()
+
+#%% get vaccuum and align with vacuum
+from qubitPack.tool_box import get_db
+from pymatgen.electronic_structure.plotter import DosPlotter
+from pymatgen.electronic_structure.dos import Dos
+from pymatgen import Element, Spin
+import numpy as np
+from qubitPack.tool_box import get_db
+from matplotlib import pyplot as plt
+
+mgb2 = get_db("mgb2", "hetero")
+
+c_term, si_term = mgb2.collection.find_one({"task_id":155}), mgb2.collection.find_one({"task_id":158})
+
+
+c_term_vac, si_term_vac = max(c_term["calcs_reversed"][0]["output"]["locpot"]["2"]), max(si_term["calcs_reversed"][0]["output"]["locpot"]["2"])
+# c_term_vac, si_term_vac  = 0, 0
+
+c_term = mgb2.get_dos(155)
+c_energies = c_term.energies - np.ones(9000)*c_term_vac
+c_efermi = c_term.efermi - c_term_vac
+c_densities = c_term.get_densities()
+c_dos = Dos(efermi=c_efermi, energies=c_energies, densities={Spin(1): c_densities})
+
+si_term = mgb2.get_dos(158)
+si_energies = si_term.energies - np.ones(9000)*si_term_vac
+si_efermi = si_term.efermi - si_term_vac
+si_densities = si_term.get_densities()
+si_dos = Dos(efermi=si_efermi, energies=si_energies, densities={Spin(1): si_densities})
+
+dos_plotter = DosPlotter(sigma=0.1, zero_at_efermi=False)
+dos_plotter.add_dos("C_terminated_align", c_dos)
+dos_plotter.add_dos("Si_terminated_align", si_dos)
+plt = dos_plotter.get_plot(xlim=[-15, 5])
+
+#%% PDOS
+c_term = mgb2.get_dos(155)
+si_term = mgb2.get_dos(158)
+
+dos_plotter = DosPlotter(sigma=0.1, zero_at_efermi=True)
+dos_plotter.add_dos_dict(c_term.get_spd_dos())
+# dos_plotter.add_dos("Si", si_term)
+plt = dos_plotter.get_plot(xlim=[-15, 5])
+plt.show()
+

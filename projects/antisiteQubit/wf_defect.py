@@ -687,12 +687,15 @@ class ZPLWF:
         maj_spin = max(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
         low_band_idx = lowest_unocc_band_idx[maj_spin]
         occu_configs[maj_spin] = "{}*1 1*0 1*1 {}*0".format(low_band_idx-2, nbands-low_band_idx)
+        print("maj_spin: {}".format(maj_spin))
+
+        if len(spins) == 1:
+            return occu_configs[maj_spin]
         if len(spins) == 2:
             minor_spin = min(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
             low_band_idx = lowest_unocc_band_idx[minor_spin]
             occu_configs[minor_spin] = "{}*1 {}*0".format(low_band_idx-1, nbands-low_band_idx+1)
-
-        return occu_configs
+            return occu_configs[maj_spin], occu_configs[minor_spin]
 
     def set_selective_sites(self, center_n, distance):
         selective_dyn = []
