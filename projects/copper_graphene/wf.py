@@ -67,7 +67,7 @@ nsteps = 5000 #10ps
 
 override_default_vasp_params={
     "user_incar_settings": {"MDALGO":md_algo, "ISIF":isif, "SMASS":Q, "SIGMA":0.04, "ISMEAR":1, "ISPIN":1, "POTIM":2}}
-for T in [500, 1200, 1400, 1600, 2000]:
+for T in [800, 2200]:
     vis = MPMDSet(st, T, T, nsteps, True, **override_default_vasp_params)
 
     fw = MDFW(st, T, T, nsteps, vasp_input_set=vis, copy_vasp_outputs=False, vasp_cmd=GAMMA_VASP_CMD)

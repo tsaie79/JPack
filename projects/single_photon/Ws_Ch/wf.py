@@ -265,8 +265,6 @@ wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
 wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[1].name)
 wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[2].name)
 
-wf = add_modify_incar(wf, {"incar_update":{"ICHARG":11}}, fw_name_constraint=wf.fws[-1].name)
-
 wf = add_modify_incar(wf)
 
 wf = set_execution_options(wf, category=CATEGORY)

@@ -70,8 +70,8 @@ from qubitPack.tool_box import get_db
 
 db = get_db("copper_graphene", "modeling")
 
-for i in range(12, 16):
+for i in range(18, 23):
     e = db.collection.find_one({"task_id":i})
 
     Structure.from_dict(e["output"]["structure"]).to("poscar","/Users/jeng-yuantsai/Research/project/copper_graphene/"
-                                                              "calculations/structures/potim_1/{}K.vasp".format(e["input"]["incar"]["TEEND"]))
+                                                              "calculations/structures/nsites_512/{}K.vasp".format(e["input"]["incar"]["TEEND"]))
