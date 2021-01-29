@@ -753,7 +753,7 @@ class ZPLWF:
             "user_incar_settings":
                 {
                     "ENCUT": self.encut,
-                    "ICHARG": 0,
+                    # "ICHARG": 0,
                     "ISIF": 2,
                     "EDIFF": 1E-5,
                     "EDIFFG": -0.01,
