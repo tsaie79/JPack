@@ -73,12 +73,13 @@ get_interpolate_sts(b_st,
 #%%
 from qubitPack.tool_box import get_db
 import pandas as pd
-es = get_db("single_photon_emitter", "cdft", port=1234).collection.aggregate([
-    {"$match": {"cdft_info": "ground_state_C3V", "poscar_idx": {"$exists":False}}},
-    {"$project": {"energy": "$output.energy", "poscar_idx":"$interpolate_st_idx", "task_id":1, "_id":0}}
+es = get_db("single_photon_emitter", "soc_cdft", port=1234).collection.aggregate([
+    {"$match": {"cdft_info": "ground_state_Ws_c3v_soc", "poscar_idx": {"$exists":True}}},
+    {"$project": {"energy": "$output.energy", "poscar_idx":"$poscar_idx", "task_id":1, "_id":0}}
 ])
 
 df = pd.DataFrame(es)
+# df["dx"] = [int(i.split("_")[-1].split(".")[0])/10 for i in df["poscar_idx"]]
 df = df.sort_values("poscar_idx")
 df.to_clipboard()
 
