@@ -53,7 +53,7 @@ for idx, i in enumerate(hetero_interfaces):
 
 #%% WF
 import numpy as np
-from pymatgen.io.vasp.sets import MPRelaxSet
+from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet
 from atomate.vasp.fireworks import OptimizeFW, StaticFW
 from atomate.vasp.powerups import *
 from fireworks import Workflow, LaunchPad, FileTransferTask
@@ -96,14 +96,15 @@ wf = preserve_fworker(wf)
 wf = set_execution_options(wf, category=CATEGORY)
 
 print(wf)
-# LPAD.add_wf(wf)
+LPAD.add_wf(wf)
 
 
-for st in [sic]:
+for st in [heter]:
     fws = []
-    uis = {"EDIFF":1E-5, "EDIFFG":-0.01, "ISIF":2}
+    uis = {"EDIFF":1E-5, "EDIFFG":-0.01, "ISIF":2, "SIGMA":0.05}
     uis.update(dp(st))
-    opt = OptimizeFW(st, override_default_vasp_params={"user_incar_settings":uis})
+    vis = MPMetalRelaxSet(st, user_incar_settings=uis)
+    opt = OptimizeFW(st, vasp_input_set=vis)
 
     uis = {"EDIFF":1E-6}
     uis.update(dp(st))
@@ -112,13 +113,13 @@ for st in [sic]:
     fws.extend([static, opt])
     wf = Workflow(fws, name=terminate+":{}".format(st.formula))
 
-    add_additional_fields_to_taskdocs(wf, {"terminate": terminate})
+    add_additional_fields_to_taskdocs(wf, {"terminate": terminate, "ps":"MPMetal"})
     wf = add_modify_incar(wf, {"incar_update": dict(NUPDOWN=0, MAGMOM=MPRelaxSet(st).incar.get("MAGMOM"))})
     wf = preserve_fworker(wf)
     wf = set_execution_options(wf, category=CATEGORY)
 
     print(wf)
-    LPAD.add_wf(wf)
+    # LPAD.add_wf(wf)
 
 
 #%% check locpot, energy
@@ -211,12 +212,101 @@ dos_plotter.add_dos("Si_terminated_align", si_dos)
 plt = dos_plotter.get_plot(xlim=[-15, 5])
 
 #%% PDOS
-c_term = mgb2.get_dos(155)
-si_term = mgb2.get_dos(158)
+from pymatgen.electronic_structure.plotter import DosPlotter
+from pymatgen.electronic_structure.dos import Dos
+from pymatgen import Element, Spin
+import numpy as np
+from qubitPack.tool_box import get_db
+from matplotlib import pyplot as plt
+
+mgb2 = get_db("mgb2", "hetero")
+c_term = mgb2.get_dos(162)
+si_term = mgb2.get_dos(161)
 
 dos_plotter = DosPlotter(sigma=0.1, zero_at_efermi=True)
-dos_plotter.add_dos_dict(c_term.get_spd_dos())
+dos_plotter.add_dos_dict(c_term.get_element_dos())
+# dos_plotter.add_dos_dict(si_term.get_element_dos())
 # dos_plotter.add_dos("Si", si_term)
 plt = dos_plotter.get_plot(xlim=[-15, 5])
 plt.show()
 
+#%% read CHGCAR and generate WAVECAR for partial charge calculations
+import numpy as np
+from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet
+from atomate.vasp.fireworks import OptimizeFW, StaticFW
+from atomate.vasp.powerups import *
+from atomate.vasp.jpowerups import *
+from fireworks import Workflow, LaunchPad, FileTransferTask
+import os
+from qubitPack.tool_box import get_db
+
+CATEGORY = "hetero"
+LPAD = LaunchPad.from_file(
+    os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/my_launchpad.yaml".format(CATEGORY)))
+
+tkid = 159 #160 159
+
+mgb2 = get_db("mgb2", "hetero", port=12345)
+e = mgb2.collection.find_one({"task_id":tkid})
+p = e["calcs_reversed"][0]["dir_name"].split("/")[-1]
+p = os.path.join("/home/tug03990/scratch/mgb2/hetero/scf", p)
+st = Structure.from_dict(e["output"]["structure"])
+
+uis = {
+    "ISTART":1,#    job   : 0-new  1-cont  2-samecut
+    "ICHARG":1,#   charge: 1-file 2-atom 10-const
+    "LPARD": True,
+    "NBMOD": -3,
+    "EINT": -2,
+    "LSEPB": False,
+    "LSEPK": False,
+    "LAECHG": False,
+}
+static = StaticFW(st, prev_calc_dir=p, vasp_input_set_params={"user_incar_settings":uis}, vasptodb_kwargs={
+    "parse_dos":False,
+    "parse_eigenvalues":False
+})
+wf = Workflow([static])
+
+add_additional_fields_to_taskdocs(wf, {"terminate": e["terminate"], "task_type": "partial charge"})
+wf = add_modify_incar(wf, {"incar_update": dict(NUPDOWN=0, MAGMOM=MPRelaxSet(st).incar.get("MAGMOM"))})
+wf = add_modify_incar(wf)
+wf = preserve_fworker(wf)
+wf = clear_to_db(wf)
+wf = set_execution_options(wf, category=CATEGORY)
+
+wf.name = "partial_chg:tkid{}:eint{}".format(tkid, uis["EINT"])
+
+LPAD.add_wf(wf)
+
+#%%
+from qubitPack.tool_box import get_db
+from subprocess import call
+
+tkid = 159 #160 159// 163, 164
+
+mgb2 = get_db("mgb2", "hetero", port=12345)
+e = mgb2.collection.find_one({"task_id":tkid})
+p = e["calcs_reversed"][0]["dir_name"]
+
+# call("scp -r {} tug03990@owlsnesttwo.hpc.temple.edu:{}".format(p, "/home/tug03990/scratch/mgb2/hetero/scf/").split(" "))
+
+#%% get bader results
+
+from qubitPack.tool_box import get_db
+import pandas as pd
+from pymatgen import Structure
+
+mgb2 = get_db("mgb2", "hetero")
+
+si = mgb2.collection.find_one({"task_id":164})
+c = mgb2.collection.find_one({"task_id":165})
+
+for e in [si, c]:
+    st = Structure.from_dict(e["input"]["structure"])
+    st.to("poscar", "/Users/jeng-yuantsai/Research/project/MgB2/calculations/mgb2/hetero/bader/{}.vasp".format(e["terminate"]))
+    print(st.species)
+    a = pd.DataFrame(st.species)
+    b = pd.DataFrame(e["calcs_reversed"][0]["bader"])
+    df = pd.concat([b,a], axis=1)
+    df.to_excel("/Users/jeng-yuantsai/Research/project/MgB2/calculations/mgb2/hetero/bader/{}.xlsx".format(e["terminate"]), index_label=False)

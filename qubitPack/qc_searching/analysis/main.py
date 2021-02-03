@@ -21,8 +21,7 @@ def get_defect_state(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboar
     tot, proj, d_df = can.get_candidates(
         0,
         threshold=threshold,
-        select_up=None,
-        select_dn=None
+        select_bands=None
     )
     e = {}
     e.update(

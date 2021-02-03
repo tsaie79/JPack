@@ -18,8 +18,8 @@ copper = Structure.from_file("/Users/jeng-yuantsai/Research/project/copper_graph
 copper = Interface(copper, hkl=[1,1,1], min_thick=5, min_vac=40, primitive=False, from_ase=True)
 
 substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
-    copper,
     graphene,
+    copper,
     max_area=200
 )
 
@@ -31,7 +31,7 @@ hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_alig
 for idx, i in enumerate(hetero_interfaces):
     i.to("poscar", os.path.join(p, "interface", "{}.vasp".format(idx)))
 
-#%%
+
 #%% hetero
 from pymatgen import Structure, Molecule
 from pymatgen.transformations.standard_transformations import RotationTransformation
@@ -45,16 +45,24 @@ from mpinterfaces.utils import *
 p = "/Users/jeng-yuantsai/Research/project/copper_graphene/model"
 
 copper = Structure.from_file("/Users/jeng-yuantsai/Research/project/copper_graphene/model/Cu_mp-30_conventional_standard.cif")
-copper = Interface(copper, hkl=[1,1,1], min_thick=5, min_vac=30-2.5-0.05, primitive=False, from_ase=True)
-
+copper = Interface(copper, hkl=[1,1,1], min_thick=5, min_vac=35, primitive=False, from_ase=True, center_slab=True)
+#30-2.5-0.05
 copper_gr = Structure.from_file("/Users/jeng-yuantsai/Research/project/copper_graphene/model/interface/gr_cop.vasp")
-copper_gr = Interface(copper_gr, hkl=[0,0,1], min_thick=1, min_vac=30-2.5-0.05, primitive=False, from_ase=True)
+# copper_gr = Structure(copper_gr.lattice, copper_gr.species, copper_gr.frac_coords*[1,1,-1])
+copper_gr = Interface(copper_gr, hkl=[0,0,1], min_thick=1, min_vac=5, primitive=False, from_ase=True, center_slab=True)
 
 substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
-    copper_gr,
     copper,
+    copper_gr,
     max_area=200
 )
+
+# substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
+#     copper,
+#     copper_gr,
+#     max_area=200
+# )
+
 
 substrate_slab_aligned.to("poscar", os.path.join(p, "subs.vasp"))
 mat2d_slab_aligned.to("poscar", os.path.join(p, "mat2d.vasp"))
@@ -70,8 +78,12 @@ from qubitPack.tool_box import get_db
 
 db = get_db("copper_graphene", "modeling")
 
-for i in range(18, 23):
-    e = db.collection.find_one({"task_id":i})
+# for e in db.collection.find({"stacking":"head", "input.incar.TEEND":{"$exists":1}}):
+#     Structure.from_dict(e["output"]["structure"]).to("poscar","/Users/jeng-yuantsai/"
+#                                                               "Research/project/copper_graphene/"
+#                                                               "calculations/structures/stacking_head/{}K.vasp".format(e["input"]["incar"]["TEEND"]))
 
-    Structure.from_dict(e["output"]["structure"]).to("poscar","/Users/jeng-yuantsai/Research/project/copper_graphene/"
-                                                              "calculations/structures/nsites_512/{}K.vasp".format(e["input"]["incar"]["TEEND"]))
+e = db.collection.find_one({"task_id":26})
+Structure.from_dict(e["output"]["structure"]).to("poscar","/Users/jeng-yuantsai/"
+                                                          "Research/project/copper_graphene/"
+                                                          "calculations/structures/stacking_head/0K.vasp")

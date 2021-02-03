@@ -322,6 +322,7 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
     '''
     atomic unit is adopted
     '''
+    from pymatgen.core.units import ang_to_bohr
     # A. Alkauskas, Q. Yan, and C. G. Van de Walle, Physical Review B 90, 27 (2014)
     struct_i, sorted_symbols = i_st, i_st.symbol_set
     struct_f, sorted_symbols = f_st, f_st.symbol_set
@@ -340,11 +341,11 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
     delta_Q2 = masses[:,None] * delta_R ** 2
     delta_R2 = delta_R**2
 
-    print('Delta_Q: {:3}'.format(np.sqrt(delta_Q2.sum())/0.529))
-    print('Delta_R: {:3}'.format(np.sqrt(delta_R2.sum())/0.529))
-    print('M: {:3}'.format(np.sqrt(delta_Q2.sum()/delta_R2.sum())))
-    info = {"Delta_Q":np.sqrt(delta_Q2.sum())/0.529, "Delta_R": np.sqrt(delta_R2.sum())/0.529,
-            "M":np.sqrt(delta_Q2.sum()/delta_R2.sum()), "unit":"atomic unit"}
+    print('Delta_Q: {:3}'.format(np.sqrt(delta_Q2.sum())*ang_to_bohr))
+    print('Delta_R: {:3}'.format(np.sqrt(delta_R2.sum())*ang_to_bohr))
+    print('M: {:3}'.format(delta_Q2.sum()/delta_R2.sum()))
+    info = {"Delta_Q":np.sqrt(delta_Q2.sum())*ang_to_bohr, "Delta_R": np.sqrt(delta_R2.sum())*ang_to_bohr,
+            "M":delta_Q2.sum()/delta_R2.sum(), "unit":"atomic unit"}
 
     resulting_sts = []
     for frac in disp_range:

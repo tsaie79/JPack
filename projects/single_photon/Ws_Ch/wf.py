@@ -206,6 +206,45 @@ for tk_id in [241]:
 
         print("{:d}: {:.3f}".format(i, st.get_distance(entry["NN"][-1], i)))
 
+
+#%% transfer needed files for soc cdft from local to HPC
+from atomate.vasp.powerups import *
+from atomate.vasp.jpowerups import *
+from fireworks import LaunchPad
+from pymatgen.io.vasp import Poscar
+import os, glob
+from monty.serialization import loadfn
+from projects.antisiteQubit.wf_defect import ZPLWF
+from qubitPack.tool_box import get_db
+
+tk_id = 269# 267te, 268s, 269se
+
+db_a = get_db("single_photon_emitter", "soc_standard_defect", port=12345)
+entry_a = db_a.collection.find_one({"task_id":tk_id})
+a_path = entry_a["dir_name"].split("/")[-1]
+
+nonsoc_a_entry = entry_a["nonsoc_from"].split("/")
+db_nonsoc_a = get_db(nonsoc_a_entry[0], nonsoc_a_entry[1], port=12345)
+nonsoc_a_path = db_nonsoc_a.collection.find_one({"task_id":int(nonsoc_a_entry[-1])})["dir_name"].split("/")[-1]
+
+soc = "/home/jengyuantsai/Research/projects/single_photon_emitter/soc_standard_defect"
+nonsoc = "/home/jengyuantsai/Research/projects/single_photon_emitter/standard_defect"
+
+from subprocess import call
+
+c = "scp -P 12346 -r jengyuantsai@localhost:{} {}".format(
+    os.path.join(soc,a_path),
+    "/home/tug03990/scratch/single_photon_emitter/soc_standard_defect/block_2021-01-22-20-56-50-305107/",
+)
+call(c.split(" "))
+print(a_path)
+
+c = "scp -P 12346 -r jengyuantsai@localhost:{} {}".format(
+    os.path.join(nonsoc, nonsoc_a_path),
+    "/home/tug03990/scratch/single_photon_emitter/standard_defect/block_2021-01-11-17-39-35-861559/",
+)
+call(c.split(" "))
+print(nonsoc_a_path)
 #%% soc cdft
 from atomate.vasp.powerups import *
 from atomate.vasp.jpowerups import *
@@ -237,8 +276,10 @@ WS2:
     soc=/home/tug03990/work/single_photon_emitter/soc_standard_defect/block_2021-01-17-04-46-01-108825/launcher_2021-01-27-03-41-44-622947
     nonsoc = '/home/tug03990/work/single_photon_emitter/soc_standard_defect/block_2021-01-17-04-46-01-108825/launcher_2021-01-26-23-58-04-516424'
 """
-tk_id = 268# 267te, 268s, 269se
+tk_id = 269# 267te, 268s, 269se
 nbands = 960
+soc_p = "/home/tug03990/scratch/single_photon_emitter/soc_standard_defect/block_2021-01-22-20-56-50-305107"
+nonsoc_p = "/home/tug03990/scratch/single_photon_emitter/standard_defect/block_2021-01-11-17-39-35-861559"
 
 db_a = get_db("single_photon_emitter", "soc_standard_defect", port=12345)
 entry_a = db_a.collection.find_one({"task_id":tk_id})
@@ -249,14 +290,12 @@ db_nonsoc_a = get_db(nonsoc_a_entry[0], nonsoc_a_entry[1], port=12345)
 nonsoc_a_path = db_nonsoc_a.collection.find_one({"task_id":int(nonsoc_a_entry[-1])})["dir_name"].split("/")[-1]
 
 
-anti_triplet = ZPLWF(os.path.join("/home/tug03990/work/single_photon_emitter/soc_standard_defect/"
-                     "block_2021-01-17-04-46-01-108825/", a_path), None)
+anti_triplet = ZPLWF(os.path.join(soc_p, a_path), None)
 
 wf = anti_triplet.wf(
     "B-C-D", 0, up_occupation=anti_triplet.get_lowest_unocc_band_idx(tk_id, db_a, nbands),
     down_occupation=None, nbands=nbands, gamma_only=True, selective_dyn=None,
-    nonsoc_prev_dir=os.path.join("/home/tug03990/work/single_photon_emitter/standard_defect/"
-                                 "block_2021-01-12-17-28-08-335869", nonsoc_a_path)
+    nonsoc_prev_dir=os.path.join(nonsoc_p, nonsoc_a_path)
 )
 
 wf = jmodify_to_soc(wf, nbands=nbands, structure=anti_triplet.structure)
@@ -271,4 +310,5 @@ wf = set_execution_options(wf, category=CATEGORY)
 wf = preserve_fworker(wf)
 LPAD.add_wf(wf)
 
+#%% soc cdft parabola
 

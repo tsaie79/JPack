@@ -188,143 +188,222 @@ class DetermineDefectState:
                                                             self.efermi+self.vacuum_locpot,
                                                             ))
 
-    def get_candidates(self, kpoint=0, threshold=0.2, select_up=None, select_dn=None):
-        # find promising eigenstates with (band_index, [energy, occupation])
-        eigenvals = defaultdict(list)
-        energy_range = [self.vbm, self.cbm]
-
-        try:
-            for band_idx, i in enumerate(self.eigenvals["1"][kpoint]):
+    def get_candidates(self, kpoint=0, threshold=0.2, select_bands=None):
+        def get_eigenvals(spin, entry_eigenvals, energy_range):
+            eigenvals = defaultdict(list)
+            for band_idx, i in enumerate(entry_eigenvals[spin][kpoint]):
                 # (band_index, [energy, occupied])
                 if energy_range[1] > (i[0] - self.vacuum_locpot) > energy_range[0]:
-                    eigenvals["1"].append((band_idx, i))
-        except IndexError:
-            print("Threshold of projection is too high!")
+                    eigenvals[spin].append((band_idx, i))
+            return eigenvals
+        def get_promising_state(spin, eigenvals):
+            promising_band = defaultdict(list)
+            band_up_proj = []
+            up = defaultdict(tuple)
+            for band in eigenvals[spin]:
+                total_proj = 0
+                adj_proj = 0
+                for ion_idx in self.nn:
+                    total_proj += sum(self.proj_eigenvals[spin][kpoint][band[0]][ion_idx])
+                for ion_adj_idx in self.nn[:-1]:
+                    adj_proj += sum(self.proj_eigenvals[spin][kpoint][band[0]][ion_adj_idx])
+                antisite_proj = sum(self.proj_eigenvals[spin][kpoint][band[0]][self.nn[-1]])
+                if total_proj >= threshold:
+                    # print("band_index: {}".format(band[0]))
+                    promising_band[spin].append((band[0], band[1], total_proj,
+                                                round(adj_proj/total_proj*100,2),
+                                                round(antisite_proj/total_proj*100,2)))
 
-        try:
-            for band_idx, i in enumerate(self.eigenvals["-1"][kpoint]):
-                if energy_range[1] > (i[0] - self.vacuum_locpot) > energy_range[0]:
-                    eigenvals["-1"].append((band_idx, i))
-        except IndexError:
-            print("Threshold of projection is too high!")
+                    sheet_procar = defaultdict(list)
+                    for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
+                        test = {}
+                        for ion_idx in self.nn:
+                            orbital_proj = self.proj_eigenvals[spin][kpoint][band[0]][ion_idx][idx]
+                            if orbital_proj < 1e-3:
+                                orbital_proj = None
+                            test.update({ion_idx: orbital_proj})
+                        test.update({"band_index": band[0]}) #
+                        test.update({"spin":"up"}) #
+                        test.update({"orbital":o})
+                        band_up_proj.append(test)
+            for i in promising_band[spin]:
+                up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
+            return up, band_up_proj
+
+        def sheet(band_info, band_proj, spin):
+            sheet_up = defaultdict(list)
+            sheet_up["band_index"] = list(band_info.keys())
+            sheet_up["energy"] = [i[0] for i in band_info.values()]
+            sheet_up["occupied"] = [i[1][0] for i in band_info.values()]
+            sheet_up["tot_proj"] = [i[1][2] for i in band_info.values()]
+            sheet_up["adj_proj"] = [i[1][3] for i in band_info.values()]
+            sheet_up["antisite_proj"] = [i[1][4] for i in band_info.values()]
+            sheet_up["n_occ_e"] = [i[1][1] for i in band_info.values()]
+            sheet_up["spin"] = ["up" for i in range(len(band_info.keys()))]
+            df_up, df_up_proj = pd.DataFrame(sheet_up), pd.DataFrame(band_proj[spin])
+            if len(sheet_up["band_index"]) != 0:
+                df_up = df_up.set_index(["band_index"])
+                df_up_proj = df_up_proj.set_index(["band_index"])
+            return df_up, df_up_proj
+
+        # find eigenstates with (band_index, [energy, occupation])
+        spins = ["1", "-1"]
+        if self.entry["input"]["incar"].get("ISPIN", None) == 1:
+            spins = ["1"]
+        elif self.entry["input"]["incar"].get("LSORBIT", None):
+            spins = ["1"]
+
+        eigenvals = {}
+        promising_band = {}
+        band_proj = {}
+        band_info = {}
+        df = {}
+        df_proj = {}
+        channel = {}
+        levels = {}
+        for spin in spins:
+            try:
+                eigenvals.update(get_eigenvals(spin, self.eigenvals, energy_range=[self.vbm, self.cbm]))
+                print(eigenvals)
+                band_detail, proj = get_promising_state(spin, eigenvals)
+                band_proj[spin] = proj
+                band_info.update(band_detail)
+                df[spin], df_proj[spin] = sheet(band_info, band_proj, spin)
+                if select_bands:
+                    for spin, band in select_bands.items():
+                        channel[spin] = df[spin].loc[band, :].sort_index(ascending=False)
+                        band_proj[spin] = df_proj[spin].loc[band, :].sort_index(ascending=False)
+                        levels[spin] = dict(zip(channel[spin].loc[band:, "energy"], channel[spin].loc[band:, "occupied"]))
+                else:
+                    channel[spin] = df[spin].sort_index(ascending=False)
+                    band_proj[spin] = df_proj[spin].sort_index(ascending=False)
+                    levels[spin] = dict(zip(channel[spin].loc[:, "energy"], channel[spin].loc[:, "occupied"]))
+            except IndexError:
+                print("Threshold of projection is too high!")
+
+        eng = EnergyLevel(levels)
+
+        # try:
+        #     for band_idx, i in enumerate(self.eigenvals["-1"][kpoint]):
+        #         if energy_range[1] > (i[0] - self.vacuum_locpot) > energy_range[0]:
+        #             eigenvals["-1"].append((band_idx, i))
+        # except IndexError:
+        #     print("Threshold of projection is too high!")
+
 
 
         # find promising states if total projection of nn is larger than 0.2
-        promising_band = defaultdict(list)
-        band_up_proj = []
-        for band in eigenvals["1"]:
-            total_proj = 0
-            adj_proj = 0
-            for ion_idx in self.nn:
-                total_proj += sum(self.proj_eigenvals["1"][kpoint][band[0]][ion_idx])
-            for ion_adj_idx in self.nn[:-1]:
-                adj_proj += sum(self.proj_eigenvals["1"][kpoint][band[0]][ion_adj_idx])
-            antisite_proj = sum(self.proj_eigenvals["1"][kpoint][band[0]][self.nn[-1]])
-            if total_proj >= threshold:
-                # print("band_index: {}".format(band[0]))
-                promising_band["1"].append((band[0], band[1], total_proj,
-                                            round(adj_proj/total_proj*100,2),
-                                            round(antisite_proj/total_proj*100,2)))
-
-                sheet_procar = defaultdict(list)
-                for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
-                    test = {}
-                    for ion_idx in self.nn:
-                        orbital_proj = self.proj_eigenvals["1"][kpoint][band[0]][ion_idx][idx]
-                        if orbital_proj < 1e-3:
-                            orbital_proj = None
-                        test.update({ion_idx: orbital_proj})
-                    test.update({"band_index": band[0]}) #
-                    test.update({"spin":"up"}) #
-                    test.update({"orbital":o})
-                    band_up_proj.append(test)
-
-        band_dn_proj = []
-        for band in eigenvals["-1"]:
-            total_proj = 0
-            adj_proj = 0
-            for ion_idx in self.nn:
-                total_proj += sum(self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx])
-            for ion_adj_idx in self.nn[:-1]:
-                adj_proj += sum(self.proj_eigenvals["-1"][kpoint][band[0]][ion_adj_idx])
-            antisite_proj = sum(self.proj_eigenvals["-1"][kpoint][band[0]][self.nn[-1]])
-            if total_proj >= threshold:
-                # print("band_index: {}".format(band[0]))
-                promising_band["-1"].append((band[0], band[1], total_proj,
-                                            round(adj_proj/total_proj*100,2),
-                                            round(antisite_proj/total_proj*100,2)))
-                # sheet_procar = defaultdict(list)
-                for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
-                    test = {}
-                    for ion_idx in self.nn:
-                        orbital_proj = self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx][idx]
-                        if orbital_proj < 1e-3:
-                            orbital_proj = None
-                        test.update({ion_idx: orbital_proj})
-                    test.update({"band_index": band[0]}) #
-                    test.update({"spin":"dn"}) #
-                    test.update({"orbital":o})
-                    band_dn_proj.append(test)
+        # promising_band = defaultdict(list)
+        # band_up_proj = []
+        # for band in eigenvals["1"]:
+        #     total_proj = 0
+        #     adj_proj = 0
+        #     for ion_idx in self.nn:
+        #         total_proj += sum(self.proj_eigenvals["1"][kpoint][band[0]][ion_idx])
+        #     for ion_adj_idx in self.nn[:-1]:
+        #         adj_proj += sum(self.proj_eigenvals["1"][kpoint][band[0]][ion_adj_idx])
+        #     antisite_proj = sum(self.proj_eigenvals["1"][kpoint][band[0]][self.nn[-1]])
+        #     if total_proj >= threshold:
+        #         # print("band_index: {}".format(band[0]))
+        #         promising_band["1"].append((band[0], band[1], total_proj,
+        #                                     round(adj_proj/total_proj*100,2),
+        #                                     round(antisite_proj/total_proj*100,2)))
+        #
+        #         sheet_procar = defaultdict(list)
+        #         for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
+        #             test = {}
+        #             for ion_idx in self.nn:
+        #                 orbital_proj = self.proj_eigenvals["1"][kpoint][band[0]][ion_idx][idx]
+        #                 if orbital_proj < 1e-3:
+        #                     orbital_proj = None
+        #                 test.update({ion_idx: orbital_proj})
+        #             test.update({"band_index": band[0]}) #
+        #             test.update({"spin":"up"}) #
+        #             test.update({"orbital":o})
+        #             band_up_proj.append(test)
+        #
+        # band_dn_proj = []
+        # for band in eigenvals["-1"]:
+        #     total_proj = 0
+        #     adj_proj = 0
+        #     for ion_idx in self.nn:
+        #         total_proj += sum(self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx])
+        #     for ion_adj_idx in self.nn[:-1]:
+        #         adj_proj += sum(self.proj_eigenvals["-1"][kpoint][band[0]][ion_adj_idx])
+        #     antisite_proj = sum(self.proj_eigenvals["-1"][kpoint][band[0]][self.nn[-1]])
+        #     if total_proj >= threshold:
+        #         # print("band_index: {}".format(band[0]))
+        #         promising_band["-1"].append((band[0], band[1], total_proj,
+        #                                     round(adj_proj/total_proj*100,2),
+        #                                     round(antisite_proj/total_proj*100,2)))
+        #         # sheet_procar = defaultdict(list)
+        #         for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
+        #             test = {}
+        #             for ion_idx in self.nn:
+        #                 orbital_proj = self.proj_eigenvals["-1"][kpoint][band[0]][ion_idx][idx]
+        #                 if orbital_proj < 1e-3:
+        #                     orbital_proj = None
+        #                 test.update({ion_idx: orbital_proj})
+        #             test.update({"band_index": band[0]}) #
+        #             test.update({"spin":"dn"}) #
+        #             test.update({"orbital":o})
+        #             band_dn_proj.append(test)
 
         # Total defect states
         up_channel, dn_channel = None, None
-        up = defaultdict(tuple)
-        dn = defaultdict(tuple)
-        for i in promising_band["1"]:
-            up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
-        for i in promising_band["-1"]:
-            dn[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
 
-        sheet_up = defaultdict(list)
-        sheet_up["band_index"] = list(up.keys())
-        sheet_up["energy"] = [i[0] for i in up.values()]
-        sheet_up["occupied"] = [i[1][0] for i in up.values()]
-        sheet_up["tot_proj"] = [i[1][2] for i in up.values()]
-        sheet_up["adj_proj"] = [i[1][3] for i in up.values()]
-        sheet_up["antisite_proj"] = [i[1][4] for i in up.values()]
-        sheet_up["n_occ_e"] = [i[1][1] for i in up.values()]
-        sheet_up["spin"] = ["up" for i in range(len(up.keys()))]
+        # up = defaultdict(tuple)
+        # dn = defaultdict(tuple)
+        # for i in promising_band["1"]:
+        #     up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
+        # for i in promising_band["-1"]:
+        #     dn[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
 
-        sheet_down = defaultdict(list)
-        sheet_down["band_index"] = list(dn.keys())
-        sheet_down["energy"] = [i[0] for i in dn.values()]
-        sheet_down["occupied"] = [i[1][0] for i in dn.values()]
-        sheet_down["tot_proj"] = [i[1][2] for i in dn.values()]
-        sheet_down["adj_proj"] = [i[1][3] for i in dn.values()]
-        sheet_down["antisite_proj"] = [i[1][4] for i in dn.values()]
-        sheet_down["n_occ_e"] = [i[1][1] for i in dn.values()]
-        sheet_down["spin"] = ["dn" for i in range(len(dn.keys()))]
 
-        df_up, df_up_proj = pd.DataFrame(sheet_up), pd.DataFrame(band_up_proj)
-        if len(sheet_up["band_index"]) != 0:
-            df_up = df_up.set_index(["band_index"])
-            df_up_proj = df_up_proj.set_index(["band_index"])
 
-        df_dn, df_dn_proj = pd.DataFrame(sheet_down), pd.DataFrame(band_dn_proj)
-        if len(sheet_down["band_index"]) != 0:
-            df_dn = df_dn.set_index(["band_index"])
-            df_dn_proj = df_dn_proj.set_index(["band_index"])
+        # sheet_down = defaultdict(list)
+        # sheet_down["band_index"] = list(dn.keys())
+        # sheet_down["energy"] = [i[0] for i in dn.values()]
+        # sheet_down["occupied"] = [i[1][0] for i in dn.values()]
+        # sheet_down["tot_proj"] = [i[1][2] for i in dn.values()]
+        # sheet_down["adj_proj"] = [i[1][3] for i in dn.values()]
+        # sheet_down["antisite_proj"] = [i[1][4] for i in dn.values()]
+        # sheet_down["n_occ_e"] = [i[1][1] for i in dn.values()]
+        # sheet_down["spin"] = ["dn" for i in range(len(dn.keys()))]
 
-        if select_up and select_dn:
-            up_channel = df_up.loc[select_up, :].sort_index(ascending=False)
-            dn_channel = df_dn.loc[select_dn, :].sort_index(ascending=False)
-            band_up_proj = df_up_proj.loc[select_up, :].sort_index(ascending=False)
-            band_dn_proj = df_dn_proj.loc[select_dn, :].sort_index(ascending=False)
+        # df_up, df_up_proj = pd.DataFrame(sheet_up), pd.DataFrame(band_up_proj)
+        # if len(sheet_up["band_index"]) != 0:
+        #     df_up = df_up.set_index(["band_index"])
+        #     df_up_proj = df_up_proj.set_index(["band_index"])
+        #
+        # df_dn, df_dn_proj = pd.DataFrame(sheet_down), pd.DataFrame(band_dn_proj)
+        # if len(sheet_down["band_index"]) != 0:
+        #     df_dn = df_dn.set_index(["band_index"])
+        #     df_dn_proj = df_dn_proj.set_index(["band_index"])
 
-        else:
-            up_channel = df_up.sort_index(ascending=False)
-            dn_channel = df_dn.sort_index(ascending=False)
 
-        if select_up and select_dn:
-            up_levels = dict(zip(up_channel.loc[select_up, "energy"], up_channel.loc[select_up, "occupied"]))
-            dn_levels = dict(zip(dn_channel.loc[select_dn, "energy"], dn_channel.loc[select_dn, "occupied"]))
-            eng = EnergyLevel(up_levels, dn_levels)
-            fig = None
-        else:
-            up_levels = dict(zip(up_channel.loc[:, "energy"], up_channel.loc[:, "occupied"]))
-            dn_levels = dict(zip(dn_channel.loc[:, "energy"], dn_channel.loc[:, "occupied"]))
-            eng = EnergyLevel(up_levels, dn_levels)
-            fig = None
+
+
+    # if select_up and select_dn:
+        #     up_channel = df_up.loc[select_up, :].sort_index(ascending=False)
+        #     dn_channel = df_dn.loc[select_dn, :].sort_index(ascending=False)
+        #     band_up_proj = df_up_proj.loc[select_up, :].sort_index(ascending=False)
+        #     band_dn_proj = df_dn_proj.loc[select_dn, :].sort_index(ascending=False)
+
+        # else:
+        #     up_channel = df_up.sort_index(ascending=False)
+        #     dn_channel = df_dn.sort_index(ascending=False)
+
+        # if select_up and select_dn:
+        #     up_levels = dict(zip(up_channel.loc[select_up, "energy"], up_channel.loc[select_up, "occupied"]))
+        #     dn_levels = dict(zip(dn_channel.loc[select_dn, "energy"], dn_channel.loc[select_dn, "occupied"]))
+        #     eng = EnergyLevel(up_levels, dn_levels)
+        #     fig = None
+        # else:
+        #     up_levels = dict(zip(up_channel.loc[:, "energy"], up_channel.loc[:, "occupied"]))
+        #     dn_levels = dict(zip(dn_channel.loc[:, "energy"], dn_channel.loc[:, "occupied"]))
+        #     eng = EnergyLevel(up_levels, dn_levels)
+        #     fig = None
 
         fig = eng.plotting(
             round(self.vbm + self.vacuum_locpot, 3),
@@ -337,10 +416,14 @@ class DetermineDefectState:
                 self.entry["task_id"],
                 self.entry["task_label"])))
 
-        state_df = pd.concat([up_channel, dn_channel], ignore_index=False)
-        proj_state_df = pd.DataFrame(band_up_proj + band_dn_proj)
+        state_df = pd.concat(list(channel.values()), ignore_index=False)
+        proj_state_df = pd.concat(band_proj.values(), ignore_index=False)
+        print(band_proj)
+        print(proj_state_df)
 
         # depict defate states
+
+
         ## up
         up_states = state_df.loc[state_df["spin"] == "up"]
         up_dist_from_vbm = up_states["energy"] - (self.vbm + self.vacuum_locpot)

@@ -819,12 +819,8 @@ class ZPLWF:
             uis["user_incar_settings"].update({"NUPDOWN": 0 if self.spin_config == "singlet" else 2})
 
         parent = cdft_C
-        if specific_structure:
-            self.structure = Structure.from_str(specific_structure.get_string(), fmt="poscar")
+        if task == "D":
             parent = None
-        elif task == "D":
-            parent = None
-
         cdft_D = JHSEStaticFW(
             structure=self.structure,
             parents=parent,
