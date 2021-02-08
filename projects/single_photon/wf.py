@@ -7,11 +7,8 @@ from projects.antisiteQubit.wf_defect import ZPLWF
 
 class std_defect:
 
-    @staticmethod
-    def standard_defect(defect_type="substitutions", dtort=0.01): #1e-4
-        CATEGORY = "standard_defect"
-        LPAD = LaunchPad.from_file(
-        os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+    @classmethod
+    def standard_defect(cls, defect_type="substitutions", dtort=0.01, category="standard_defect"): #1e-4
 
         db_name, col_name = "single_photon_emitter", "pc"
         col = get_db(db_name, col_name, port=12345).collection
@@ -48,21 +45,21 @@ class std_defect:
                             nupdowns=[-1],
                             task="opt-hse_relax-hse_scf",
                             vasptodb={
-                                "category": CATEGORY, "NN": se_antisite.NN,
+                                "category": category, "NN": se_antisite.NN,
                                 "defect_entry": se_antisite.defect_entry,
                                 "lattice_constant": "HSE",
                                 "perturbed": se_antisite.distort,
                                 "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["task_id"]),
                             },
                             wf_addition_name="{}:{}".format(na, thick),
-                            category=CATEGORY,
+                            category=category,
                         )
 
-                        # wf = scp_files(
-                        #     wf,
-                        #     "/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(CATEGORY),
-                        #     fw_name_constraint=wf.fws[-1].name,
-                        # )
+                        wf = scp_files(
+                            wf,
+                            "/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(category),
+                            fw_name_constraint=wf.fws[-1].name,
+                        )
                         # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
                         #                     fw_name_constraint="HSE_scf")
 
@@ -78,7 +75,7 @@ class std_defect:
                         wf = preserve_fworker(wf)
                         wf.name = wf.name+":dx[{}]".format(se_antisite.distort)
                         print(wf.name)
-                        LPAD.add_wf(wf)
+                        return wf
     @classmethod
     def soc_standard_defect(cls, std_d_tkid, std_d_base_dir, category="soc_standard_defect"):
 
