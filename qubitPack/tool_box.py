@@ -157,7 +157,7 @@ def defect_from_primitive_cell(orig_st, defect_type, natom, substitution=None, d
 
 
 class GenDefect:
-    def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None, distort=None, sub_on_side=None, move_origin=-1):
+    def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None, distort=None, sub_on_side=None, move_origin=True):
         for site_property in orig_st.site_properties:
             orig_st.remove_site_property(site_property)
         if vacuum_thickness:
@@ -217,7 +217,7 @@ class GenDefect:
             self.vacancies(distort, sub_on_side)
 
         if move_origin:
-            self.move_origin_to_defect(move_origin)
+            self.move_origin_to_defect()
 
     def substitutions(self, distort, substitution):
         bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
@@ -274,9 +274,10 @@ class GenDefect:
             sudo_bulk.translate_sites([sudo_bulk_site], perturb, frac_coords=False)
         return sudo_bulk
 
-    def move_origin_to_defect(self, nn_idx=-1):
-        center_site_idx = self.NN[nn_idx]
-        center_site_coords = self.defect_st.coords[center_site_idx]
+    def move_origin_to_defect(self):
+        # center_site_idx = self.NN[nn_idx]
+        # center_site_coords = self.defect_st[center_site_idx].coords
+        center_site_coords = self.defect_site_in_bulk.coords
         self.defect_st.translate_sites(range(self.defect_st.num_sites), -1*center_site_coords, frac_coords=False)
 
     def make_complex(self, substitution):
