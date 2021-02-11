@@ -73,7 +73,7 @@ class Defect:
                         wf = clear_to_db(wf, fw_name_constraint=wf.fws[0].name)
                         # wf = clear_to_db(wf, fw_name_constraint=wf.fws[1].name)
 
-                    # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
+                        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
                         wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_relax")
                         wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_scf")
                         # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_soc")
@@ -146,7 +146,7 @@ class Defect:
         anti_triplet = ZPLWF(os.path.join(soc_std_d_base_dir, soc_std_d_path), None)
 
         wf = anti_triplet.wf(
-            task, 0, up_occupation=get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary=False),
+            task, 0, up_occupation=get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary=True),
             down_occupation=None, nbands=nbands, gamma_only=True, selective_dyn=None,
             specific_structure=specific_poscar,
             nonsoc_prev_dir=os.path.join(std_d_base_dir, std_d_path)
