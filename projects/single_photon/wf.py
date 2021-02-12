@@ -29,7 +29,8 @@ class Defect:
                 # cation vacancy
                 #"as_1_{}_on_{}"
                 #"vac_1_{}"
-                if "as_1_{}_on_{}".format(cation,anion) not in defect[defect_type][sub]["name"]:
+                print(defect[defect_type][sub]["name"])
+                if "vac_2_{}".format(anion) not in defect[defect_type][sub]["name"]:
                     continue
                 for na, thicks in geo_spec.items():
                     for thick in thicks:
@@ -146,7 +147,7 @@ class Defect:
         anti_triplet = ZPLWF(os.path.join(soc_std_d_base_dir, soc_std_d_path), None)
 
         wf = anti_triplet.wf(
-            task, 0, up_occupation=get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary=True),
+            task, 0, up_occupation=get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary=False),
             down_occupation=None, nbands=nbands, gamma_only=True, selective_dyn=None,
             specific_structure=specific_poscar,
             nonsoc_prev_dir=os.path.join(std_d_base_dir, std_d_path)
