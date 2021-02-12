@@ -229,7 +229,7 @@ class DefectWF:
     def MX2_anion_antisite(cls, defect_type="vacancies", distorts=(0)):
             col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
             # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
-            mx2s = col.find({"task_id":{"$in":[4237]}})
+            mx2s = col.find({"task_id":{"$in":[4229]}})
 
             # col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_basic_aexx0.25_final/db.json").collection
             # # mx2s = col.find({"task_id":{"$in":[3281, 3282, 3291, 3285]}}) #3281, 3282, 3281, 3291, 3285
@@ -668,34 +668,6 @@ class ZPLWF:
         self.nelect = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).nelect
         self.spin_config = spin_config
         self.encut = 1.3*max([potcar.enmax for potcar in MPHSERelaxSet(self.structure).potcar])
-
-    def get_lowest_unocc_band_idx(self, task_id, db_obj, nbands):
-
-        eig = db_obj.get_eigenvals(task_id)
-        spins = list(eig.keys())
-
-        lowest_unocc_band_idx = []
-        for spin in spins:
-            band_idx = 0
-            while eig[spin][0][band_idx][1] == 1:
-                band_idx += 1
-            lowest_unocc_band_idx.append(band_idx+1)
-        lowest_unocc_band_idx = dict(zip(spins, lowest_unocc_band_idx))
-
-
-        occu_configs = {}
-        maj_spin = max(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
-        low_band_idx = lowest_unocc_band_idx[maj_spin]
-        occu_configs[maj_spin] = "{}*1 1*0 1*1 {}*0".format(low_band_idx-2, nbands-low_band_idx)
-        print("maj_spin: {}".format(maj_spin))
-
-        if len(spins) == 1:
-            return occu_configs[maj_spin]
-        if len(spins) == 2:
-            minor_spin = min(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
-            low_band_idx = lowest_unocc_band_idx[minor_spin]
-            occu_configs[minor_spin] = "{}*1 {}*0".format(low_band_idx-1, nbands-low_band_idx+1)
-            return occu_configs[maj_spin], occu_configs[minor_spin]
 
     def set_selective_sites(self, center_n, distance):
         selective_dyn = []

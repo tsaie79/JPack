@@ -73,6 +73,34 @@ for idx, i in enumerate(hetero_interfaces):
     i.to("poscar", os.path.join(p, "interface", "{}.vasp".format(idx)))
 
 #%%
+from mpinterfaces.interface import Ligand, Interface
+from mpinterfaces.old_transformations import *
+from mpinterfaces.utils import *
+
+p = "/Users/jeng-yuantsai/Research/project/copper_graphene/model"
+
+copper = Structure.from_file("/Users/jeng-yuantsai/Research/project/copper_graphene/model/Cu_mp-30_conventional_standard.cif")
+copper = Interface(copper, hkl=[1,1,1], min_thick=5, min_vac=20, primitive=False, from_ase=True, center_slab=True)
+
+copper.to("poscar", "/Users/jeng-yuantsai/Research/project/copper_graphene/model/3-Cu/3-Cu.vasp")
+
+#%% random sampling
+from random import sample
+
+
+rnd_site = sample(range(192), 64)
+for site in rnd_site:
+    st.replace(site, "C")
+
+
+
+#%%
+from qubitPack.tool_box import modify_vacuum
+p = "/Users/jeng-yuantsai/Research/project/copper_graphene/model"
+st = Structure.from_file(os.path(p, "interface", "gr_cop.vasp"))
+st = modify_vacuum(st, )
+
+#%%
 from pymatgen import Structure
 from qubitPack.tool_box import get_db
 
@@ -83,7 +111,20 @@ db = get_db("copper_graphene", "modeling")
 #                                                               "Research/project/copper_graphene/"
 #                                                               "calculations/structures/stacking_head/{}K.vasp".format(e["input"]["incar"]["TEEND"]))
 
-e = db.collection.find_one({"task_id":26})
-Structure.from_dict(e["output"]["structure"]).to("poscar","/Users/jeng-yuantsai/"
-                                                          "Research/project/copper_graphene/"
-                                                          "calculations/structures/stacking_head/0K.vasp")
+for e in db.collection.find({"formula_pretty":"Cu3C2", "input.incar.TEEND":{"$exists":1}}):
+    Structure.from_dict(e["output"]["structure"]).to("poscar","/Users/jeng-yuantsai/"
+                                                              "Research/project/copper_graphene/"
+                                                              "calculations/structures/c-cu/{}K.vasp".format(e["input"]["incar"]["TEEND"]))
+#%% Cu
+from pymatgen import Structure
+from qubitPack.tool_box import get_db
+
+db = get_db("copper_graphene", "modeling")
+
+for e in db.collection.find({"chemsys":"Cu", "nsites":384, "input.incar.TEEND":{"$exists":1}}):
+    Structure.from_dict(e["output"]["structure"]).to(
+        "poscar",
+        "/Users/jeng-yuantsai/"
+        "Research/project/copper_graphene/"
+        "calculations/structures/cu/{}K.vasp".format(e["input"]["incar"]["TEEND"])
+    )

@@ -90,20 +90,21 @@ from pymatgen.electronic_structure.plotter import DosPlotter
 
 cdft = get_db("single_photon_emitter", "soc_standard_defect")
 
-dos = cdft.get_dos(70)
-ds_plotter = DosPlotter()
-ds_plotter.add_dos("t", dos)
-plt = ds_plotter.get_plot(xlim=[-5,5])
-plt.show()
-# tot, proj, d_df = get_defect_state(
-#     cdft,
-#     {"task_id": 72},
-#     1,-3,
-#     None,
-#     True,
-#     "dist",
-#     None,
-#     0.1
+# dos = cdft.get_dos(70)
+# ds_plotter = DosPlotter()
+# ds_plotter.add_dos("t", dos)
+# plt = ds_plotter.get_plot(xlim=[-5,5])
+# plt.show()
+tot, proj, d_df = get_defect_state(
+    cdft,
+    {"task_id":70},
+    1,-3,
+    None,
+    True,
+    "dist",
+    None,
+    0.2
+)
 
 #%%
 from qubitPack.tool_box import get_db
@@ -115,3 +116,14 @@ chemsys = "S-W"
 en_soc = soc.collection.find_one({"chemsys":chemsys, "task_label":"HSE_soc",
                                   "output.spacegroup.symbol":"P3m1"})["output"]["energy"]
 en_nosoc = nosoc.collection.find_one({"chemsys":chemsys, "task_label":"HSE_scf"})["output"]["energy"]
+
+#%%
+from qubitPack.tool_box import get_db
+
+db = get_db("single_photon_emitter", "standard_defect")
+e = db.collection.find_one({"task_id":22})
+
+locpot = max(e["calcs_reversed"][0]["output"]["locpot"]["2"])
+cbm = e["output"]["cbm"] - locpot
+vbm = e["output"]["vbm"] - locpot
+

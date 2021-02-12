@@ -7,12 +7,12 @@ from pymatgen import Structure
 
 col = get_db("single_photon_emitter", "soc_cdft").collection
 
-chemsys = ["S-W", "Se-W", "Te-W"]
+chemsys = ["S-W"]
 chem, E_ab, E_bc, E_cd, E_da, ZPL =[], [], [], [], [], []
 for chemsys in chemsys:
-    b = col.find_one({"task_label":{"$regex": "B-HSE_scf_soc"}, "chemsys":chemsys})
-    c = col.find_one({"task_label":{"$regex": "C-HSE_relax_soc"}, "chemsys":chemsys})
-    d = col.find_one({"task_label":{"$regex": "D-HSE_scf_soc"}, "chemsys":chemsys})
+    b = col.find_one({"task_label":{"$regex": "B-HSE_scf_soc"}, "chemsys":chemsys, "PS":"secondary_excite"})
+    c = col.find_one({"task_label":{"$regex": "C-HSE_relax_soc"}, "chemsys":chemsys, "PS":"secondary_excite"})
+    d = col.find_one({"task_label":{"$regex": "D-HSE_scf_soc"}, "chemsys":chemsys, "PS":"secondary_excite"})
 
     E_ab.append(b["output"]["energy"] - b["source"]["total_energy"])
     E_bc.append(b["output"]["energy"] - c["output"]["energy"])
@@ -156,14 +156,22 @@ for frac, st in sts.items():
 from qubitPack.qc_searching.analysis.main import get_defect_state
 from qubitPack.tool_box import get_db
 
-db = get_db("single_photon_emitter", "standard_defect")
-tot, proj, d_df = get_defect_state(
-    db,
-    {"task_id": 22},
-    1,-2,
-    None,
-    True,
-    "dist",
-    None,
-    0.1
-)
+db = get_db("single_photon_emitter", "soc_standard_defect")
+# tot, proj, d_df = get_defect_state(
+#     db,
+#     {"task_id": 70},
+#     1,-2.5,
+#     None,
+#     True,
+#     "dist",
+#     None,
+#     0.1)
+
+dos = db.get_dos(7)
+pdos = dos.get_spd_dos()
+from pymatgen.electronic_structure.plotter import DosPlotter
+
+plotter = DosPlotter()
+plotter.add_dos_dict(pdos)
+f = plotter.get_plot(xlim=[-5,5])
+f.show()

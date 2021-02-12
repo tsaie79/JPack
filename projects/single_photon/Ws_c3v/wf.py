@@ -37,7 +37,7 @@ def hse_scf_wf():
     db_name, col_name = "owls", "mx2_antisite_pc"
     col = get_db(db_name, col_name, user="Jeng", password="qimin", port=12345).collection
     # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
-    mx2s = col.find({"task_id":{"$in":[3083, 3093]}})
+    mx2s = col.find({"task_id":{"$in":[3091]}})
 
     for mx2 in mx2s:
         pc = Structure.from_dict(mx2["output"]["structure"])
@@ -49,7 +49,7 @@ def hse_scf_wf():
             gamma_mesh=True,
             scf_dos=False,
             nupdowns=[-1],
-            task="hse_relax",
+            task="hse_relax-hse_scf-hse_bs",
             category="pc",
         )
         print(scf_wf)
@@ -57,7 +57,13 @@ def hse_scf_wf():
         wf = add_modify_incar(scf_wf,
                               {
                                   "incar_update":
-                                      {"LASPH": True, "EDIFF": 1E-7, "EDIFFG": -0.001, "ISIF": 3, "NSW": 250, "LCHARG":False, "LWAVE":False}})
+                                      {"LASPH": True, "EDIFF": 1E-7, "EDIFFG": -0.001, "ISIF": 3, "NSW": 250}})
+
+
+        for i in [2]:
+            wf = jmodify_to_soc(wf, structure=pc,fw_name_constraint=wf.fws[i].name)
+        for i in [0, 1]:
+            wf = clear_to_db(wf, fw_name_constraint=wf.fws[i].name)
 
         wf = set_queue_options(wf, "24:00:00", fw_name_constraint=wf.fws[0].name)
 
@@ -112,9 +118,9 @@ def hse_band_structure():
 hse_scf_wf()
 
 #%% make standard defect calc
-CATEGORY = "soc_standard_defect"
+CATEGORY = "mx2_antisite_basic_aexx0.25_final"
 LPAD = LaunchPad.from_file(
-    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/my_launchpad.yaml".format(CATEGORY))))
+    os.path.expanduser(os.path.join("~", "config/category/{}/my_launchpad.yaml".format(CATEGORY))))
 
 def ws2_anion_antisite(defect_type="substitutions", dtort=0): #1e-4
     col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
@@ -147,19 +153,19 @@ def ws2_anion_antisite(defect_type="substitutions", dtort=0): #1e-4
                         sub_on_side=None
                     )
                     ###
-                    scf_dir = "/home/tug03990/work/single_photon_emitter/cdft/A/WS2_enhenced_relax"
-                    st = Structure.from_file(os.path.join(scf_dir, "CONTCAR"))
+                    # scf_dir = "/home/tug03990/work/single_photon_emitter/cdft/A/WS2_enhenced_relax"
+                    # st = Structure.from_file(os.path.join(scf_dir, "CONTCAR"))
 
 
                     wf = get_wf_full_hse(
-                        structure=st,
+                        structure=se_antisite.defect_st,
                         task_arg=None,
                         charge_states=[0],
                         gamma_only=False,
                         gamma_mesh=True,
-                        scf_dos=True,
-                        nupdowns=[-1],
-                        task="hse_scf-hse_soc",
+                        scf_dos=False,
+                        nupdowns=[0],
+                        task="hse_relax-hse_scf",
                         vasptodb={"category": CATEGORY, "NN": se_antisite.NN,
                                   "defect_entry": se_antisite.defect_entry,
                                   },
@@ -175,23 +181,23 @@ def ws2_anion_antisite(defect_type="substitutions", dtort=0): #1e-4
                             "perturbed": se_antisite.distort,
                             # "pc_from": "single_photon_emitter/pc/HSE_scf/{}".format(mx2["task_id"])
                             "pc_from": "mx2_antisite_pc/HSE_scf/{}".format(mx2["task_id"]),
-                            "sym": "C_3v_in_paper"
+                            "sym": "C_3v_singlet"
                         }
                     )
 
-                    wf = scp_files(
-                        wf,
-                        "/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(CATEGORY),
-                        fw_name_constraint=wf.fws[-1].name,
-                    )
+                    # wf = scp_files(
+                    #     wf,
+                    #     "/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(CATEGORY),
+                    #     fw_name_constraint=wf.fws[-1].name,
+                    # )
                     # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
                     #                     fw_name_constraint="HSE_scf")
                     wf = clear_to_db(wf, fw_name_constraint=wf.fws[0].name)
 
                     # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
-                    # wf = set_queue_options(wf, "48:00:00", fw_name_constraint="HSE_relax")
-                    wf = set_queue_options(wf, "32:00:00", fw_name_constraint="HSE_scf")
-                    wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_soc")
+                    wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_relax")
+                    wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_scf")
+                    # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_soc")
                     wf = add_modify_incar(wf)
                     # related to directory
                     wf = preserve_fworker(wf)
@@ -519,3 +525,17 @@ for poscar in glob.glob(os.path.join(sts_path, "{}/*.vasp".format(state))):
 
 
     LPAD.add_wf(wf)
+
+#%%
+from projects.single_photon.wf import Defect
+from fireworks import LaunchPad
+from atomate.vasp.powerups import *
+import os
+
+category = "standard_defect"
+wf = Defect.standard_defect(dtort=0)
+wf = use_gamma_vasp(wf, gamma_vasp_cmd=GAMMA_VASP_CMD)
+LPAD = LaunchPad.from_file(
+    os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
+                                         "my_launchpad.yaml".format(category))))
+LPAD.add_wf(wf)
