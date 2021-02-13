@@ -539,3 +539,17 @@ LPAD = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
                                          "my_launchpad.yaml".format(category))))
 LPAD.add_wf(wf)
+
+#%%
+from qubitPack.tool_box import get_db
+from qubitPack.qc_searching.analysis.main import get_defect_state
+
+tot, proj, d_df = get_defect_state(
+    get_db("single_photon_emitter", "standard_defect"),
+    {"task_id": 374},
+    1,-2.5,
+    None,
+    True,
+    "dist",
+    None,
+    0.1)
