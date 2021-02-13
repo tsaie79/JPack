@@ -104,7 +104,6 @@ class Defect:
             charge_states=[0],
             gamma_only=False,
             gamma_mesh=True,
-            scf_dos=True,
             nupdowns=[-1],
             task="hse_soc",
             vasptodb={
