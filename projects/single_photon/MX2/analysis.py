@@ -10,9 +10,9 @@ col = get_db("single_photon_emitter", "soc_cdft").collection
 chemsys = ["S-W"]
 chem, E_ab, E_bc, E_cd, E_da, ZPL =[], [], [], [], [], []
 for chemsys in chemsys:
-    b = col.find_one({"task_label":{"$regex": "B-HSE_scf_soc"}, "chemsys":chemsys, "PS":"secondary_excite"})
-    c = col.find_one({"task_label":{"$regex": "C-HSE_relax_soc"}, "chemsys":chemsys, "PS":"secondary_excite"})
-    d = col.find_one({"task_label":{"$regex": "D-HSE_scf_soc"}, "chemsys":chemsys, "PS":"secondary_excite"})
+    b = col.find_one({"task_label":{"$regex": "B-HSE_scf_soc"}, "chemsys":chemsys, "PS":"secondary"})
+    c = col.find_one({"task_label":{"$regex": "C-HSE_relax_soc"}, "chemsys":chemsys, "PS":"secondary"})
+    d = col.find_one({"task_label":{"$regex": "D-HSE_scf_soc"}, "chemsys":chemsys, "PS":"secondary"})
 
     E_ab.append(b["output"]["energy"] - b["source"]["total_energy"])
     E_bc.append(b["output"]["energy"] - c["output"]["energy"])

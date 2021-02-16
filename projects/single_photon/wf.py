@@ -30,7 +30,7 @@ class Defect:
                 #"as_1_{}_on_{}"
                 #"vac_1_{}"
                 print(defect[defect_type][sub]["name"])
-                if "vac_2_{}".format(anion) not in defect[defect_type][sub]["name"]:
+                if "as_1_{}_on_{}".format(cation, anion) not in defect[defect_type][sub]["name"]:
                     continue
                 for na, thicks in geo_spec.items():
                     for thick in thicks:
@@ -49,7 +49,6 @@ class Defect:
                             charge_states=[0],
                             gamma_only=False,
                             gamma_mesh=True,
-                            scf_dos=True,
                             nupdowns=[-1],
                             task="hse_relax-hse_scf",
                             vasptodb={
@@ -86,7 +85,7 @@ class Defect:
                         print(wf.name)
                         return wf
     @classmethod
-    def soc_standard_defect(cls, std_d_tkid, std_d_base_dir, category="soc_standard_defect", scp=False):
+    def soc_standard_defect(cls, std_d_tkid, std_d_base_dir, category="soc_standard_defect", scp=False, saxis=(0,0,1)):
 
         std_d_name = "single_photon_emitter"
         std_d_col_name = "standard_defect"
@@ -100,7 +99,7 @@ class Defect:
 
         wf = get_wf_full_hse(
             structure=st,
-            task_arg={"prev_calc_dir": std_d_dir},
+            task_arg={"prev_calc_dir": std_d_dir, "saxis": saxis},
             charge_states=[0],
             gamma_only=False,
             gamma_mesh=True,
@@ -112,7 +111,7 @@ class Defect:
                 "defect_entry": entry["defect_entry"],
                 "nonsoc_from": "{}/{}/{}/{}".format(std_d_name, std_d_col_name, entry["task_label"], entry["task_id"])
             },
-            wf_addition_name="{}:{}:SOC".format(entry["perturbed"], entry["task_id"]),
+            wf_addition_name="{}:{}:SOC:{}".format(entry["perturbed"], entry["task_id"], saxis),
         )
 
         wf = add_modify_incar(wf, {"incar_update":{"LCHARG":False, "LWAVE":True, "LAECHG":False}})
@@ -131,7 +130,8 @@ class Defect:
         return wf
 
     @classmethod
-    def soc_cdft(cls, task, soc_std_d_tkid, nbands, soc_std_d_base_dir, std_d_base_dir, specific_poscar=None, category="soc_cdft",):
+    def soc_cdft(cls, task, soc_std_d_tkid, nbands, soc_std_d_base_dir, std_d_base_dir, specific_poscar=None,
+                 category="soc_cdft", secondary=False):
 
 
         soc_std_d = get_db("single_photon_emitter", "soc_standard_defect", port=12345)
@@ -146,7 +146,7 @@ class Defect:
         anti_triplet = ZPLWF(os.path.join(soc_std_d_base_dir, soc_std_d_path), None)
 
         wf = anti_triplet.wf(
-            task, 0, up_occupation=get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary=False),
+            task, 0, up_occupation=get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary=secondary),
             down_occupation=None, nbands=nbands, gamma_only=True, selective_dyn=None,
             specific_structure=specific_poscar,
             nonsoc_prev_dir=os.path.join(std_d_base_dir, std_d_path)
@@ -163,7 +163,7 @@ class Defect:
         return wf
 
     @classmethod
-    def cdft(cls, task, std_d_tkid, std_d_base_dir, nbands, category="cdft"):
+    def cdft(cls, task, std_d_tkid, std_d_base_dir, nbands, category="cdft", specific_poscar=None, secondary=False):
 
         std_d = get_db("single_photon_emitter", "standard_defect", port=12345)
         std_d_e = std_d.collection.find_one({"task_id":std_d_tkid})
@@ -171,11 +171,17 @@ class Defect:
 
         anti_triplet = ZPLWF(os.path.join(std_d_base_dir, std_d_path), None)
 
-        maj_occ, minor_occ = get_lowest_unocc_band_idx(std_d_tkid, std_d, nbands)
+        maj_occ, minor_occ = get_lowest_unocc_band_idx(std_d_tkid, std_d, nbands, secondary)
 
         wf = anti_triplet.wf(
-            task, 0, up_occupation=maj_occ,
+            task, 0, up_occupation="328*1 1*0.5 1*0.5 1*1 619*0",
             down_occupation=minor_occ, nbands=nbands, gamma_only=True, selective_dyn=None,
+            specific_structure=specific_poscar,
+            nonsoc_prev_dir=None
+        )
+        wf = scp_files(
+            wf,
+            dest="/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(category),
         )
 
         wf = add_modify_incar(wf)

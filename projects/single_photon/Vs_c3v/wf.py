@@ -52,12 +52,14 @@ import os
 category = "soc_cdft"
 wf = Defect.soc_cdft(
     "B-C-D",
-    354,
+    375,
     950,
-    "/home/tug03990/work/single_photon_emitter/soc_standard_defect/block_2021-01-17-04-46-01-108825",
-    "/home/tug03990/work/single_photon_emitter/standard_defect/block_2021-01-12-17-28-08-335869,"
+    "/home/tug03990/scratch/single_photon_emitter/soc_standard_defect/block_2021-01-22-20-56-50-305107",
+    "/home/tug03990/scratch/single_photon_emitter/standard_defect/block_2021-01-11-17-39-35-861559",
+    secondary=False
 )
-wf = add_additional_fields_to_taskdocs(wf, {"PS": "secondary"})
+wf = add_modify_incar(wf, {"incar_update":{"ENCUT":320}})
+wf = add_additional_fields_to_taskdocs(wf, {"PS": "direct"})
 LPAD = LaunchPad.from_file(
     os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
                                          "my_launchpad.yaml".format(category))))
@@ -95,58 +97,17 @@ LPAD = LaunchPad.from_file(
 LPAD.add_wf(wf)
 #%%
 from qubitPack.tool_box import get_db
-from matplotlib import pyplot as plt
-import pandas as pd
-import numpy as np
-import os
-from pymatgen import Structure
-d = get_db("single_photon_emitter", "soc_cdft", port=12345)
-es = d.collection.find({"poscar_idx":{"$exists":1}, "chemsys":"Mo-S", "start":"2_3"})
+from qubitPack.qc_searching.analysis.main import get_defect_state
 
-def force(outcar):
-    from pymatgen.io.vasp.outputs import Outcar
+tot, proj, d_df = get_defect_state(
+    get_db("single_photon_emitter", "soc_standard_defect"),
+    {"task_id": 375},
+    1,-2.5,
+    None,
+    True,
+    "dist",
+    None,
+    0.1)
 
-    outcar = Outcar(outcar)
-
-    forces = outcar.read_table_pattern(
-        header_pattern=r"\sPOSITION\s+TOTAL-FORCE \(eV/Angst\)\n\s-+",
-        row_pattern=r"\s+[+-]?\d+\.\d+\s+[+-]?\d+\.\d+\s+[+-]?\d+\.\d+\s+([+-]?\d+\.\d+)\s+([+-]?\d+\.\d+)\s+([+-]?\d+\.\d+)",
-        footer_pattern=r"\s--+",
-        postprocess=lambda x: float(x),
-        last_one_only=False
-    )
-    forces = np.array(forces[0])
-    f = np.max(forces)
-    return f
-
-
-en, dxs, fs, z = [], [], [], []
-for e in es:
-    dir_name = e["calcs_reversed"][0]["dir_name"]
-    energy = e["output"]["energy"]
-    dx = e["poscar_idx"]
-    f = None
-    try:
-        f = force(os.path.join(dir_name, "OUTCAR.gz"))
-    except:
-        f = force(os.path.join(dir_name, "OUTCAR"))
-    dx = dx.split("_")[-1].split(".")[0]
-    dx = int(dx)*0.1
-    en.append(energy)
-    dxs.append(dx)
-    fs.append(f)
-
-    st = Structure.from_dict(e["output"]["structure"])
-    z.append(st[25].coords[-1])
-
-df = pd.DataFrame({"dx": dxs, "f": fs, "en":en, 'z': z})
-df.sort_values("dx", inplace=True)
-
-fig, ax = plt.subplots(3,1, sharex=True)
-ax[0].scatter(df["dx"], df["z"])
-ax[1].scatter(df["dx"], df["f"])
-ax[2].scatter(df["dx"], df["en"])
-
-plt.show()
 
 

@@ -223,7 +223,7 @@ class DetermineDefectState:
                                 orbital_proj = None
                             test.update({ion_idx: orbital_proj})
                         test.update({"band_index": band[0]}) #
-                        test.update({"spin":"up"}) #
+                        test.update({"spin":spin}) #
                         test.update({"orbital":o})
                         band_up_proj.append(test)
             for i in promising_band[spin]:
@@ -239,7 +239,7 @@ class DetermineDefectState:
             sheet_up["adj_proj"] = [i[1][3] for i in band_info.values()]
             sheet_up["antisite_proj"] = [i[1][4] for i in band_info.values()]
             sheet_up["n_occ_e"] = [i[1][1] for i in band_info.values()]
-            sheet_up["spin"] = ["up" for i in range(len(band_info.keys()))]
+            sheet_up["spin"] = [spin for i in range(len(band_info.keys()))]
             df_up, df_up_proj = pd.DataFrame(sheet_up), pd.DataFrame(band_proj[spin])
             if len(sheet_up["band_index"]) != 0:
                 df_up = df_up.set_index(["band_index"])
