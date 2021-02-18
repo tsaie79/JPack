@@ -18,6 +18,11 @@ def get_db(db_name, collection_name, user="Jeng_ro", password="qimin", port=1234
     return VaspCalcDb(host="localhost", port=port, database=db_name,
                       collection=collection_name, user=user, password=password, authsource=db_name)
 
+def cd_db(tk_id, db="single_photon_emitter", col="soc_standard_defect"):
+    d = get_db(db, col, port=12345)
+    p = d.collection.find_one({"task_id": tk_id})["calcs_reversed"][0]["dir_name"]
+    os.chdir(p)
+
 def find_cation_anion(structure):
     cation, anion = None, None
     for idx, el in enumerate(list(dict.fromkeys(structure.species))):
