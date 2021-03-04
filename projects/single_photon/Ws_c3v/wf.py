@@ -545,8 +545,8 @@ from qubitPack.tool_box import get_db
 from qubitPack.qc_searching.analysis.main import get_defect_state
 
 tot, proj, d_df = get_defect_state(
-    get_db("single_photon_emitter", "standard_defect"),
-    {"task_id": 374},
+    get_db("single_photon_emitter", "soc_standard_defect", port=1234),
+    {"task_id": 399},
     1,-2.5,
     None,
     True,

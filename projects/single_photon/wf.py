@@ -46,17 +46,17 @@ class Defect:
                         wf = get_wf_full_hse(
                             structure=se_antisite.defect_st,
                             task_arg=dict(lcharg=True),
-                            charge_states=[0],
+                            charge_states=[0,0],
                             gamma_only=False,
                             gamma_mesh=True,
-                            nupdowns=[-1],
+                            nupdowns=[-1,0],
                             task="hse_relax-hse_scf",
                             vasptodb={
                                 "category": category, "NN": se_antisite.NN,
                                 "defect_entry": se_antisite.defect_entry,
                                 "lattice_constant": "HSE",
                                 "perturbed": se_antisite.distort,
-                                "PS": "encut320",
+                                "PS": "set LMAXMIX",
                                 "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["task_id"]),
                             },
                             wf_addition_name="{}:{}".format(na, thick),
@@ -78,17 +78,16 @@ class Defect:
                         wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_scf")
                         # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_soc")
 
-                        wf = use_gamma_vasp(wf, gamma_vasp_cmd=GAMMA_VASP_CMD)
                         wf = add_modify_incar(wf)
                         wf = preserve_fworker(wf)
                         wf.name = wf.name+":dx[{}]".format(se_antisite.distort)
                         print(wf.name)
                         return wf
     @classmethod
-    def soc_standard_defect(cls, std_d_tkid, std_d_base_dir, category="soc_standard_defect", scp=False, saxis=(0,0,1)):
+    def soc_standard_defect(cls, std_d_tkid, std_d_base_dir, category="soc_excited_state", scp=False, saxis=(0,0,1)):
 
         std_d_name = "single_photon_emitter"
-        std_d_col_name = "standard_defect"
+        std_d_col_name = "excited_state"
         std_d = get_db(std_d_name, std_d_col_name, port=12345)
         entry = std_d.collection.find_one({"task_id": std_d_tkid})
         std_d_dir = entry["calcs_reversed"][0]["dir_name"].split("/")[-1]
@@ -107,11 +106,11 @@ class Defect:
             task="hse_soc",
             vasptodb={
                 "category": category,
-                "NN": entry["NN"],
-                "defect_entry": entry["defect_entry"],
+                # "NN": entry["NN"],
+                # "defect_entry": entry["defect_entry"],
                 "nonsoc_from": "{}/{}/{}/{}".format(std_d_name, std_d_col_name, entry["task_label"], entry["task_id"])
             },
-            wf_addition_name="{}:{}:SOC:{}".format(entry["perturbed"], entry["task_id"], saxis),
+            wf_addition_name="{}:{}:SOC:{}".format(None, entry["task_id"], saxis), #entry["perturbed"]
         )
 
         wf = add_modify_incar(wf, {"incar_update":{"LCHARG":False, "LWAVE":True, "LAECHG":False}})
@@ -130,60 +129,84 @@ class Defect:
         return wf
 
     @classmethod
-    def soc_cdft(cls, task, soc_std_d_tkid, nbands, soc_std_d_base_dir, std_d_base_dir, specific_poscar=None,
-                 category="soc_cdft", secondary=False):
-
+    def soc_cdft(cls, task, soc_std_d_tkid, nbands, occ=None, soc_std_d_base_dir=None, std_d_base_dir=None,
+                 specific_poscar=None, category="soc_cdft", secondary=False):
 
         soc_std_d = get_db("single_photon_emitter", "soc_standard_defect", port=12345)
         soc_std_d_e = soc_std_d.collection.find_one({"task_id":soc_std_d_tkid})
+
+        if not soc_std_d_base_dir:
+            soc_std_d_base_dir = soc_std_d_e["calcs_reversed"][0]["dir_name"].split("launch")[0]
+
         soc_std_d_path = soc_std_d_e["dir_name"].split("/")[-1]
 
         std_d_e = soc_std_d_e["nonsoc_from"].split("/")
         std_d = get_db(std_d_e[0], std_d_e[1], port=12345)
         std_d_path = std_d.collection.find_one({"task_id":int(std_d_e[-1])})["dir_name"].split("/")[-1]
-
+        if not std_d_base_dir:
+            std_d_base_dir = std_d.collection.find_one({"task_id":int(std_d_e[-1])})["dir_name"].split("launch")[0]
 
         anti_triplet = ZPLWF(os.path.join(soc_std_d_base_dir, soc_std_d_path), None)
 
+        if not occ:
+            maj_spin, occ_config = get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary)
+            occ = occ_config[maj_spin]
+
         wf = anti_triplet.wf(
-            task, 0, up_occupation=get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary=secondary),
+            task, 0, up_occupation=occ,
             down_occupation=None, nbands=nbands, gamma_only=True, selective_dyn=None,
             specific_structure=specific_poscar,
             nonsoc_prev_dir=os.path.join(std_d_base_dir, std_d_path)
         )
-
-        wf = jmodify_to_soc(wf, nbands=nbands, structure=anti_triplet.structure)
+        import math
+        wf = jmodify_to_soc(wf, nbands=nbands, structure=anti_triplet.structure) #saxis=[1/math.sqrt(2), 1/math.sqrt(2), 0]
         for idx, task in enumerate(task.split("-")):
             if task == "B" or task == "C":
                 wf = add_modify_incar(wf, {"incar_update": {"ICHARG":0}}, fw_name_constraint=wf.fws[idx].name)
 
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up":occ, "dn":None}})
         wf = add_modify_incar(wf)
         wf = set_execution_options(wf, category=category)
         wf = preserve_fworker(wf)
         return wf
 
     @classmethod
-    def cdft(cls, task, std_d_tkid, std_d_base_dir, nbands, category="cdft", specific_poscar=None, secondary=False):
+    def cdft(cls, task, std_d_tkid, nbands, occ=None, std_d_base_dir=None, category="cdft", specific_poscar=None, secondary=False):
 
         std_d = get_db("single_photon_emitter", "standard_defect", port=12345)
         std_d_e = std_d.collection.find_one({"task_id":std_d_tkid})
         std_d_path = std_d_e["dir_name"].split("/")[-1]
 
+        if not std_d_base_dir:
+            std_d_base_dir = std_d.collection.find_one({"task_id":int(std_d_e[-1])})["dir_name"].split("launch")[0]
+
         anti_triplet = ZPLWF(os.path.join(std_d_base_dir, std_d_path), None)
 
-        maj_occ, minor_occ = get_lowest_unocc_band_idx(std_d_tkid, std_d, nbands, secondary)
-
+        up_occ, dn_occ = None, None
+        if not occ:
+            maj_spin, occ_config = get_lowest_unocc_band_idx(std_d_tkid, std_d, nbands, secondary)
+            if maj_spin == "1" and len(occ_config.keys()) == 1:
+                up_occ = occ_config[maj_spin]
+                dn_occ = None
+            else:
+                up_occ = occ_config["1"]
+                dn_occ = occ_config["-1"]
+        else:
+            up_occ = occ["1"]
+            dn_occ = occ["-1"]
+        print("up_occ: {}, dn_occ:{}".format(up_occ, dn_occ))
         wf = anti_triplet.wf(
-            task, 0, up_occupation="328*1 1*0.5 1*0.5 1*1 619*0",
-            down_occupation=minor_occ, nbands=nbands, gamma_only=True, selective_dyn=None,
+            task, 0, up_occupation=up_occ,
+            down_occupation=dn_occ, nbands=nbands, gamma_only=True, selective_dyn=None,
             specific_structure=specific_poscar,
             nonsoc_prev_dir=None
         )
-        wf = scp_files(
-            wf,
-            dest="/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(category),
-        )
+        # wf = scp_files(
+        #     wf,
+        #     dest="/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(category),
+        # )
 
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up":up_occ, "dn":dn_occ}})
         wf = add_modify_incar(wf)
         wf = set_execution_options(wf, category=category)
         wf = preserve_fworker(wf)

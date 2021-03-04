@@ -157,21 +157,122 @@ from qubitPack.qc_searching.analysis.main import get_defect_state
 from qubitPack.tool_box import get_db
 
 db = get_db("single_photon_emitter", "soc_standard_defect")
-# tot, proj, d_df = get_defect_state(
-#     db,
-#     {"task_id": 70},
-#     1,-2.5,
-#     None,
-#     True,
-#     "dist",
-#     None,
-#     0.1)
+tot, proj, d_df = get_defect_state(
+    db,
+    {"task_id": 395},
+    1,-2.5,
+    None,
+    True,
+    "dist",
+    None,
+    0)
 
-dos = db.get_dos(7)
-pdos = dos.get_spd_dos()
-from pymatgen.electronic_structure.plotter import DosPlotter
+# dos = db.get_dos(7)
+# pdos = dos.get_spd_dos()
+# from pymatgen.electronic_structure.plotter import DosPlotter
+#
+# plotter = DosPlotter()
+# plotter.add_dos_dict(pdos)
+# f = plotter.get_plot(xlim=[-5,5])
+# f.show()
 
-plotter = DosPlotter()
-plotter.add_dos_dict(pdos)
-f = plotter.get_plot(xlim=[-5,5])
-f.show()
+#%%
+from qubitPack.tool_box import get_db
+from matplotlib import pyplot as plt
+import pandas as pd
+import numpy as np
+import os
+from pymatgen import Structure
+d = get_db("single_photon_emitter", "soc_cdft", port=12345)
+es = d.collection.find({"poscar_idx":{"$exists":1}, "chemsys":"Mo-S", "start":"2_3"})
+
+def force(outcar):
+    from pymatgen.io.vasp.outputs import Outcar
+
+    outcar = Outcar(outcar)
+
+    forces = outcar.read_table_pattern(
+        header_pattern=r"\sPOSITION\s+TOTAL-FORCE \(eV/Angst\)\n\s-+",
+        row_pattern=r"\s+[+-]?\d+\.\d+\s+[+-]?\d+\.\d+\s+[+-]?\d+\.\d+\s+([+-]?\d+\.\d+)\s+([+-]?\d+\.\d+)\s+([+-]?\d+\.\d+)",
+        footer_pattern=r"\s--+",
+        postprocess=lambda x: float(x),
+        last_one_only=False
+    )
+    forces = np.array(forces[0])
+    f = np.max(forces)
+    return f
+
+
+en, dxs, fs, z = [], [], [], []
+for e in es:
+    dir_name = e["calcs_reversed"][0]["dir_name"]
+    energy = e["output"]["energy"]
+    dx = e["poscar_idx"]
+    f = None
+    try:
+        f = force(os.path.join(dir_name, "OUTCAR.gz"))
+    except:
+        f = force(os.path.join(dir_name, "OUTCAR"))
+    dx = dx.split("_")[-1].split(".")[0]
+    dx = int(dx)*0.1
+    en.append(energy)
+    dxs.append(dx)
+    fs.append(f)
+
+    st = Structure.from_dict(e["output"]["structure"])
+    z.append(st[25].coords[-1])
+
+df = pd.DataFrame({"dx": dxs, "f": fs, "en":en, 'z': z})
+df.sort_values("dx", inplace=True)
+
+fig, ax = plt.subplots(3,1, sharex=True)
+ax[0].scatter(df["dx"], df["z"])
+ax[1].scatter(df["dx"], df["f"])
+ax[2].scatter(df["dx"], df["en"])
+
+plt.show()
+
+#%% Read energy of KS-config ea and ee
+import os
+from qubitPack.tool_box import get_db
+import pandas as pd
+from pymatgen.io.vasp.outputs import Oszicar
+
+d0 = get_db("single_photon_emitter", "soc_standard_defect", port=12345)
+triplet_soc_g = d0.collection.find_one({"task_id":399})["output"]["energy"]
+d = get_db("single_photon_emitter", "soc_excited_state", port=12345)
+singlet_soc_g = d0.collection.find_one({"task_id":401})["output"]["energy"]
+
+ea = d.collection.aggregate(
+    [
+        {"$match": {"ks_config":{"$in": ["ea", "ee"]}}},
+        {"$project": {"_id":0, "task_id":1,
+                      "excite_config":1, "ks_config":1, "cdft_occ":1, "energy":"$output.energy", "ir": "$ir_c3",
+                      "mag": "$calcs_reversed.output.outcar.total_magnetization",
+                      "dir_name": "$calcs_reversed.dir_name"
+                      }}
+     ]
+)
+ea = pd.DataFrame(ea)
+ea = ea.set_index("task_id")
+ea["dE"] = ea["energy"] - triplet_soc_g
+
+mags = []
+for p in ea["dir_name"]:
+    oszicar = Oszicar(os.path.join(p[0], "OSZICAR.gz")).as_dict()
+    mag = oszicar["ionic_steps"][0]["mag"]
+    mags.append(mag)
+ea["mags"] = mags
+ea = ea.sort_values("ks_config")
+ea.to_clipboard()
+
+# ee = d.collection.aggregate(
+#     [
+#         {"$match": {"ks_config":"ee"}},
+#         {"$project": {"_id":0, "excite_config":1, "ks_config":1, "cdft_occ":1, "energy":"$output.energy", "ir": "$ir_c3"}}
+#     ]
+# )
+# ee = pd.DataFrame(ee)
+# ee["dE"] = ee["energy"] - triplet_soc_g
+
+

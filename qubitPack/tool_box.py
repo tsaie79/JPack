@@ -417,7 +417,6 @@ def get_lowest_unocc_band_idx(task_id, db_obj, nbands, secondary=False):
         lowest_unocc_band_idx.append(band_idx+1)
     lowest_unocc_band_idx = dict(zip(spins, lowest_unocc_band_idx))
 
-
     occu_configs = {}
     maj_spin = max(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
     low_band_idx = lowest_unocc_band_idx[maj_spin]
@@ -428,10 +427,12 @@ def get_lowest_unocc_band_idx(task_id, db_obj, nbands, secondary=False):
     print("maj_spin: {}, occ:{}".format(maj_spin, occu_configs[maj_spin]))
 
     if len(spins) == 1:
-        return occu_configs[maj_spin]
+        return maj_spin, occu_configs
     if len(spins) == 2:
         minor_spin = min(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
+        if minor_spin == maj_spin:
+            maj_spin, minor_spin = "1", "-1"
         low_band_idx = lowest_unocc_band_idx[minor_spin]
         occu_configs[minor_spin] = "{}*1 {}*0".format(low_band_idx-1, nbands-low_band_idx+1)
         print("minor_spin: {}, occ:{}".format(minor_spin, occu_configs[minor_spin]))
-        return occu_configs[maj_spin], occu_configs[minor_spin]
+        return maj_spin, occu_configs
