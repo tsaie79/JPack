@@ -27,19 +27,23 @@ tci = pd.read_csv("icsd_num_layer_materials_TCI.dat", header=None)
 ti = pd.read_csv("icsd_num_layer_materials_TI.dat", header=None)
 
 er = []
+collection = []
 for row in ti[0]:
     icsd_id = row.split("_")[1]
     print(icsd_id)
     with MPRester() as mp:
         try:
-            e = mp.query({"icsd_ids": int(icsd_id)}, ["cifs.conventional_standard", "task_id"])
-            st = Structure.from_str(e[0]["cifs.conventional_standard"], fmt="cif").\
-                to("poscar", "ti/icsd-{}_{}.vasp".format(icsd_id, e[0]["task_id"]))
+            e = mp.query({"icsd_ids": int(icsd_id)}, ["cifs.conventional_standard", "task_id",
+                                                      "band_gap", "magnetic_type", "total_magnetization"])
+            collection.append((icsd_id, e[0]))
+            print(collection)
         except Exception as err:
             er.append((icsd_id, row))
             print("$$"*10)
             print(err)
-dumpfn(dict(er), "ti/err_icsd.json")
+dumpfn(dict(er), "ti/err_icsd.json", indent=4)
+dumpfn(dict(collection), "ti/orig.json", indent=4)
+
 #%%
 import pandas as pd
 import os, glob
@@ -48,43 +52,43 @@ from monty.serialization import dumpfn
 
 dir_path = "/Users/jeng-yuantsai/Research/code/JPack/projects/ferromag_insulator_Lin/"
 os.chdir(dir_path)
-# tci = pd.read_csv("icsd_num_layer_materials_TCI.dat", header=None)
-# ti = pd.read_csv("icsd_num_layer_materials_TI.dat", header=None)
 
 gap = []
-for row in glob.glob("ti_slab_hex/*"):
+for row in glob.glob("ti_slab_hex/*.vasp"):
     row = row.split("/")[-1]
     icsd_id = row.split("_")[0]
     icsd_id = icsd_id.split("-")[1]
     print(icsd_id)
     with MPRester() as mp:
         try:
-            e = mp.query({"icsd_ids": int(icsd_id)}, ["band_gap"])
-            gap.append((row, e[0]["band_gap"]))
-            print(e[0]["band_gap"])
+            e = mp.query({"icsd_ids": int(icsd_id)}, ["band_gap", "magnetic_type", "total_magnetization"])
+            gap.append((row, e[0]))
+            print(e[0])
         except Exception as err:
             print("$$"*10)
             print(err)
 dumpfn(dict(gap), "ti_slab_hex/pbe_gap.json", indent=4)
 #%% check angles
 from pymatgen import Structure
-import glob
+from glob import glob
 from mpinterfaces.utils import *
+from monty.serialization import loadfn
 
 
 dir_path = "/Users/jeng-yuantsai/Research/code/JPack/projects/ferromag_insulator_Lin/"
 os.chdir(dir_path)
-
-for i in glob.glob("ti/*.vasp"):
-    st = Structure.from_file(i)
-    angles = [round(i, 0)for i in st.lattice.angles]
+es = loadfn("ti/orig.json")
+col = []
+for icsd_id, v in es.items():
+    print(icsd_id)
+    st = Structure.from_str(v["cifs.conventional_standard"], fmt="cif")
     if st.lattice.is_hexagonal():
-        print(i)
-        print(angles)
         print(st.num_sites)
         slab = get_ase_slab(st, hkl=[0,0,1], min_thick=40, min_vac=15)
-        os.makedirs("ti_slab", exist_ok=True)
+        os.makedirs("ti_slab_hex", exist_ok=True)
         slab.sort()
-        slab.to("poscar", "ti_slab/{}".format(i.split("/")[-1]))
+        v["cifs.conventional_standard"] = slab.to("cif")
+        col.append((icsd_id, v))
+dumpfn(dict(col), "ti_slab_hex/ti_hex_slabs.json", indent=4)
 
 #%%
