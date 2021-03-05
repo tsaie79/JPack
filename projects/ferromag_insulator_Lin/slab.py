@@ -40,7 +40,32 @@ for row in ti[0]:
             print("$$"*10)
             print(err)
 dumpfn(dict(er), "ti/err_icsd.json")
+#%%
+import pandas as pd
+import os, glob
+from pymatgen import MPRester, Structure
+from monty.serialization import dumpfn
 
+dir_path = "/Users/jeng-yuantsai/Research/code/JPack/projects/ferromag_insulator_Lin/"
+os.chdir(dir_path)
+# tci = pd.read_csv("icsd_num_layer_materials_TCI.dat", header=None)
+# ti = pd.read_csv("icsd_num_layer_materials_TI.dat", header=None)
+
+gap = []
+for row in glob.glob("ti_slab_hex/*"):
+    row = row.split("/")[-1]
+    icsd_id = row.split("_")[0]
+    icsd_id = icsd_id.split("-")[1]
+    print(icsd_id)
+    with MPRester() as mp:
+        try:
+            e = mp.query({"icsd_ids": int(icsd_id)}, ["band_gap"])
+            gap.append((row, e[0]["band_gap"]))
+            print(e[0]["band_gap"])
+        except Exception as err:
+            print("$$"*10)
+            print(err)
+dumpfn(dict(gap), "ti_slab_hex/pbe_gap.json", indent=4)
 #%% check angles
 from pymatgen import Structure
 import glob
