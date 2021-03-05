@@ -16,7 +16,7 @@ LPAD = LaunchPad.from_file(
 f_path = "/home/tug03990/config/project/mag_insulator/slab/structures/tci_slab_hex"
 
 for f in glob.glob(os.path.join(f_path, "*.vasp")):
-    print(f)
+    print(f.split("/")[-1])
     fws = []
 
     st = Structure.from_file(f)
