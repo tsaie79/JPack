@@ -7,16 +7,19 @@ from atomate.vasp.fireworks import OptimizeFW
 from atomate.vasp.powerups import *
 from atomate.vasp.jpowerups import cp_vdw_file
 from fireworks import LaunchPad, Workflow
-import os
+import os, glob
 
 CATEGORY = "slab"
 LPAD = LaunchPad.from_file(
-    os.path.join(os.path.expanduser("~"), "config/project/mag_insulator/{}/my_launchpad.yaml".format(CATEGORY)))
+    os.path.expanduser(os.path.join("~", "config/project/mag_insulator/{}/my_launchpad.yaml".format(CATEGORY))))
 
-for f in ["3-cu.vasp"]:#, "copper-gr.vasp"]:
+f_path = "/home/tug03990/config/project/mag_insulator/slab/structures/tci_slab_hex"
+
+for f in glob.glob(os.path.join(f_path, "*.vasp")):
+    print(f)
     fws = []
 
-    st = Structure.from_file("/home/tug03990/scratch/copper_graphene/modeling/{}".format(f))
+    st = Structure.from_file(f)
     encut = 1.3*max([potcar.enmax for potcar in MPRelaxSet(st).potcar])
 
     override_default_vasp_params={
@@ -26,7 +29,6 @@ for f in ["3-cu.vasp"]:#, "copper-gr.vasp"]:
     vis_set = MPMetalRelaxSet(st, force_gamma=True, **override_default_vasp_params)
     opt_vdw = OptimizeFW(st, vasp_input_set=vis_set, vasp_cmd=">>vasp_cmd<<")
     opt_vdw = cp_vdw_file(opt_vdw)
-
 
     hse_static = JHSEStaticFW(
         st, vasp_input_set_params={
@@ -39,10 +41,14 @@ for f in ["3-cu.vasp"]:#, "copper-gr.vasp"]:
     fws.append(opt_vdw)
     fws.append(hse_static)
 
-    wf = Workflow(fws, name="{}_{}".format(st.formula, f))
-    wf = add_additional_fields_to_taskdocs(wf, {"source": f})
+    wf = Workflow(fws, name="{}_{}".format(st.formula, f.split("/")[-1]))
+    wf = add_additional_fields_to_taskdocs(wf, {"source": f.split("/")[-1]})
     wf = preserve_fworker(wf)
     wf = set_execution_options(wf, category=CATEGORY)
     wf = add_modify_incar(wf)
 
+    wf = set_queue_options(wf, "32:00:00", fw_name_constraint=opt_vdw.name)
+    wf = set_queue_options(wf, "24:00:00", fw_name_constraint=hse_static.name)
+
     LPAD.add_wf(wf)
+    break
