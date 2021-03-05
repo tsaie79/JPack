@@ -1,6 +1,3 @@
-pbe relax
-hse static
-
 #%%
 import numpy as np
 from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet
@@ -34,7 +31,7 @@ for f in ["3-cu.vasp"]:#, "copper-gr.vasp"]:
     hse_static = JHSEStaticFW(
         st, vasp_input_set_params={
             "user_incar_settings": {"EDIFF":1E-5, "SIGMA":0.05, "ENCUT":encut},
-            "user_kpoints_settings": Kpoints.automatic_density_by_vol(st, 6**3)
+            "user_kpoints_settings": Kpoints.automatic_density_by_vol(st, 12**3)
         },
         parents=opt_vdw
     )
