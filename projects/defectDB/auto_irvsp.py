@@ -1,6 +1,5 @@
 from atomate.vasp.workflows.base.core import get_wf
-from pymatgen import Structure
-from fireworks import LaunchPad
+from fireworks import LaunchPad, Workflow
 import os
 from atomate.vasp.powerups import (
     add_additional_fields_to_taskdocs,
@@ -15,66 +14,10 @@ from qubitPack.tool_box import get_db
 import numpy as np
 from pymatgen.core.structure import Structure, SymmOp
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from phonopy.structure.symmetry import ge
+from pymatgen.io.vasp.sets import MPRelaxSet
+from subprocess import call
+from pytopomat.workflows.fireworks import IrvspFW
 
-
-
-st = {'@module': 'pymatgen.core.structure',
-      '@class': 'Structure',
-      'charge': None,
-      'lattice': {'matrix': [[5.468728, 0.0, 3.348630120303753e-16],
-                             [-3.348630120303753e-16, 5.468728, 3.348630120303753e-16],
-                             [0.0, 0.0, 5.468728]],
-                  'a': 5.468728,
-                  'b': 5.468728,
-                  'c': 5.468728,
-                  'alpha': 90.0,
-                  'beta': 90.0,
-                  'gamma': 90.0,
-                  'volume': 163.55317139465933},
-      'sites': [{'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.25, 0.75, 0.25],
-                 'xyz': [1.3671819999999997, 4.101546, 1.3671820000000003],
-                 'label': 'Si',
-                 'properties': {}},
-                {'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.0, 0.0, 0.5],
-                 'xyz': [0.0, 0.0, 2.734364],
-                 'label': 'Si',
-                 'properties': {}},
-                {'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.25, 0.25, 0.75],
-                 'xyz': [1.367182, 1.367182, 4.101546],
-                 'label': 'Si',
-                 'properties': {}},
-                {'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.0, 0.5, 0.0],
-                 'xyz': [-1.6743150601518765e-16, 2.734364, 1.6743150601518765e-16],
-                 'label': 'Si',
-                 'properties': {}},
-                {'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.75, 0.75, 0.75],
-                 'xyz': [4.101546, 4.101546, 4.101546000000001],
-                 'label': 'Si',
-                 'properties': {}},
-                {'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.5, 0.0, 0.0],
-                 'xyz': [2.734364, 0.0, 1.6743150601518765e-16],
-                 'label': 'Si',
-                 'properties': {}},
-                {'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.75, 0.25, 0.25],
-                 'xyz': [4.101546, 1.367182, 1.3671820000000003],
-                 'label': 'Si',
-                 'properties': {}},
-                {'species': [{'element': 'Si', 'occu': 1.0}],
-                 'abc': [0.5, 0.5, 0.5],
-                 'xyz': [2.734364, 2.734364, 2.7343640000000002],
-                 'label': 'Si',
-                 'properties': {}}]}
-
-
-st = Structure.from_dict(st)
 
 c2db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="adminUser", password="qiminyan").collection
 for spg in c2db.distinct("spacegroup"):
@@ -84,25 +27,37 @@ for spg in c2db.distinct("spacegroup"):
         st = e["structure"]
     except Exception:
         continue
+
+    os.makedirs("symmetrized_st", exist_ok=True)
+    os.chdir("symmetrized_st")
     st = Structure.from_dict(st)
+    st.to("poscar", "POSCAR")
+    call("phonopy --symmetry --tolerance 0.01 -c POSCAR".split(" "))
+    st = Structure.from_file("PPOSCAR")
+    st.to("poscar", "POSCAR")
+    call("pos2aBR")
+    st = Structure.from_file("POSCAR_std")
+    os.chdir("..")
 
-
-    wf = get_wf(st, "/home/tug03990/site-packages/pytopomat/pytopomat/workflows/irvsp_hse.yaml")
+    wf = get_wf(st, "/home/tug03990/site-packages/pytopomat/pytopomat/workflows/irvsp_hse_sp.yaml")
+    fws = wf.fws[:2]
+    fw_to_db = IrvspFW(structure=st, parents=fws[1], additional_fields={"c2db_uid": e["uid"], "spg": e["spacegroup"]})
+    fws.append(fw_to_db)
+    wf = Workflow(fws, name=wf.name)
     lpad = LaunchPad.from_file(os.path.expanduser(
         os.path.join("~", "config/project/testIR/irvsp_test/my_launchpad.yaml")))
-
-    wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True, "ISYM":3, "ISPIN":1}}, "line")
-    wf = add_modify_incar(wf, {"incar_update": {"ISPIN":1}})
-    wf = add_additional_fields_to_taskdocs(wf, {"c2db_uid": e["uid"], "spg": e["spacegroup"]})
+    wf = clean_up_files(wf, ("WAVECAR*", "CHGCAR*"), wf.fws[-1].name, task_name_constraint=wf.fws[-1].tasks[-1].fw_name)
+    magmom = MPRelaxSet(st).incar.get("MAGMOM", None)
+    wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True, "ISYM":3, "MAGMOM": magmom}}, "line")
+    wf = add_modify_incar(wf, {"incar_update": {"ISPIN":2}})
     wf = set_execution_options(wf, category="irvsp_test")
     wf = preserve_fworker(wf)
     wf.name = wf.name + ":{}".format(spg)
-    lpad.add_wf(wf)
+    # lpad.add_wf(wf)
 
 #%%
 from atomate.vasp.workflows.base.core import get_wf
-from pymatgen import Structure
-from fireworks import LaunchPad
+from fireworks import LaunchPad, Workflow
 import os
 from atomate.vasp.powerups import (
     add_additional_fields_to_taskdocs,
@@ -116,28 +71,40 @@ from atomate.vasp.powerups import (
 from qubitPack.tool_box import get_db
 import numpy as np
 from pymatgen.core.structure import Structure, SymmOp
+from pymatgen.io.vasp.sets import MPRelaxSet
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from subprocess import call
+from pytopomat.workflows.fireworks import IrvspFW
 
-st = Structure.from_dict(st)
 
 c2db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="adminUser", password="qiminyan").collection
 
-e = c2db.find_one({"uid":"MoS2-MoS2-NM"})
+e = c2db.find_one({"uid":"CuF2-GeS2-NM"})
 
+os.makedirs("symmetrized_st", exist_ok=True)
+os.chdir("symmetrized_st")
 st = Structure.from_dict(e["structure"])
 st.to("poscar", "POSCAR")
 call("phonopy --symmetry --tolerance 0.01 -c POSCAR".split(" "))
-st = Structure.from_file("POSCAR")
+st = Structure.from_file("PPOSCAR")
+st.to("poscar", "POSCAR")
+call("pos2aBR")
+st = Structure.from_file("POSCAR_std")
+os.chdir("..")
 
-wf = get_wf(st, "/home/tug03990/site-packages/pytopomat/pytopomat/workflows/irvsp_hse.yaml")
+
+wf = get_wf(st, "/home/tug03990/site-packages/pytopomat/pytopomat/workflows/irvsp_hse_sp.yaml")
+fws = wf.fws[:2]
+fw_to_db = IrvspFW(parents=fws[1], additional_fields={"c2db_uid": e["uid"], "spg": e["spacegroup"]}, name=wf.fws[-1].name)
+fws.append(fw_to_db)
+wf = Workflow(fws, name=wf.name)
 lpad = LaunchPad.from_file(os.path.expanduser(
     os.path.join("~", "config/project/testIR/irvsp_test/my_launchpad.yaml")))
-
-wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True, "ISYM":3, "ISPIN":1}}, "line")
-wf = add_modify_incar(wf, {"incar_update": {"ISPIN":1}})
-wf = add_additional_fields_to_taskdocs(wf, {"c2db_uid": e["uid"], "spg": e["spacegroup"]})
+wf = clean_up_files(wf, ("WAVECAR*", "CHGCAR*"), wf.fws[-1].name, task_name_constraint=wf.fws[-1].tasks[-1].fw_name)
+magmom = MPRelaxSet(st).incar.get("MAGMOM", None)
+wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True, "ISYM":3, "MAGMOM": magmom}}, "line")
+wf = add_modify_incar(wf, {"incar_update": {"ISPIN":2}})
 wf = set_execution_options(wf, category="irvsp_test")
 wf = preserve_fworker(wf)
-wf.name = wf.name + ":{}".format(spg)
+# wf.name = wf.name + ":{}".format(spg)
 lpad.add_wf(wf)
