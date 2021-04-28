@@ -450,3 +450,4 @@ def standardize_structure(orig_st):
     std_st = Structure.from_file("POSCAR_std")
     os.chdir("..")
     shutil.rmtree("standardize_st")
+    return std_st
