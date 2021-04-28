@@ -32,11 +32,12 @@ ax = df.plot.hist(bins=50, alpha=1)
 plt.show()
 
 #%%
+
 db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/code/JPack/qubitPack/database_profile/db_qimin_db.json")
 
 es = db.collection.aggregate(
     [   {"$unwind": "$calcs_reversed"},
-        {"$match": {"task_type":"static", "functional_type": "SCAN", "output.bandgap":{"$gte":0.1},
+        {"$match": {"task_type":"static", "functional_type": "SCAN", "output.bandgap":{"$gt":0.1},
                     "calcs_reversed.output.outcar.total_magnetization": {"$gte":0.1}
                     }},
         {"$group": {"_id": {"mag": "$calcs_reversed.output.outcar.total_magnetization"},
@@ -97,7 +98,6 @@ es = db.collection.aggregate(
                       "c": "$structure.lattice.c"
                       }
          },
-
         {"$sort": {"gap_hse_nosoc":1}}
         ]
 )
@@ -119,3 +119,90 @@ df["workfunction"] = df["evacmean"] - df["vbm_hse_nosoc"]
 df.to_clipboard(excel=True)
 ax = df.plot.hist(bins=15, alpha=1)
 plt.show()
+#%% create sheet about bulk
+import pandas as pd
+from qubitPack.tool_box import get_db
+db = get_db("mag_insulator", "slab")
+
+es = db.collection.aggregate(
+    [   {"$unwind": "$calcs_reversed"},
+        {"$match": {"task_label":"hse line", "output.bandgap":{"$gt":0}}},
+        {"$project": {
+            "formula": "$formula_pretty",
+            "tid": "$task_id",
+            "ICSD_id": "$icsd_id",
+            "mp_id": "$mpid",
+            "chemsys": "$chemsys",
+            "cbm": "$output.cbm",
+            "vbm": "$output.vbm",
+            "bandgap": "$output.bandgap",
+            "locpot": "$vacuum_locpot",
+            "space_group": "$output.spacegroup.symbol",
+            "a": "$input.structure.lattice.a",
+            "b": "$input.structure.lattice.b",
+            "c": "$input.structure.lattice.c",
+            "_id": 0
+         }},
+        {"$sort": {"bandgap":1, "mag":1}}
+        ]
+)
+
+
+df = pd.DataFrame(es)
+d = df.to_json(indent=4)
+from json import loads
+d = loads(d)
+
+# for k, v in d.items():
+#     print(k, v)
+#     if k != "mag":
+#         d[k].update(dict(zip(v.keys(), [i[0] for i in v.values()])))
+#     else:
+#         continue
+df = pd.DataFrame(d)
+df["workfunction"] = df["locpot"]-df["vbm"]
+
+df.to_clipboard(excel=True)
+# ax = df.plot.hist(bins=15, alpha=1)
+# plt.show()
+
+#%%
+from matplotlib import pyplot as plt
+
+db = get_db("mag_insulator", "slab", user="Jeng")
+es = db.collection.find({"task_label":"hse line", "output.bandgap": {"$gt":0}})
+for e in es:
+    locpot = e["calcs_reversed"][0]["output"]["locpot"]["2"]
+    locpot = max(locpot)
+    print(locpot)
+    db.collection.update_one({"task_id": e["task_id"]}, {"$set": {"vacuum_locpot": locpot}})
+
+#%%
+from qubitPack.tool_box import get_db
+import pandas as pd
+import numpy as np
+
+db = get_db("mag_insulator", "slab", user="Jeng")
+es = db.collection.find({"task_label":"static","output.is_metal":False}, {"icsd_id":1})
+df = pd.DataFrame(es)
+icsd_ids = df["icsd_id"]
+
+hse = db.collection.find({"task_label":{"$regex": "hse"}, "icsd_id": {"$in": icsd_ids.tolist()}},
+                         {"output.bandgap":1, "icsd_id":1})
+df = pd.DataFrame(hse)
+icsd_hse = df["icsd_id"]
+
+intersect = np.setdiff1d(icsd_ids, icsd_hse)
+hse = db.collection.find({"task_label":{"$regex": "static"}, "icsd_id": {"$in": intersect.tolist()}},
+                         {"output.bandgap":1, "icsd_id":1, "_id":0, "formula_pretty":1})
+df = pd.DataFrame(hse)
+
+#%%
+from qubitPack.tool_box import get_db
+import pandas as pd
+import numpy as np
+
+db = get_db("mag_insulator", "fireworks", user="Jeng")
+es = db.collection.find({"spec._tasks.additional_fields.icsd_id": {"$in": df["icsd_id"].tolist()},
+                         "spec._tasks.additional_fields.task_label": "hse line"})
+d = pd.DataFrame(es)

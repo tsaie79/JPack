@@ -397,17 +397,14 @@ class DefectWF:
                     # break
 
     @classmethod
-    def MX2_formation_energy(cls,category="W_Te_Ef_gamma"):
-            lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/W_Te_Ef_gamma/my_launchpad.yaml")
-            # lpad = LaunchPad.auto_load()
+    def MX2_formation_energy(cls, category="W_S_Ef"):
+            lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/W_S_Ef/my_launchpad.yaml")
             aexx = 0.25
-            # col = VaspCalcDb.from_db_file("/home/tug03990/config/category/"
-            #                               "mx2_antisite_pc/db.json").collection
-            col = VaspCalcDb.from_db_file(
-                '/home/tug03990/atomate/example/config/project/antisiteQubit/W_Te_Ef_gamma/db.json').collection
 
-            mx2s = col.find({"task_id":{"$in":[347]}}) #3097
-            geo_spec = {5*5*3: [25]}
+            col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
+            # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
+            mx2s = col.find({"task_id":{"$in":[4229]}})
+            geo_spec = {4*4*3: [20, 25]}
             for mx2 in mx2s:
                 # pc = Structure.from_dict(mx2["structure"])
                 pc = Structure.from_dict(mx2["output"]["structure"])
@@ -423,76 +420,153 @@ class DefectWF:
 
                         for thick in thicks:
                             # ++++++++++++++++++++++++++++++ defect formation energy+++++++++++++++++++++++++++++++
-                            wf_antisite = DefectWF(pc, natom=na,
-                                                   vacuum_thickness=thick, substitution=None,
-                                                   antisite=True, type_vac=antisite, bulk=False, distort=0)
-                            # wf_antisite.defect_st = defect_st
-                            wf_antisite = wf_antisite.hse_scf_wf(
-                                charge_states=[1], gamma_only=[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
-                                dos_hse=False,
-                                nupdown_set=[1],
-                                defect_type="defect_75:25:q[1]:stable",
-                                task_info="{}:{}".format(na, thick),
-                                encut=320,
-                                include_hse_relax=False
-                            )
-                            wf_antisite = add_modify_incar(
-                                wf_antisite,
-                                {"incar_update":{"AEXX": aexx}},
-                                "HSE_scf"
+                            # wf_antisite = DefectWF(pc, natom=na,
+                            #                        vacuum_thickness=thick, substitution=None,
+                            #                        antisite=True, type_vac=antisite, bulk=False, distort=0)
+                            # wf_antisite = DefectWF.MX2_anion_antisite()
+                            # # wf_antisite.defect_st = defect_st
+                            # wf_antisite = wf_antisite.hse_scf_wf(
+                            #     charge_states=[1], gamma_only=[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
+                            #     dos_hse=False,
+                            #     nupdown_set=[1],
+                            #     defect_type="defect_75:25:q[1]:stable",
+                            #     task_info="{}:{}".format(na, thick),
+                            #     encut=320,
+                            #     include_hse_relax=False
+                            # )
+                            # wf_antisite = add_modify_incar(
+                            #     wf_antisite,
+                            #     {"incar_update":{"AEXX": aexx}},
+                            #     "HSE_scf"
+                            # )
+
+
+                            antisite_st = GenDefect(
+                                orig_st=pc,
+                                defect_type=("substitutions", antisite),
+                                natom=na,
+                                vacuum_thickness=thick,
+                                sub_on_side=None,
                             )
 
+                            wf_antisite = get_wf_full_hse(
+                                structure=antisite_st.defect_st,
+                                charge_states=[1, 0, -1],
+                                gamma_only=[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
+                                gamma_mesh=False,
+                                nupdowns=[1, 2, 3],
+                                task="hse_relax-hse_scf",
+                                vasptodb={"category": category, "NN": antisite_st.NN,
+                                          "defect_entry": antisite_st.defect_entry, "defect_type": "defect"},
+                                wf_addition_name="{}:{}".format(na, thick),
+                            )
+
+                            wf_antisite = add_modify_incar(
+                                wf_antisite,
+                                {"incar_update":{"AEXX": aexx, "ENCUT":320}},
+                            )
+
+
+
+
                             wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="HSE_scf")
-                            wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="PBE_relax")
+                            wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="HSE_relax")
                             # related to directory
                             wf_antisite = set_execution_options(wf_antisite, category=category)
                             wf_antisite = preserve_fworker(wf_antisite)
                             lpad.add_wf(wf_antisite)
 
                             # +++++++++++++++++++++bulk formation energy part+++++++++++++++++++++++++++++++++++
-                            wf_bulk_Ef = DefectWF(pc, natom=na, vacuum_thickness=thick, substitution=None,
-                                                   antisite=False, type_vac=antisite, bulk=True)
-                            # wf_bulk_Ef.defect_st = defect_st
-                            wf_bulk_Ef = wf_bulk_Ef.hse_scf_wf(
-                                charge_states=[0], gamma_only=[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
-                                dos_hse=False,
-                                nupdown_set=[-1],
-                                defect_type="host",
-                                task_info="{}:{}".format(na, thick),
-                                encut=320
-                            )
-                            wf_bulk_Ef = add_modify_incar(wf_bulk_Ef,
-                                                           {"incar_update": {"AEXX": aexx}},
-                                                           "HSE_scf")
+                            # wf_bulk_Ef = DefectWF(pc, natom=na, vacuum_thickness=thick, substitution=None,
+                            #                        antisite=False, type_vac=antisite, bulk=True)
+                            # # wf_bulk_Ef.defect_st = defect_st
+                            # wf_bulk_Ef = wf_bulk_Ef.hse_scf_wf(
+                            #     charge_states=[0], gamma_only=[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
+                            #     dos_hse=False,
+                            #     nupdown_set=[-1],
+                            #     defect_type="host",
+                            #     task_info="{}:{}".format(na, thick),
+                            #     encut=320
+                            # )
 
-                            wf_bulk_Ef = set_queue_options(wf_bulk_Ef, "24:00:00", fw_name_constraint="HSE_scf")
-                            wf_bulk_Ef = set_queue_options(wf_bulk_Ef, "24:00:00", fw_name_constraint="PBE_relax")
-                            wf_bulk_Ef = set_execution_options(wf_bulk_Ef, category=category)
-                            wf_bulk_Ef = preserve_fworker(wf_bulk_Ef)
-                            # lpad.add_wf(wf_bulk_Ef)
+
+                            antisite_st = GenDefect(
+                                orig_st=pc,
+                                defect_type=("bulk", antisite),
+                                natom=na,
+                                vacuum_thickness=thick,
+                                sub_on_side=None,
+                                move_origin=False
+                            )
+
+                            wf_bulk = get_wf_full_hse(
+                                structure=antisite_st.bulk_st,
+                                charge_states=[0],
+                                gamma_only=[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
+                                gamma_mesh=False,
+                                nupdowns=[-1],
+                                task="hse_relax-hse_scf",
+                                vasptodb={"category": category, "defect_type": "host"},
+                                wf_addition_name="{}:{}".format(na, thick),
+                            )
+
+                            wf_bulk = add_modify_incar(
+                                wf_bulk,
+                                {"incar_update":{"AEXX": aexx, "ENCUT":320}},
+                            )
+
+                            wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_scf")
+                            wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_relax")
+                            wf_bulk = set_execution_options(wf_bulk, category=category)
+                            wf_bulk = preserve_fworker(wf_bulk)
+                            lpad.add_wf(wf_bulk)
 
                             #+++++++++++++++++++++ bulk VBM++++++++++++++++++++++++++++++++++++++++++++++++++++
-                            wf_bulk_vbm = DefectWF(pc, natom=na, vacuum_thickness=thick, substitution=None,
-                                                  antisite=False, type_vac=antisite, bulk=True)
-
-                            # wf_bulk_vbm.defect_st = defect_st
-                            wf_bulk_vbm = wf_bulk_vbm.hse_scf_wf(
-                                charge_states=[0], gamma_only=[list(find_K_from_k(sc_size, [1/3, 1/3, 0])[0])],
-                                dos_hse=False,
-                                nupdown_set=[-1],
-                                defect_type="vbm",
-                                task_info="{}:{}".format(na, thick),
-                                encut=320
+                            # wf_bulk_vbm = DefectWF(pc, natom=na, vacuum_thickness=thick, substitution=None,
+                            #                       antisite=False, type_vac=antisite, bulk=True)
+                            #
+                            # # wf_bulk_vbm.defect_st = defect_st
+                            # wf_bulk_vbm = wf_bulk_vbm.hse_scf_wf(
+                            #     charge_states=[0], gamma_only=[list(find_K_from_k(sc_size, [1/3, 1/3, 0])[0])],
+                            #     dos_hse=False,
+                            #     nupdown_set=[-1],
+                            #     defect_type="vbm",
+                            #     task_info="{}:{}".format(na, thick),
+                            #     encut=320
+                            # )
+                            # wf_bulk_vbm = add_modify_incar(wf_bulk_vbm,
+                            #                               {"incar_update": {"AEXX": aexx}},
+                            #                               "HSE_scf")
+                            antisite_st = GenDefect(
+                                orig_st=pc,
+                                defect_type=("bulk", antisite),
+                                natom=na,
+                                vacuum_thickness=thick,
+                                sub_on_side=None,
+                                move_origin=False
                             )
-                            wf_bulk_vbm = add_modify_incar(wf_bulk_vbm,
-                                                          {"incar_update": {"AEXX": aexx}},
-                                                          "HSE_scf")
+
+                            wf_bulk_vbm = get_wf_full_hse(
+                                structure=antisite_st.bulk_st,
+                                charge_states=[0],
+                                gamma_only=[list(find_K_from_k(sc_size, [1/3, 1/3, 1/3])[0])],
+                                gamma_mesh=False,
+                                nupdowns=[-1],
+                                task="hse_relax-hse_scf",
+                                vasptodb={"category": category, "defect_type": "vbm"},
+                                wf_addition_name="{}:{}".format(na, thick),
+                            )
+
+                            wf_bulk_vbm = add_modify_incar(
+                                wf_bulk_vbm,
+                                {"incar_update":{"AEXX": aexx, "ENCUT":320}},
+                            )
 
                             wf_bulk_vbm = set_queue_options(wf_bulk_vbm, "24:00:00", fw_name_constraint="HSE_scf")
-                            wf_bulk_vbm = set_queue_options(wf_bulk_vbm, "24:00:00", fw_name_constraint="PBE_relax")
+                            wf_bulk_vbm = set_queue_options(wf_bulk_vbm, "24:00:00", fw_name_constraint="HSE_relax")
                             wf_bulk_vbm = set_execution_options(wf_bulk_vbm, category=category)
                             wf_bulk_vbm = preserve_fworker(wf_bulk_vbm)
-                            # lpad.add_wf(wf_bulk_vbm)
+                            lpad.add_wf(wf_bulk_vbm)
 
     @classmethod
     def antisite_wse2_singlet_triplet(cls):
@@ -1332,6 +1406,6 @@ class Cluster:
 
 
 if __name__ == '__main__':
-    HostWF.hse_band_structure()
+    DefectWF.MX2_formation_energy()
 
 

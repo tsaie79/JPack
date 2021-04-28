@@ -841,7 +841,7 @@ def main():
         # print("$$"*50, "all")
         # print(pd.DataFrame(results))
 
-    regular_antisite("antisiteQubit", "W_Te_Ef_gamma", ["Te-W"])
+    regular_antisite("antisiteQubit", "W_S_Ef", ["S-W"])
     # SP_Kpoints_antisite()
 
 if __name__ == '__main__':
