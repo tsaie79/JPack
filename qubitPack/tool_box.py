@@ -436,3 +436,17 @@ def get_lowest_unocc_band_idx(task_id, db_obj, nbands, secondary=False):
         occu_configs[minor_spin] = "{}*1 {}*0".format(low_band_idx-1, nbands-low_band_idx+1)
         print("minor_spin: {}, occ:{}".format(minor_spin, occu_configs[minor_spin]))
         return maj_spin, occu_configs
+
+def standardize_structure(orig_st):
+    from subprocess import call
+    import shutil
+    os.makedirs("standardize_st", exist_ok=True)
+    os.chdir("standardize_st")
+    orig_st.to("poscar", "POSCAR")
+    call("phonopy --symmetry --tolerance 0.01 -c POSCAR".split(" "))
+    std_st = Structure.from_file("PPOSCAR")
+    std_st.to("poscar", "POSCAR")
+    call("pos2aBR")
+    std_st = Structure.from_file("POSCAR_std")
+    os.chdir("..")
+    shutil.rmtree("standardize_st")
