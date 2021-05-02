@@ -647,7 +647,7 @@ class FormationEnergy2D:
             #                                                    regr.score(X, y)))
             return regr.intercept_, regr.coef_[0], regr
 
-        fig, axes = plt.subplots(4,1,figsize=(5,8))
+        fig, axes = plt.subplots(4,1,figsize=(5,10))
         fig.subplots_adjust(hspace=1, wspace=1)
 
         areas = np.sort(pd_data.area.unique())
@@ -673,8 +673,8 @@ class FormationEnergy2D:
                     A_result = linear_regression(A_X, A_y)
                     #plot
                     print(i)
-                    area = dict(zip(areas, ["5X5", "6X6"]))
-                    colors = dict(zip(areas, ["dodgerblue", "darkorange"]))
+                    area = dict(zip(areas, ["4X4", "5X5", "6X6"]))
+                    colors = dict(zip(areas, ["forestgreen", "dodgerblue", "darkorange"]))
                     axes[idx].plot(A_X, A_y, "o", color=colors[i], label=area[i])
                     axes[idx].plot(np.append(np.array([[0]]), A_X, axis=0),
                                    A_result[-1].predict(np.append(np.array([[0]]), A_X, axis=0)), color=colors[i],
@@ -693,7 +693,7 @@ class FormationEnergy2D:
             print(tot[0], tot[1])
 
             # plot
-            colors = ["dodgerblue", "darkorange"]
+            colors = ["forestgreen", "dodgerblue", "darkorange"]
             axes[idx+1].plot(np.append(np.array([[0]]), tot_X, axis=0),
                              tot[-1].predict(np.append(np.array([[0]]), tot_X, axis=0)), linestyle="dotted", color="black")
             for x, y, color in zip(tot_X, tot_y, colors):
@@ -712,13 +712,13 @@ class FormationEnergy2D:
 
 
         axes[0].set_xlim(left=0)
-        axes[0].set_ylim(bottom=0, top=1)
+        axes[0].set_ylim(bottom=0, top=3)
         axes[0].set_title("Step 1. for donor state "+r"$\epsilon (+/0)$")
         axes[1].set_xlim(left=0)
-        axes[1].set_ylim(bottom=0, top=1.5)
+        axes[1].set_ylim(bottom=0, top=3)
         axes[1].set_title("Step 2. for donor state "+r"$\epsilon (+/0)$")
         axes[2].set_xlim(left=0)
-        axes[2].set_ylim(bottom=0.5, top=2)
+        axes[2].set_ylim(bottom=0.5, top=3)
         axes[2].set_title("Step 1. for acceptor state "+r"$\epsilon (0/-)$")
         axes[3].set_xlim(left=0)
         axes[3].set_ylim(bottom=0.5, top=2)
@@ -790,7 +790,7 @@ def main():
         c = [20, 25]
         # bulk_k = [[0.25, 0.25, 0], [-0.5, -0.5, 0]]
         bulk_k = [[0,0,0]]
-        vbm_k = [[0, 0, 0], [-0.33333333, -0.33333333, 0]]
+        vbm_k = [[0, 0, 0], [-0.33333333, -0.33333333, 0], [0.33333333, 0.33333333,0]]
         results = []
         for compound in compounds:
             se_antisite = FormationEnergy2D(
@@ -803,7 +803,8 @@ def main():
                     "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
                     "input.parameters.AEXX": aexx,
                     "charge_state": 0,
-                    "defect_type": "host"
+                    "defect_type": "host",
+                    "task_label": "HSE_scf"
                 },
                 bk_vbm_bg_db_files=[os.path.join(path, project, collection_name, "db.json")],
                 bk_vbm_bg_filter={
@@ -814,13 +815,14 @@ def main():
                     "input.structure.lattice.c": {"$in": c},
                     "charge_state": 0,
                     "input.parameters.AEXX": aexx,
-                    "defect_type": "vbm"
+                    "defect_type": "vbm",
+                    "task_label": "HSE_scf"
                 },
                 defect_db_files=[os.path.join(path, project, collection_name, "db.json")],
                 defect_entry_filter={
                     "charge_state": {"$in": [1, 0, -1]},
                     "chemsys": compound,
-                    "formula_anonymous": {"$in": ["A26B49", "A37B71"]},
+                    "formula_anonymous": {"$in": ["A26B49", "A37B71", "A17B31"]},
                     "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
                     "input.incar.NSW": 0,
                     "input.incar.LASPH": True,
@@ -828,6 +830,7 @@ def main():
                     "input.structure.lattice.c": {"$in": c},
                     "input.parameters.AEXX": aexx,
                     "defect_type": {"$in":["defect_new", "defect"]},
+                    "task_label": "HSE_scf"
                     # "calcs_reversed.output.outcar.total_magnetization": {"$lte": 3.1, "$gte": 0},
                     # "task_id": {"$nin": [327]}
                      #for ws2

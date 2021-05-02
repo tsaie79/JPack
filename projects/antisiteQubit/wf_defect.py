@@ -465,16 +465,13 @@ class DefectWF:
                                 wf_antisite,
                                 {"incar_update":{"AEXX": aexx, "ENCUT":320}},
                             )
-
-
-
-
+                            wf_antisite = add_modify_incar(wf_antisite)
                             wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="HSE_scf")
                             wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="HSE_relax")
                             # related to directory
                             wf_antisite = set_execution_options(wf_antisite, category=category)
                             wf_antisite = preserve_fworker(wf_antisite)
-                            lpad.add_wf(wf_antisite)
+                            # lpad.add_wf(wf_antisite)
 
                             # +++++++++++++++++++++bulk formation energy part+++++++++++++++++++++++++++++++++++
                             # wf_bulk_Ef = DefectWF(pc, natom=na, vacuum_thickness=thick, substitution=None,
@@ -514,12 +511,12 @@ class DefectWF:
                                 wf_bulk,
                                 {"incar_update":{"AEXX": aexx, "ENCUT":320}},
                             )
-
+                            wf_bulk = add_modify_incar(wf_bulk)
                             wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_scf")
                             wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_relax")
                             wf_bulk = set_execution_options(wf_bulk, category=category)
                             wf_bulk = preserve_fworker(wf_bulk)
-                            lpad.add_wf(wf_bulk)
+                            # lpad.add_wf(wf_bulk)
 
                             #+++++++++++++++++++++ bulk VBM++++++++++++++++++++++++++++++++++++++++++++++++++++
                             # wf_bulk_vbm = DefectWF(pc, natom=na, vacuum_thickness=thick, substitution=None,
@@ -549,7 +546,7 @@ class DefectWF:
                             wf_bulk_vbm = get_wf_full_hse(
                                 structure=antisite_st.bulk_st,
                                 charge_states=[0],
-                                gamma_only=[list(find_K_from_k(sc_size, [1/3, 1/3, 1/3])[0])],
+                                gamma_only=[list(find_K_from_k(sc_size, [1/3, 1/3, 0])[0])],
                                 gamma_mesh=False,
                                 nupdowns=[-1],
                                 task="hse_relax-hse_scf",
@@ -561,12 +558,26 @@ class DefectWF:
                                 wf_bulk_vbm,
                                 {"incar_update":{"AEXX": aexx, "ENCUT":320}},
                             )
-
+                            wf_bulk_vbm = add_modify_incar(wf_bulk_vbm)
                             wf_bulk_vbm = set_queue_options(wf_bulk_vbm, "24:00:00", fw_name_constraint="HSE_scf")
                             wf_bulk_vbm = set_queue_options(wf_bulk_vbm, "24:00:00", fw_name_constraint="HSE_relax")
                             wf_bulk_vbm = set_execution_options(wf_bulk_vbm, category=category)
                             wf_bulk_vbm = preserve_fworker(wf_bulk_vbm)
                             lpad.add_wf(wf_bulk_vbm)
+
+    @classmethod
+    def nv_center(cls):
+        category = "NV_cneter"
+        lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/W_S_Ef/my_launchpad.yaml")
+        nv = Structure.from_file("/home/tug03990/work/antisiteQubit/NV_center/poscar.vasp")
+        from atomate.vasp.workflows.base.core import get_wf
+        wf = get_wf(nv, "../wf_yaml/static.yaml")
+
+        wf = add_modify_incar(wf)
+        wf = set_queue_options(wf, "32:00:00")
+        wf = set_execution_options(wf, category=category)
+        wf = preserve_fworker(wf)
+        lpad.add_wf(wf)
 
     @classmethod
     def antisite_wse2_singlet_triplet(cls):
@@ -728,6 +739,8 @@ class DefectWF:
 
                     lpad = LaunchPad.auto_load()
                     lpad.add_wf(wf)
+
+
 
 
 class ZPLWF:
