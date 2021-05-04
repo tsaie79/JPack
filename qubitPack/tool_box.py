@@ -437,7 +437,7 @@ def get_lowest_unocc_band_idx(task_id, db_obj, nbands, secondary=False):
         print("minor_spin: {}, occ:{}".format(minor_spin, occu_configs[minor_spin]))
         return maj_spin, occu_configs
 
-def standardize_structure(orig_st):
+def phonopy_structure(orig_st):
     from subprocess import call
     import shutil
     os.makedirs("standardize_st", exist_ok=True)
