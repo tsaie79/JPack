@@ -33,19 +33,10 @@ def find_cation_anion(structure):
     return cation, anion
 
 
-def modify_vacuum(orig_st, vacuum):
-    if vacuum < orig_st.lattice.c:
-        print("Please Set Vacuum > original lattice!!")
-    ase_offset = AseAtomsAdaptor.get_atoms(orig_st)
-    ase_offset.center(vacuum=0.0, axis=2)
-    try:
-        offset = AseAtomsAdaptor.get_structure(ase_offset).lattice.c
-    except Exception as err:
-        print(err)
-        offset = 0
-    ase_atom_obj = AseAtomsAdaptor.get_atoms(orig_st)
-    ase_atom_obj.center(vacuum=(vacuum-offset)/2, axis=2)
-    return AseAtomsAdaptor.get_structure(ase_atom_obj)
+def set_vacuum(orig_st, vacuum):
+    from mpinterfaces.utils import ensure_vacuum
+    st = ensure_vacuum(orig_st, vacuum)
+    return st
 
 
 def get_rand_vec(distance): #was 0.001
