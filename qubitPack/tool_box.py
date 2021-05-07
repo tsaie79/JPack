@@ -368,12 +368,12 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
     return resulting_sts, info
 
 
-def delete_entry_in_db(task_id, db_name, col_name, auth_user="Jeng", delete_fs_only=False):
+def delete_entry_in_db(task_id, db_name, col_name, auth_user="Jeng", delete_fs_only=False, port=1234):
     """
     remove entry and all Gridfs files in db
 
     """
-    db = get_db(db_name, col_name, user=auth_user)
+    db = get_db(db_name, col_name, user=auth_user, port=port)
     entry = db.collection.find_one({"task_id":task_id})
 
     remove_dict = {}

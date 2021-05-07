@@ -214,6 +214,7 @@ class DetermineDefectState:
                                                 round(adj_proj/total_proj*100,2),
                                                 round(antisite_proj/total_proj*100,2)))
 
+
                     sheet_procar = defaultdict(list)
                     for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
                         test = {}
@@ -256,15 +257,14 @@ class DetermineDefectState:
         eigenvals = {}
         promising_band = {}
         band_proj = {}
-        band_info = {}
         df = {}
         df_proj = {}
         channel = {}
         levels = {}
         for spin in spins:
+            band_info = {}
             try:
                 eigenvals.update(get_eigenvals(spin, self.eigenvals, energy_range=[self.vbm, self.cbm]))
-                print(eigenvals)
                 band_detail, proj = get_promising_state(spin, eigenvals)
                 band_proj[spin] = proj
                 band_info.update(band_detail)
@@ -280,7 +280,7 @@ class DetermineDefectState:
                     levels[spin] = dict(zip(channel[spin].loc[:, "energy"], channel[spin].loc[:, "occupied"]))
             except IndexError:
                 print("Threshold of projection is too high!")
-
+        print(levels)
         eng = EnergyLevel(levels)
 
         # try:
@@ -350,7 +350,7 @@ class DetermineDefectState:
         #             band_dn_proj.append(test)
 
         # Total defect states
-        up_channel, dn_channel = None, None
+        # up_channel, dn_channel = None, None
 
         # up = defaultdict(tuple)
         # dn = defaultdict(tuple)
