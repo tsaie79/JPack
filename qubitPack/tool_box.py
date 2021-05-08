@@ -157,7 +157,7 @@ class GenDefect:
         for site_property in orig_st.site_properties:
             orig_st.remove_site_property(site_property)
         if vacuum_thickness:
-            self.orig_st = modify_vacuum(orig_st, vacuum_thickness)
+            self.orig_st = set_vacuum(orig_st, vacuum_thickness)
         else:
             self.orig_st = orig_st
         self.defect_type = defect_type
