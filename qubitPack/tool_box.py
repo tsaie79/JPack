@@ -1,6 +1,7 @@
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.io.vasp.inputs import Poscar, Structure
 from pymatgen.analysis.local_env import CrystalNN
+from pymatgen.analysis.defects.core import Vacancy, Substitution
 
 import numpy as np
 import os
@@ -182,6 +183,7 @@ class GenDefect:
                     self.defect_site_in_bulk_index = self.defect_st.index(self.defect_site_in_bulk.to_unit_cell())
                 self.NN = [self.defect_st.index(self.defect_st[nn['site_index']])
                            for nn in CrystalNN().get_nn_info(self.defect_st, self.defect_site_in_bulk_index)]
+                self.pmg_obj = Substitution(self.bulk_st, self.defect_site_in_bulk)
 
             elif defect_type[0] == "vacancies":
                 try:
@@ -190,6 +192,7 @@ class GenDefect:
                     self.defect_site_in_bulk_index = self.bulk_st.index(self.defect_site_in_bulk.to_unit_cell())
                 self.NN = [self.defect_st.index(self.bulk_st[nn['site_index']])
                            for nn in CrystalNN().get_nn_info(self.bulk_st, self.defect_site_in_bulk_index)]
+                self.pmg_obj = Vacancy(self.bulk_st, self.defect_site_in_bulk)
 
             self.nn_dist = dict(before=None, after=None)
             self.nn_dist["before"] = dict(zip([str(idx) for idx in self.NN], range(len(self.NN))))
@@ -198,6 +201,7 @@ class GenDefect:
 
             self.defect_entry["supercell"].pop("structure")
             self.defect_entry["supercell"]["bulk"] = self.bulk_st
+
 
         elif defect_type[0] == "bulk":
             self.defect_entry = self.defects[self.defect_type[0]]
