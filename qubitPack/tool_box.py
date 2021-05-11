@@ -183,7 +183,7 @@ class GenDefect:
                     self.defect_site_in_bulk_index = self.defect_st.index(self.defect_site_in_bulk.to_unit_cell())
                 self.NN = [self.defect_st.index(self.defect_st[nn['site_index']])
                            for nn in CrystalNN().get_nn_info(self.defect_st, self.defect_site_in_bulk_index)]
-                self.pmg_obj = Substitution(self.bulk_st, self.defect_site_in_bulk)
+                self.pmg_obj = Substitution(self.orig_st, self.defect_entry["unique_site"])
 
             elif defect_type[0] == "vacancies":
                 try:
@@ -192,7 +192,7 @@ class GenDefect:
                     self.defect_site_in_bulk_index = self.bulk_st.index(self.defect_site_in_bulk.to_unit_cell())
                 self.NN = [self.defect_st.index(self.bulk_st[nn['site_index']])
                            for nn in CrystalNN().get_nn_info(self.bulk_st, self.defect_site_in_bulk_index)]
-                self.pmg_obj = Vacancy(self.bulk_st, self.defect_site_in_bulk)
+                self.pmg_obj = Vacancy(self.orig_st, self.defect_entry["unique_site"])
 
             self.nn_dist = dict(before=None, after=None)
             self.nn_dist["before"] = dict(zip([str(idx) for idx in self.NN], range(len(self.NN))))
