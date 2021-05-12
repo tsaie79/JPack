@@ -446,3 +446,8 @@ def phonopy_structure(orig_st):
     os.chdir("..")
     shutil.rmtree("standardize_st")
     return std_st
+
+def get_encut(st):
+    from pymatgen.io.vasp.sets import MPRelaxSet
+    encut = 1.3*max([potcar.enmax for potcar in MPRelaxSet(st).potcar])
+    return encut
