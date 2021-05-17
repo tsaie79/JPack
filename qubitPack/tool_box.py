@@ -154,7 +154,7 @@ def defect_from_primitive_cell(orig_st, defect_type, natom, substitution=None, d
 
 
 class GenDefect:
-    def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None, distort=None, sub_on_side=None, move_origin=True):
+    def __init__(self, orig_st, defect_type, natom, vacuum_thickness=None, distort=None, sub_on_side=None, standardize_st=True):
         for site_property in orig_st.site_properties:
             orig_st.remove_site_property(site_property)
         if vacuum_thickness:
@@ -216,8 +216,8 @@ class GenDefect:
         elif defect_type[0] == "vacancies":
             self.vacancies(distort, sub_on_side)
 
-        if move_origin:
-            self.move_origin_to_defect()
+        if standardize_st:
+            self.defect_st = phonopy_structure(self.defect_st)
 
     def substitutions(self, distort, substitution):
         bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
