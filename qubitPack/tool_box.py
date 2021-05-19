@@ -381,8 +381,8 @@ def remove_entry_in_db(task_id, db_object, delete_fs_only=False, pmg_file=True, 
     db = db_object
     entry = db.collection.find_one({"task_id":task_id})
 
-    remove_dict = {}
     if pmg_file:
+        remove_dict = {}
         for i in list(entry["calcs_reversed"][0].keys()):
             if "fs" in i:
                 chunks = i.rsplit("_", 1)[0] + ".chunks"
@@ -390,23 +390,29 @@ def remove_entry_in_db(task_id, db_object, delete_fs_only=False, pmg_file=True, 
                 files = i.rsplit("_", 1)[0] + ".files"
                 remove_dict[files] = entry["calcs_reversed"][0][i]
 
-        for k, v in remove_dict.items():
-            d = db.db[k]
-            try:
-                d.collection.delete_one({"_id": v})
-            except Exception as err:
-                print(err)
-                continue
+        if delete_fs_only:
+            for k, v in remove_dict.items():
+                d = db.db[k]
+                try:
+                    d.collection.delete_one({"_id": v})
+                except Exception as err:
+                    print(err)
+                    continue
 
-        if not delete_fs_only:
-            db.collection.delete_one({"task_id":task_id})
+        else:
+            for k, v in remove_dict.items():
+                d = db.db[k]
+                try:
+                    d.collection.delete_one({"_id": v})
+                except Exception as err:
+                    print(err)
+                    continue
 
-        if remove_dir:
-            dir_path = os.path.join(remove_dir, db.db_name, db.collection.name, entry["dir_name"].split("/")[-1])
-            try:
+            if remove_dir:
+                dir_path = os.path.join(remove_dir, db.db_name, db.collection.name, entry["dir_name"].split("/")[-1])
                 shutil.rmtree(dir_path)
-            except Exception as err:
-                print(err)
+
+            db.collection.delete_one({"task_id":task_id})
 
     else:
         db.collection.delete_one({"task_id":task_id})
