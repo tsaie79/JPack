@@ -1,3 +1,4 @@
+import shutil
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.io.vasp.inputs import Poscar, Structure
 from pymatgen.analysis.local_env import CrystalNN
@@ -372,7 +373,8 @@ def get_interpolate_sts(i_st, f_st, disp_range=np.linspace(0, 2, 11), output_dir
     return resulting_sts, info
 
 
-def delete_entry_in_db(task_id, db_name, col_name, auth_user="Jeng", delete_fs_only=False, port=1234):
+def remove_entry_in_db(task_id, db_name, col_name, auth_user="Jeng", delete_fs_only=False, port=1234, pmg_file=True,
+                       remove_dir=None):
     """
     remove entry and all Gridfs files in db
 
@@ -381,22 +383,30 @@ def delete_entry_in_db(task_id, db_name, col_name, auth_user="Jeng", delete_fs_o
     entry = db.collection.find_one({"task_id":task_id})
 
     remove_dict = {}
-    for i in list(entry["calcs_reversed"][0].keys()):
-        if "fs" in i:
-            chunks = i.rsplit("_", 1)[0] + ".chunks"
-            remove_dict[chunks] = entry["calcs_reversed"][0][i]
-            files = i.rsplit("_", 1)[0] + ".files"
-            remove_dict[files] = entry["calcs_reversed"][0][i]
+    if pmg_file:
+        for i in list(entry["calcs_reversed"][0].keys()):
+            if "fs" in i:
+                chunks = i.rsplit("_", 1)[0] + ".chunks"
+                remove_dict[chunks] = entry["calcs_reversed"][0][i]
+                files = i.rsplit("_", 1)[0] + ".files"
+                remove_dict[files] = entry["calcs_reversed"][0][i]
 
-    for k,v in remove_dict.items():
-        d = get_db(db_name, k, user=auth_user)
-        try:
-            d.collection.delete_one({"_id": v})
-        except Exception as err:
-            print(err)
-            continue
+        for k,v in remove_dict.items():
+            d = get_db(db_name, k, user=auth_user)
+            try:
+                d.collection.delete_one({"_id": v})
+            except Exception as err:
+                print(err)
+                continue
 
-    if not delete_fs_only:
+        if not delete_fs_only:
+            db.collection.delete_one({"task_id":task_id})
+
+        if remove_dir:
+            dir_path = os.path.join(remove_dir, db_name, col_name, entry["dir_name"].split("/")[-1])
+            shutil.rmtree(dir_path)
+
+    else:
         db.collection.delete_one({"task_id":task_id})
 
 def get_lowest_unocc_band_idx(task_id, db_obj, nbands, secondary=False):
