@@ -411,8 +411,10 @@ def remove_entry_in_db(task_id, db_object, delete_fs_only=False, pmg_file=True, 
             if remove_dir:
                 dir_path = os.path.join(remove_dir, db.db_name, db.collection.name, entry["dir_name"].split("/")[-1])
                 shutil.rmtree(dir_path)
+                print("removed {}".format(dir_path))
 
-            db.collection.delete_one({"task_id":task_id})
+            db.collection.delete_one({"task_id": task_id})
+            print("removed {}/{}/{}".format(db.db_name, db.collection.name, task_id))
 
     else:
         db.collection.delete_one({"task_id":task_id})
