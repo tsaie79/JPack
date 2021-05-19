@@ -390,8 +390,8 @@ def remove_entry_in_db(task_id, db_object, delete_fs_only=False, pmg_file=True, 
                 files = i.rsplit("_", 1)[0] + ".files"
                 remove_dict[files] = entry["calcs_reversed"][0][i]
 
-        for k,v in remove_dict.items():
-            d = get_db(db_name, k, user=auth_user)
+        for k, v in remove_dict.items():
+            d = db.db[k]
             try:
                 d.collection.delete_one({"_id": v})
             except Exception as err:
@@ -402,7 +402,7 @@ def remove_entry_in_db(task_id, db_object, delete_fs_only=False, pmg_file=True, 
             db.collection.delete_one({"task_id":task_id})
 
         if remove_dir:
-            dir_path = os.path.join(remove_dir, db_name, col_name, entry["dir_name"].split("/")[-1])
+            dir_path = os.path.join(remove_dir, db.db_name, db.collection.name, entry["dir_name"].split("/")[-1])
             shutil.rmtree(dir_path)
 
     else:
