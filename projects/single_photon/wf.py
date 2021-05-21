@@ -131,7 +131,7 @@ class Defect:
 
     @classmethod
     def soc_cdft(cls, task, soc_std_d_tkid, nbands, occ=None, soc_std_d_base_dir=None, std_d_base_dir=None,
-                 specific_poscar=None, category="soc_cdft", secondary=False):
+                 specific_poscar=None, category="soc_cdft"):
 
         soc_std_d = get_db("single_photon_emitter", "soc_standard_defect", port=12345)
         soc_std_d_e = soc_std_d.collection.find_one({"task_id":soc_std_d_tkid})
@@ -150,7 +150,8 @@ class Defect:
         anti_triplet = ZPLWF(os.path.join(soc_std_d_base_dir, soc_std_d_path), None)
 
         if not occ:
-            maj_spin, occ_config = get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, secondary)
+            maj_spin, occ_config = get_lowest_unocc_band_idx(soc_std_d_tkid, soc_std_d, nbands, prevent_JT=True,
+                                                             second_excite=False)
             occ = occ_config[maj_spin]
 
         wf = anti_triplet.wf(
@@ -291,12 +292,12 @@ def main():
         category = "soc_cdft"
         wf = Defect.soc_cdft(
             "B-C-D",
-            492,
+            467,
             950,
             occ=None,
             category=category
         )
-        # wf = add_additional_fields_to_taskdocs(wf, {"occupy": "657*1 1*0 1*1 291*0"})
+        wf = add_additional_fields_to_taskdocs(wf, {"PS": "prevent_JT"})
         wf = set_execution_options(wf, fworker_name="efrc")
         LPAD = LaunchPad.from_file(
             os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
@@ -311,12 +312,12 @@ def main():
             occ=None,
             category=category
         )
-        # wf = add_additional_fields_to_taskdocs(wf, {"occupy": "657*1 1*0 1*1 291*0"})
+        wf = add_additional_fields_to_taskdocs(wf, {"PS": "prevent_JT"})
         wf = set_execution_options(wf, fworker_name="efrc")
         LPAD = LaunchPad.from_file(
             os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
                                                  "my_launchpad.yaml".format(category))))
-        # LPAD.add_wf(wf)
+        LPAD.add_wf(wf)
     def std_defect():
         wf = Defect.standard_defect()
         LPAD = LaunchPad.from_file(
@@ -339,6 +340,6 @@ def main():
 
         LPAD.add_wf(wf)
 
-    cdft()
+    soc_cdft()
 if __name__ == '__main__':
     main()
