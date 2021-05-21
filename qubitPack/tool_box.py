@@ -471,3 +471,8 @@ def get_encut(st):
     from pymatgen.io.vasp.sets import MPRelaxSet
     encut = 1.3*max([potcar.enmax for potcar in MPRelaxSet(st).potcar])
     return encut
+
+def cd_from_db(db, task_id):
+    import os
+    path = db.collection.find_one({"task_id": task_id})["calcs_reversed"][0]["dir_name"]
+    os.chdir(path)
