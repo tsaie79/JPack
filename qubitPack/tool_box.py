@@ -414,7 +414,7 @@ def remove_entry_in_db(task_id, db_object, delete_fs_only=False, pmg_file=True, 
     else:
         db.collection.delete_one({"task_id":task_id})
 
-def get_lowest_unocc_band_idx(task_id, db_obj, nbands, secondary=False):
+def get_lowest_unocc_band_idx(task_id, db_obj, nbands, prevent_JT=True, second_excite=False):
 
     eig = db_obj.get_eigenvals(task_id)
     spins = list(eig.keys())
@@ -430,8 +430,10 @@ def get_lowest_unocc_band_idx(task_id, db_obj, nbands, secondary=False):
     occu_configs = {}
     maj_spin = max(lowest_unocc_band_idx, key=lambda key: lowest_unocc_band_idx[key])
     low_band_idx = lowest_unocc_band_idx[maj_spin]
-    if secondary:
-        occu_configs[maj_spin] = "{}*1 1*0 1*1 1*1 {}*0".format(low_band_idx-3, nbands-(low_band_idx))
+    if second_excite:
+        occu_configs[maj_spin] = "{}*1 1*0 1*1 1*1 {}*0".format(low_band_idx-3, nbands-low_band_idx)
+    elif prevent_JT:
+        occu_configs[maj_spin] = "{}*1 1*0.5 1*0.5 1*1 {}*0".format(low_band_idx-3, nbands-low_band_idx)
     else:
         occu_configs[maj_spin] = "{}*1 1*0 1*1 {}*0".format(low_band_idx-2, nbands-low_band_idx)
     print("maj_spin: {}, occ:{}".format(maj_spin, occu_configs[maj_spin]))
