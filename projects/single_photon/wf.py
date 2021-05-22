@@ -16,7 +16,7 @@ class Defect:
 
         db_name, col_name = "owls", "mx2_antisite_pc"
         col = get_db(db_name, col_name, port=12345).collection
-        mx2s = col.find({"task_id":{"$in":[3093]}})
+        mx2s = col.find({"task_id":{"$in":[3091, 3083]}})
         # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
 
         geo_spec = {5* 5 * 3: [20]}
@@ -49,7 +49,7 @@ class Defect:
                             charge_states=[0],
                             gamma_only=False,
                             gamma_mesh=True,
-                            nupdowns=[2],
+                            nupdowns=[0],
                             task="hse_relax-hse_scf",
                             vasptodb={
 
@@ -70,7 +70,7 @@ class Defect:
                         # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
                         #                     fw_name_constraint="HSE_scf")
 
-                        wf = clear_to_db(wf, fw_name_constraint=wf.fws[0].name)
+                        wf = remove_todb(wf, fw_name_constraint=wf.fws[0].name)
                         # wf = clear_to_db(wf, fw_name_constraint=wf.fws[1].name)
 
                         # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
@@ -79,7 +79,7 @@ class Defect:
                         # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_soc")
 
                         wf = add_modify_incar(wf)
-                        wf = set_execution_options(wf, category=category, fworker_name="efrc")
+                        wf = set_execution_options(wf, category=category, fworker_name="owls")
                         wf = preserve_fworker(wf)
                         wf.name = wf.name+":dx[{}]".format(se_antisite.distort)
                         print(wf.name)
@@ -292,7 +292,7 @@ def main():
         category = "soc_cdft"
         wf = Defect.soc_cdft(
             "B-C-D",
-            467,
+            466,
             950,
             occ=None,
             category=category
@@ -307,7 +307,7 @@ def main():
         category = "cdft"
         wf = Defect.cdft(
             "B-C-D",
-            459,
+            460,
             475,
             occ=None,
             category=category

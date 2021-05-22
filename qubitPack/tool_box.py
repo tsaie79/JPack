@@ -212,7 +212,7 @@ class GenDefect:
         elif defect_type[0] == "vacancies":
             self.vacancies(distort, sub_on_side)
 
-        if standardize_st:
+        if standardize_st and self.defect_st:
             self.defect_st = phonopy_structure(self.defect_st)
 
     def substitutions(self, distort, substitution):
