@@ -202,18 +202,19 @@ class GenDefect:
         elif defect_type[0] == "bulk":
             self.defect_entry = self.defects[self.defect_type[0]]
             self.defect_entry["supercell"].pop("structure")
+            self.defect_st = None
 
         else:
             print("!!!Please insert substitutions, vacancies, or bulk!!!")
+
+        if standardize_st and self.defect_st:
+            self.defect_st = phonopy_structure(self.defect_st)
 
         if defect_type[0] == "substitutions":
             self.substitutions(distort, sub_on_side)
 
         elif defect_type[0] == "vacancies":
             self.vacancies(distort, sub_on_side)
-
-        if standardize_st and self.defect_st:
-            self.defect_st = phonopy_structure(self.defect_st)
 
     def substitutions(self, distort, substitution):
         bond_length = [self.defect_st.get_distance(self.defect_site_in_bulk_index, NN_index)
