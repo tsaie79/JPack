@@ -140,7 +140,10 @@ class ProcarParse:
 
 
 class DetermineDefectState:
-    def __init__(self, db, db_filter, cbm, vbm, save_fig_path, locpot=None):
+    def __init__(self, db, db_filter, cbm, vbm, save_fig_path, locpot=None, locpot_c2db=None):
+        """
+        locpot or locpot_c2db (3D tuple): (db_object, task_id/uid, displacement)
+        """
 
         self.save_fig_path = save_fig_path
 
@@ -148,17 +151,26 @@ class DetermineDefectState:
 
         print("---task_id: %s---" % self.entry["task_id"])
 
-        if locpot:
+        if locpot_c2db:
             self.vacuum_locpot = max(self.entry["calcs_reversed"][0]["output"]["locpot"]["2"])
+            self.entry_host = locpot_c2db[0].collection.find_one({"uid": locpot_c2db[1]})
+            self.vacuum_locpot_host = self.entry_host["evac"]
+            self.cbm = self.entry_host["cbm_hse_nosoc"] + locpot_c2db[2]
+            self.vbm = self.entry_host["vbm_hse_nosoc"] + locpot_c2db[2]
+            efermi_to_defect_vac = self.entry["calcs_reversed"][0]["output"]["efermi"] - self.vacuum_locpot + locpot_c2db[2]
+            self.efermi = efermi_to_defect_vac
 
-            db_host = locpot
-            self.entry_host = db_host.collection.find_one({"task_id": int(self.entry["pc_from"].split("/")[-1])})
+        elif locpot:
+            self.vacuum_locpot = max(self.entry["calcs_reversed"][0]["output"]["locpot"]["2"])
+            db_host = locpot[0]
+            if not locpot[1]:
+                self.entry_host = db_host.collection.find_one({"task_id": int(self.entry["pc_from"].split("/")[-1])})
+            else:
+                self.entry_host = db_host.collection.find_one({"task_id": locpot[1]})
             self.vacuum_locpot_host = max(self.entry_host["calcs_reversed"][0]["output"]["locpot"]["2"])
-
-            self.cbm = self.entry_host["output"]["cbm"] - self.vacuum_locpot_host #A
-            self.vbm = self.entry_host["output"]["vbm"] - self.vacuum_locpot_host
-            efermi_to_defect_vac = self.entry["calcs_reversed"][0]["output"]["efermi"] - self.vacuum_locpot
-
+            self.cbm = self.entry_host["output"]["cbm"] - self.vacuum_locpot_host + locpot[2]
+            self.vbm = self.entry_host["output"]["vbm"] - self.vacuum_locpot_host + locpot[2]
+            efermi_to_defect_vac = self.entry["calcs_reversed"][0]["output"]["efermi"] - self.vacuum_locpot + locpot[2]
             self.efermi = efermi_to_defect_vac
 
         else:
@@ -200,35 +212,36 @@ class DetermineDefectState:
             promising_band = defaultdict(list)
             band_up_proj = []
             up = defaultdict(tuple)
-            for band in eigenvals[spin]:
-                total_proj = 0
-                adj_proj = 0
-                for ion_idx in self.nn:
-                    total_proj += sum(self.proj_eigenvals[spin][kpoint][band[0]][ion_idx])
-                for ion_adj_idx in self.nn[:-1]:
-                    adj_proj += sum(self.proj_eigenvals[spin][kpoint][band[0]][ion_adj_idx])
-                antisite_proj = sum(self.proj_eigenvals[spin][kpoint][band[0]][self.nn[-1]])
-                if total_proj >= threshold:
-                    # print("band_index: {}".format(band[0]))
-                    promising_band[spin].append((band[0], band[1], total_proj,
-                                                round(adj_proj/total_proj*100,2),
-                                                round(antisite_proj/total_proj*100,2)))
+            if eigenvals.get(spin, None):
+                for band in eigenvals[spin]:
+                    total_proj = 0
+                    adj_proj = 0
+                    for ion_idx in self.nn:
+                        total_proj += sum(self.proj_eigenvals[spin][kpoint][band[0]][ion_idx])
+                    for ion_adj_idx in self.nn[:-1]:
+                        adj_proj += sum(self.proj_eigenvals[spin][kpoint][band[0]][ion_adj_idx])
+                    antisite_proj = sum(self.proj_eigenvals[spin][kpoint][band[0]][self.nn[-1]])
+                    if total_proj >= threshold:
+                        # print("band_index: {}".format(band[0]))
+                        promising_band[spin].append((band[0], band[1], total_proj,
+                                                    round(adj_proj/total_proj*100,2),
+                                                    round(antisite_proj/total_proj*100,2)))
 
 
-                    sheet_procar = defaultdict(list)
-                    for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
-                        test = {}
-                        for ion_idx in self.nn:
-                            orbital_proj = self.proj_eigenvals[spin][kpoint][band[0]][ion_idx][idx]
-                            if orbital_proj < 1e-3:
-                                orbital_proj = None
-                            test.update({ion_idx: orbital_proj})
-                        test.update({"band_index": band[0]}) #
-                        test.update({"spin":spin}) #
-                        test.update({"orbital":o})
-                        band_up_proj.append(test)
-            for i in promising_band[spin]:
-                up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
+                        sheet_procar = defaultdict(list)
+                        for idx, o in enumerate(['s', 'py', 'pz', 'px', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']):
+                            test = {}
+                            for ion_idx in self.nn:
+                                orbital_proj = self.proj_eigenvals[spin][kpoint][band[0]][ion_idx][idx]
+                                if orbital_proj < 1e-3:
+                                    orbital_proj = None
+                                test.update({ion_idx: orbital_proj})
+                            test.update({"band_index": band[0]}) #
+                            test.update({"spin":spin}) #
+                            test.update({"orbital":o})
+                            band_up_proj.append(test)
+                for i in promising_band[spin]:
+                    up[i[0]] = (round(i[1][0], 3), (i[1][1] > 0.4, i[1][1], i[2], i[3], i[4]))
             return up, band_up_proj
 
         def sheet(band_info, band_proj, spin):
@@ -418,21 +431,32 @@ class DetermineDefectState:
 
         state_df = pd.concat(list(channel.values()), ignore_index=False)
         proj_state_df = pd.concat(band_proj.values(), ignore_index=False)
-        print(band_proj)
+        proj_state_df = proj_state_df.fillna(0)
+        proj_state_df["adjacent"] = proj_state_df.iloc[:,0] + proj_state_df.iloc[:,1] + proj_state_df.iloc[:, 2]
+        proj_state_df["antisite"] = proj_state_df.iloc[:,3]
+
+        # proj_state_df.loc[proj_state_df["adjacent"] < 0.01, "adjacent"] = 0
+        # proj_state_df.loc[proj_state_df["antisite"] < 0.01, "antisite"] = 0
+
+        proj_state_df = proj_state_df.sort_values(["spin", "band_index", "orbital"], ascending=False)
+        print("=="*20)
         print(proj_state_df)
+        print("=="*20)
+        print(state_df)
 
         # depict defate states
 
 
         ## up
-        up_states = state_df.loc[state_df["spin"] == "up"]
+        up_states = state_df.loc[state_df["spin"] == "1"]
+        print("**"*20)
+        print(up_states)
         up_dist_from_vbm = up_states["energy"] - (self.vbm + self.vacuum_locpot)
         up_dist_from_vbm = up_dist_from_vbm.round(3)
         up_occ = up_states.loc[:, "n_occ_e"]
         up_band_index = up_states.index
-
         ## dn
-        dn_states = state_df.loc[state_df["spin"] == "dn"]
+        dn_states = state_df.loc[state_df["spin"] == "-1"]
         dn_dist_from_vbm = dn_states["energy"] - (self.vbm + self.vacuum_locpot)
         dn_dist_from_vbm = dn_dist_from_vbm.round(3)
         dn_occ = dn_states.loc[:, "n_occ_e"]
@@ -451,6 +475,7 @@ class DetermineDefectState:
                 }
             ]
         )
+
         # highest_level_from_cbm = (self.cbm + self.vacuum_locpot) - highest_level
         # lowest_level_from_vbm = lowest_level - (self.vbm + self.vacuum_locpot)
         # highest_occupied_level_from_cbm = (self.cbm + self.vacuum_locpot) - highest_occupied_level

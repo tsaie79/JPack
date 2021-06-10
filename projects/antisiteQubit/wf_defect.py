@@ -222,14 +222,14 @@ class DefectWF:
                 lpad.add_wf(wf)
 
     @classmethod
-    def MX2_anion_antisite(cls, defect_type="vacancies", category="vac_tmd", distort=0, add_irvsp_fw=True):
+    def MX2_anion_antisite(cls, defect_type="vacancies", category="vac_tmd", distort=0, add_irvsp_fw=False):
         # for analysis and plotting, use script in qubitPak/defect_formation_energy_correction
         lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/{}/my_launchpad.yaml".format(category))
         aexx = 0.25
 
         col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
-        # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
-        mx2s = col.find({"task_id":{"$in":[4238]}})
+        # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
+        mx2s = col.find({"task_id":{"$in":[3093, 3102]}})
         geo_spec = {5*5*3: [20]}
         for mx2 in mx2s:
             # pc = Structure.from_dict(mx2["structure"])
@@ -238,7 +238,7 @@ class DefectWF:
             cation, anion = find_cation_anion(pc)
             for idx, antisite in enumerate(range(len(defect[defect_type]))):
                 print(cation, anion)
-                if "vac_2_{}".format(anion) not in defect[defect_type][antisite]["name"]:
+                if "vac_1_{}".format(anion) not in defect[defect_type][antisite]["name"]:
                     continue
                 for na, thicks in geo_spec.items():
                     sc_size = np.eye(3, dtype=int)*math.sqrt(na/3)
@@ -256,8 +256,8 @@ class DefectWF:
                         wf_antisite = get_wf_full_hse(
                             structure=antisite_st.defect_st,
                             charge_states=[-2, -2],
-                            gamma_only=[(0,0,0)],#[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
-                            gamma_mesh=False,
+                            gamma_only=None, #[(0,0,0)],#[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
+                            gamma_mesh=True,
                             nupdowns=[0, 2],
                             task="hse_relax-hse_scf",
                             vasptodb={"category": category, "NN": antisite_st.NN,
@@ -273,7 +273,12 @@ class DefectWF:
                                 fw_irvsp = IrvspFW(
                                     structure=antisite_st.defect_st,
                                     parents=fws[i+1],
-                                    additional_fields={"spg_pymatgen": SpacegroupAnalyzer(antisite_st.defect_st).get_space_group_symbol()},
+                                    irvsptodb_kwargs={
+                                        "additional_fields":
+                                            {
+                                                "spg_pymatgen": SpacegroupAnalyzer(antisite_st.defect_st).get_space_group_symbol()
+                                            }
+                                },
 
                                 )
                                 fws.append(fw_irvsp)
@@ -293,13 +298,13 @@ class DefectWF:
 
                         wf_antisite = add_modify_incar(
                             wf_antisite,
-                            {"incar_update":{"AEXX": aexx, "ENCUT":320}},
+                            {"incar_update":{"AEXX": aexx}},
                         )
                         wf_antisite = add_modify_incar(wf_antisite)
                         wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="HSE_scf")
                         wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="HSE_relax")
                         # related to directory
-                        wf_antisite = set_execution_options(wf_antisite, category=category, fworker_name="nersc")
+                        wf_antisite = set_execution_options(wf_antisite, category=category, fworker_name="owls")
                         wf_antisite = preserve_fworker(wf_antisite)
 
                         wf = add_additional_fields_to_taskdocs(
@@ -316,7 +321,7 @@ class DefectWF:
                         #     "/home/jengyuantsai/Research/projects/single_photon_emitter/standard_defect",
                         #     fw_name_constraint="HSE_scf",
                         # )
-                        lpad.add_wf(wf)
+                        # lpad.add_wf(wf)
 
     @classmethod
     def defct_static(cls):
@@ -449,14 +454,14 @@ class DefectWF:
 
             col = VaspCalcDb.from_db_file("/home/tug03990/config/category/mx2_antisite_pc/db.json").collection
             # 4229: S-W, 4239: Se-W, 4236: Te-W, 4237:Mo-S, 4238: Mo-Se, 4235:Mo-Te
-            mx2s = col.find({"task_id":{"$in":[4229]}})
+            mx2s = col.find({"task_id":{"$in":[4239]}})
             geo_spec = {5*5*3: [20]}
             for mx2 in mx2s:
                 # pc = Structure.from_dict(mx2["structure"])
                 pc = Structure.from_dict(mx2["output"]["structure"])
                 defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
                 cation, anion = find_cation_anion(pc)
-                defect_type = "vacancies"
+                defect_type = "substitutions"
                 for idx, antisite in enumerate(range(len(defect[defect_type]))):
                     print(cation, anion)
                     # if "{}_on_{}".format(cation, anion) not in defect["substitutions"][antisite]["name"]:
@@ -495,7 +500,7 @@ class DefectWF:
 
                                 wf_antisite = add_modify_incar(
                                     wf_antisite,
-                                    {"incar_update":{"AEXX": aexx, "ENCUT":320, "LWAVE": False}},
+                                    {"incar_update":{"AEXX": aexx, "LWAVE": False}},
                                 )
                                 wf_antisite = add_modify_incar(wf_antisite)
                                 wf_antisite = set_queue_options(wf_antisite, "24:00:00", fw_name_constraint="HSE_scf")
@@ -504,7 +509,7 @@ class DefectWF:
                                 wf_antisite = set_execution_options(wf_antisite, category=category)
                                 wf_antisite = preserve_fworker(wf_antisite)
                                 return wf_antisite
-                            lpad.add_wf(defect_wf())
+                            # lpad.add_wf(defect_wf())
 
                             # +++++++++++++++++++++bulk formation energy part+++++++++++++++++++++++++++++++++++
                             def bulk_wf():
@@ -514,7 +519,6 @@ class DefectWF:
                                     natom=na,
                                     vacuum_thickness=thick,
                                     sub_on_side=None,
-                                    move_origin=False
                                 )
 
                                 wf_bulk = get_wf_full_hse(
@@ -531,15 +535,15 @@ class DefectWF:
 
                                 wf_bulk = add_modify_incar(
                                     wf_bulk,
-                                    {"incar_update":{"AEXX": aexx, "ENCUT":320, "LWAVE": False}},
+                                    {"incar_update":{"AEXX": aexx, "LWAVE": False}},
                                 )
                                 wf_bulk = add_modify_incar(wf_bulk)
                                 wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_scf")
                                 wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_relax")
-                                wf_bulk = set_execution_options(wf_bulk, category=category)
+                                wf_bulk = set_execution_options(wf_bulk, category=category, fworker_name="efrc")
                                 wf_bulk = preserve_fworker(wf_bulk)
                                 return wf_bulk
-                            # lpad.add_wf(bulk_wf())
+                            lpad.add_wf(bulk_wf())
 
                             #+++++++++++++++++++++ bulk VBM++++++++++++++++++++++++++++++++++++++++++++++++++++
                             def vbm_wf():
@@ -549,7 +553,6 @@ class DefectWF:
                                     natom=na,
                                     vacuum_thickness=thick,
                                     sub_on_side=None,
-                                    move_origin=False
                                 )
 
                                 wf_bulk_vbm = get_wf_full_hse(
@@ -566,7 +569,7 @@ class DefectWF:
 
                                 wf_bulk_vbm = add_modify_incar(
                                     wf_bulk_vbm,
-                                    {"incar_update":{"AEXX": aexx, "ENCUT":320, "LWAVE": False}},
+                                    {"incar_update":{"AEXX": aexx,"LWAVE": False}},
                                 )
                                 wf_bulk_vbm = add_modify_incar(wf_bulk_vbm)
                                 wf_bulk_vbm = set_queue_options(wf_bulk_vbm, "24:00:00", fw_name_constraint="HSE_scf")
@@ -1350,9 +1353,9 @@ class FormationEnergy:
 
         category = "formation_energy"
         lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/{}/my_launchpad.yaml".format(category))
-        for mp_id in ["mp-96", "mp-91"]:
+        for mp_id in ["mp-570481"]:
             with MPRester() as mp:
-                st = mp.get_structure_by_material_id(mp_id)
+                st = mp.get_structure_by_material_id(mp_id, conventional_unit_cell=True)
                 print(st)
                 wf = get_wf_full_hse(
                     structure=st,
@@ -1360,7 +1363,7 @@ class FormationEnergy:
                     gamma_only=None,
                     gamma_mesh=True,
                     nupdowns=[-1],
-                    task="hse_relax-hse_scf",
+                    task="hse_scf",
                     vasptodb={"category": category, "mp_id": mp_id},
                     wf_addition_name="",
                     task_arg={"parse_dos": False}
@@ -1374,7 +1377,7 @@ class FormationEnergy:
                 # wf = set_queue_options(wf, "00:30:00", fw_name_constraint="HSE_scf")
                 # wf = set_queue_options(wf, "00:30:00", fw_name_constraint="HSE_relax")
                 # related to directory
-                wf = set_execution_options(wf, category=category, fworker_name="nersc")
+                wf = set_execution_options(wf, category=category, fworker_name="efrc")
                 wf = preserve_fworker(wf)
                 lpad.add_wf(wf)
 
@@ -1404,82 +1407,194 @@ class FormationEnergy:
         return dentry
 
     @classmethod
-    def account_chemical_pot(cls):
-        from pymatgen.analysis.phase_diagram import PhaseDiagram
-        from pymatgen.analysis.defects.thermodynamics import DefectPhaseDiagram
-        from pymatgen.ext.matproj import MPRester
-        dentry = FormationEnergy.calc_Ef()
-        red_comp = dentry.bulk_structure.composition.reduced_composition
-        elt_set = list(dentry.bulk_structure.symbol_set)
-        print(elt_set, red_comp)
-        with MPRester() as mp:
-            pd_ents = mp.get_entries_in_chemsys(elt_set)
+    def formation(cls, type):
+        import pandas as pd
+        col = get_db("antisiteQubit", "formation_energy").collection
+        mx2_en = col.find_one({"task_id":767})["output"]["energy"]
+        m_en = col.find_one({"task_id":760})["output"]["energy"]
+        m_num_sites = col.find_one({"task_id":760})["nsites"]
+        x_en = col.find_one({"task_id":763})["output"]["energy"]
+        x_num_sites = col.find_one({"task_id":763})["nsites"]
 
-        pd = PhaseDiagram(pd_ents)
-        print(pd)
-        cp_dict = pd.get_all_chempots(red_comp)
+        host_form_en = mx2_en/75*3 - m_en/m_num_sites - 2*x_en/x_num_sites
+        print(type)
+        print("host Ef:{:.3f}".format(host_form_en))
 
-        print('\nResulting chemical potentials:')
-        for k,v in cp_dict.items():
-            print("\t{}: {}".format(k,v))
+        def chempots(type=type):
+            m_chempot, x_chempot= None, None
+            if type == "M_rich":
+                m_chempot = m_en/m_num_sites
+                x_chempot = x_en/x_num_sites + 0.5*host_form_en
+            else:
+                x_chempot = x_en/x_num_sites
+                m_chempot = m_en/m_num_sites + host_form_en
+            return m_chempot, x_chempot
 
-        # get formation energy at the valence band minimum, given a dictionary of chemical potentials
+        def W_S():
+            defect_form_en = col.find_one({"task_id": 771})["output"]["energy"] - mx2_en - (chempots()[0] - chempots()[1])
+            return {"type": type, "defect": "W_S", "Ef": defect_form_en}
 
-        for region, cps in cp_dict.items():
-            form_en = dentry.formation_energy( chemical_potentials=cps, fermi_level=0)
-            print("At the VBM, for chemical potentials given by {}"
-                  "\n\t{} chg {} formation energy is {}".format(region, dentry.name, dentry.charge, form_en))
+        def S_W():
+            defect_form_en = col.find_one({"task_id": 768})["output"]["energy"] - mx2_en - (chempots()[1] - chempots()[0])
+            return {"type": type, "defect": "S_W", "Ef": defect_form_en}
+
+        def V_W():
+            defect_form_en = col.find_one({"task_id": 762})["output"]["energy"] - mx2_en + chempots()[0]
+            return {"type": type, "defect": "V_W", "Ef": defect_form_en}
+
+        def V_S():
+            defect_form_en = col.find_one({"task_id": 770})["output"]["energy"] - mx2_en + chempots()[1]
+            # print(col.find_one({"task_id": 720})["output"]["energy"]/75*3 - mx2_en/75*3)
+            # print(col.find_one({"task_id": 720})["output"]["energy"] - mx2_en)
+            return {"type": type, "defect": "V_S", "Ef": defect_form_en}
+
+        df = pd.DataFrame([W_S(), S_W(), V_W(), V_S()])
+        df.to_clipboard()
+        print(df)
+
+class COHP:
+    @classmethod
+    def wf(cls):
+        from atomate.vasp.fireworks.lobster import LobsterFW
+        from qubitPack.tool_box import get_db
+        from fireworks import LaunchPad, Workflow
+        category = "cohp"
+        source_static_tk_id = 786
+        static = get_db("antisiteQubit", "move_z", port=12345)
+        static = static.collection.find_one({"task_id": source_static_tk_id})
+        static_path = static["calcs_reversed"][0]["dir_name"]
+        fw = LobsterFW(structure=Structure.from_dict(static["input"]["structure"]), prev_calc_dir=static_path)
+        wf = Workflow([fw], name=fw.name)
+        wf = add_modify_incar(wf)
+        wf = set_execution_options(wf, category=category, fworker_name="owls")
+        wf = preserve_fworker(wf)
+        print(wf)
+        LPAD = LaunchPad.from_file(
+            os.path.expanduser(os.path.join("~", "config/project/antisiteQubit/{}/"
+                                                 "my_launchpad.yaml".format(category))))
+
+        LPAD.add_wf(wf)
 
     @classmethod
-    def test(cls):
-        from pymatgen.analysis.phase_diagram import PhaseDiagram, PDPlotter, Composition
-        from pymatgen.ext.matproj import MPRester
-        from pymatgen.analysis.defects.thermodynamics import DefectPhaseDiagram
-        from pycdt.core.chemical_potentials import get_mp_chempots_from_dpd
-
-        dentry = FormationEnergy.calc_Ef()
-        dpd = DefectPhaseDiagram([dentry], dentry.parameters["vbm"], dentry.parameters["band_gap"])
-        print('Finished charges:')
-        for k, v in dpd.finished_charges.items():
-            print('\t{}: {}'.format( k, v))
-        print('\nSTABLE charges (and transition levels):')
-        for k, v in dpd.stable_charges.items():
-            print('\t{}: {}\t(t.l.: {} ) '.format( k, v,
-                                                   dpd.transition_levels[k]))
-
-        cp = get_mp_chempots_from_dpd(dpd)
-        print("Chemical potentials determined!")
-        for k,v in cp.items():
-            print("\tFacet {}, has {}".format( k, v))
-
-        p = dpd.plot(cp, ylim=None, ax_fontsize=1.3, fermi_level = None)
-        p.show()
-
-    @classmethod
-    def test2(cls):
-        from pymatgen.analysis.phase_diagram import PhaseDiagram, Composition
-        from pymatgen.analysis.defects.thermodynamics import DefectPhaseDiagram
-        from pymatgen.ext.matproj import MPRester
-        with MPRester() as mp:
-            pd_ents = mp.get_entries_in_chemsys(["Mo", "S"])
-
-        pd = PhaseDiagram(pd_ents)
-        for p in pd_ents:
-            if p.name == "MoS2":
-                print(p.name, p.energy_per_atom, p.entry_id, pd.get_form_energy_per_atom(p), pd.get_e_above_hull(p))
-        cp_dict = pd.get_all_chempots(Composition("MoS2"))
-
-        print('\nResulting chemical potentials:')
-        for k,v in cp_dict.items():
-            print("\t{}: {}".format(k,v))
+    def analysis(cls):
+        from pymatgen.electronic_structure.cohp import CompleteCohp
+        from pymatgen.electronic_structure.plotter import CohpPlotter
+        from pymatgen.electronic_structure.core import Orbital
+        import os
+        main_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/cohp/"
+        main_path += "launcher_2021-05-25-21-22-33-177425" #"WTe2" -0.402076
+        # main_path += "launcher_2021-05-25-21-13-08-771930" #"WS2" -2.023164
+        # main_path += "launcher_2021-05-26-15-51-50-934362" #V_S in WS2
+        # main_path += "launcher_2021-06-02-19-57-42-192796" #W_S -0.5; EF= -1.403767
+        # main_path += "launcher_2021-06-02-19-57-49-331235" #W_Te 0.5
 
 
+        os.chdir(main_path)
+        # completecohp = CompleteCohp.from_file(fmt="LOBSTER", filename="COHPCAR.lobster", structure_file="POSCAR")
+        completecohp = CompleteCohp.from_file(fmt="LOBSTER", filename="COOPCAR.lobster.gz", structure_file="POSCAR", are_coops=True)
+        completecohp.efermi = -0.402076
+        def summed(lobster_list, plot_label):
+            labelist = lobster_list #["929", "961", "967"]
+            cp = CohpPlotter(are_coops=True)
+            # get a nicer plot label
+            plotlabel = plot_label #"W75-W50+W55+W56 bonds"
 
+            cp.add_cohp(plotlabel, completecohp.get_summed_cohp_by_label_list(
+                label_list=labelist, divisor=1))
+            x = cp.get_plot(integrated=False)
+            x.ylim([-5, 5])
+            x.show()
+
+        def orbital_resolved(label, orbitals):
+            #search for the number of the COHP you would like to plot in ICOHPLIST.lobster (the numbers in COHPCAR.lobster are different!)
+            label = str(label)
+            cp = CohpPlotter()
+            #get a nicer plot label
+            plotlabel=str(completecohp.bonds[label]['sites'][0].species_string)+'-'+str(completecohp.bonds[label]['sites'][1].species_string+"{}".format(orbitals))
+
+            cp.add_cohp(plotlabel,completecohp.get_orbital_resolved_cohp(label=label, orbitals=orbitals))
+            #check which COHP you are plotting
+
+            print("This is a COHP between the following sites: "+str(completecohp.bonds[label]['sites'][0])+' and '+ str(completecohp.bonds[label]['sites'][1]))
+
+            x = cp.get_plot(integrated=False)
+            x.ylim([-5, 5])
+            x.show()
+
+        def sum_lobster_orbitals(lobster_list, orbitals, plot_label):
+            cp = CohpPlotter()
+            #"W75-W50+W55+W56 bonds"
+            cp.add_cohp(plot_label, completecohp.get_summed_cohp_by_label_and_orbital_list(lobster_list, orbitals))
+            x = cp.get_plot(integrated=False)
+            x.ylim([-5, 5])
+            x.show()
+
+        # summed([str(i) for i in [13, 184, 215]], "W26-W1+W6+W7") #WS2
+        summed([str(i) for i in [929, 961, 967]], "W75-W50+W55+W56") #WTe2
+        # summed([str(i) for i in [3, 4, 173]], "W1+W6+W7") #Vs in WS2
+        # orbital_resolved(13, orbitals=[[5, Orbital.dxy], [5, Orbital.dz2]])
+        # antisite_o = [5, Orbital.dz2]
+        # for o in [[5, Orbital.dx2], [5, Orbital.dxy], [5, Orbital.dz2], [5, Orbital.dxz], [5, Orbital.dyz]]:
+        #     sum_lobster_orbitals([str(i) for i in [929, 961, 967]], [[o, antisite_o],
+        #                                                             [o, antisite_o],
+        #                                                             [o, antisite_o]], "{}-{}".format(o[1].name, antisite_o[1].name))
+class MoveZ:
+    def __init__(self):
+        self.db = get_db("antisiteQubit", "move_z")
+        self.ws2 = [
+            {"a1": 317, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": 0.1, "chemsys": "S-W"},
+            {"a1": 317, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": 0, "chemsys": "S-W"},
+            {"a1": 315, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": -0.1, "chemsys": "S-W"},
+            {"a1": 315, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": -0.2, "chemsys": "S-W"},
+            {"a1": 315, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": -0.25, "chemsys": "S-W"},
+            {"a1": 327, "a1e": 329, "e1": 313, "e2": 314, "e2e": 330, "e1e": 328, "dz": -0.3, "chemsys": "S-W"},
+            {"a1": 327, "a1e": 328, "e1": 313, "e2": 314, "e2e": 330, "e1e": 329, "dz": -0.4, "chemsys": "S-W"},
+            {"a1": 327, "a1e": 328, "e1": 313, "e2": 315, "e2e": 330, "e1e": 329, "dz": -0.5, "chemsys": "S-W"},
+            {"a1": 327, "a1e": 328, "e1": 313, "e2": 315, "e2e": 330, "e1e": 329, "dz": -0.75, "chemsys": "S-W"},
+        ]
+        self.wte2 = [
+            {"a1": 310, "a1e": 328, "e1": 258, "e2": 259, "e2e": 330, "e1e": 329, "dz": -0.1, "chemsys": "Te-W"},
+            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0, "chemsys": "Te-W"},
+            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.1, "chemsys": "Te-W"},
+            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.2, "chemsys": "Te-W"},
+            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.3, "chemsys": "Te-W"},
+            {"a1": 310, "a1e": 328, "e1": 269, "e2": 271, "e2e": 330, "e1e": 329, "dz": 0.4, "chemsys": "Te-W"},
+            {"a1": 302, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": 0.5, "chemsys": "Te-W"},
+        ]
+    def get_sheet(self):
+        import pandas as pd
+        from matplotlib import pyplot as plt
+        data = []
+        for eigv in self.ws2:
+            e = self.db.collection.find_one({"chemsys": eigv["chemsys"], "dz": eigv["dz"]})
+            locpot = max(e["calcs_reversed"][0]["output"]["locpot"]["2"])
+            locpot = 0
+            eig = self.db.get_eigenvals(e["task_id"])
+            eig_a1e = eig["1"][0][eigv["a1e"]][0]-locpot
+            eig_e1e = eig["1"][0][eigv["e1e"]][0]-locpot
+            eig_e2e = eig["1"][0][eigv["e2e"]][0]-locpot
+            eig_a1 = eig["1"][0][eigv["a1"]][0]-locpot
+            eig_e2 = eig["1"][0][eigv["e2"]][0]-locpot
+            eig_e1 = eig["1"][0][eigv["e1"]][0]-locpot
+            data.append({"dz": eigv["dz"], "a1*":eig_a1e, "e1*":eig_e1e, "e2*": eig_e2e, "e1":eig_e1, "e2":eig_e2, "a1":eig_a1,
+                         "a1_band": eigv["a1"], "a1e_band":eigv["a1e"], "e1_band":eigv["e1"], "e2_band":eigv["e2"], "e1e_band":eigv["e1e"],
+                         "e2e_band": eigv["e2e"]
+                         })
+        df = pd.DataFrame(data).sort_values("dz")
+        df.to_clipboard("\t")
+        df = df.loc[:, ["dz", "a1", "a1*", "e1", "e1*", "e2", "e2*"]]
+        fig = plt.figure(dpi=280)
+        df.plot("dz", style=["r*-", "ro-", "b*--", "bo--", "b*-", "bo-"], ax=plt.gca())
+        plt.xlabel("displacement in z-direction (Å)")
+        plt.ylabel("level energy relative to vacuum (eV)")
+        plt.legend(loc="upper center", frameon=True, ncol=6, bbox_to_anchor=(0.5, 1.1))
+        plt.show()
 
 def main():
-    DefectWF.MX2_anion_antisite()
-    # FormationEnergy.comp_wf()
-
+    # DefectWF.MX2_formation_energy()
+    # FormationEnergy.formation("M_rich")
+    MoveZ().get_sheet()
+    # COHP.analysis()
 
 if __name__ == '__main__':
     main()

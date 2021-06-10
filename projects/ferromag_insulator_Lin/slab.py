@@ -179,14 +179,15 @@ from mpinterfaces.utils import *
 from mpinterfaces.old_transformations import generate_all_configs
 
 # os.chdir("/Users/jeng-yuantsai/Research/code/JPack/projects/ferromag_insulator_Lin/tci_slab_nonhex/C2-m/")
-os.chdir('/Users/jeng-yuantsai/Research/code/JPack/projects/ferromag_insulator_Lin/ti_slab_hex/graphite')
+# os.chdir('/Users/jeng-yuantsai/Research/code/JPack/projects/ferromag_insulator_Lin/ti_slab_hex/graphite')
+os.chdir("/Users/jeng-yuantsai/Research/code/JPack/projects/ferromag_insulator_Lin/tci_slab_nonhex/C2-m/sns")
 
 separation = 3  # in angstroms
 nlayers_2d = 1
 nlayers_substrate = 1
 
-substrate_bulk = Structure.from_file("t.vasp")
-st = Structure.from_file("t.vasp")
+substrate_bulk = Structure.from_file("s.vasp")
+st = Structure.from_file("s.vasp")
 # substrate_bulk = get_struct_from_mp('Ag')
 sa_sub = SpacegroupAnalyzer(substrate_bulk)
 # substrate_bulk = sa_sub.get_conventional_standard_structure()

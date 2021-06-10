@@ -78,7 +78,7 @@ for tk_id, n, m in zip([12,13,14], ["hollow", "top", "bridge"], range(3)):
     ax.set_title(n)
 plt.show()
 #%%
-from pymatgen.electronic_structure.cohp import  CompleteCohp
+from pymatgen.electronic_structure.cohp import CompleteCohp
 os.chdir('/Users/jeng-yuantsai/Research/project/co2_hydrogenation/figures/cohp')
 
 hollow, bridge, top = "tkid_18_hollow", "tkid_20_bridge", "tkid_19_top"

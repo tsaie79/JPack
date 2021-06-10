@@ -42,7 +42,7 @@ LPAD = LaunchPad.from_file(
                                          "my_launchpad.yaml".format(category))))
 
 LPAD.add_wf(wf)
-#%%
+#%% Triplet
 from projects.single_photon.wf import Defect
 from fireworks import LaunchPad
 from atomate.vasp.powerups import *
@@ -54,10 +54,10 @@ import os
 # now, saxis=110
 category = "soc_excited_state"
 for i,j, ir in zip(["656*1 1*1 1*0 1*0 1*1 1*0 1*0 138*0", "656*1 1*0 1*1 1*1 1*0 1*0 1*0 138*0",
-                    "656*1 1*1 1*0 1*1 1*0 1*0 1*0 138*0"],
-               ["100100", "011000", "101000"], ["g3", "g1", "g2"]):
+                    "656*1 1*1 1*0 1*1 1*0 1*0 1*0 138*0", "656*1 1*0 1*1 1*0 1*1 1*0 1*0 138*0"],
+               ["100100", "011000", "101000", "010100"], ["g3", "g1", "g2", "g1"]):
     wf = Defect.soc_cdft(
-        "C",
+        "B",
         399,
         800,
         i,
@@ -68,6 +68,38 @@ for i,j, ir in zip(["656*1 1*1 1*0 1*0 1*1 1*0 1*0 138*0", "656*1 1*0 1*1 1*1 1*
     )
     wf.name = wf.name+":ea:{}:{}".format(j, ir)
     wf = add_modify_incar(wf, {"incar_update":{"LMAXMIX":4, "ENCUT":320}})
+    wf = clear_to_db(wf)
+    wf = add_additional_fields_to_taskdocs(wf, {"excite_config": j, "ks_config": "ea", "ir_c3":ir, "PS":"ZPL"})
+    LPAD = LaunchPad.from_file(
+        os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
+                                             "my_launchpad.yaml".format(category))))
+    LPAD.add_wf(wf)
+#%% Triplet testing
+from projects.single_photon.wf import Defect
+from fireworks import LaunchPad
+from atomate.vasp.powerups import *
+from atomate.vasp.jpowerups import *
+from qubitPack.tool_box import get_db
+from pymatgen import Structure
+from pymatgen.io.vasp.inputs import Poscar
+import os
+# now, saxis=110
+category = "soc_excited_state"
+for i,j, ir in zip(["656*1 1*0.5 1*0.5 1*1 1*0 1*0 1*0 138*0", "656*1 1*0.5 1*0.5 1*0 1*1 1*0 1*0 138*0"],
+                   ["551000", "550100"], ["g6", "g5"]):
+    wf = Defect.soc_cdft(
+        "B",
+        399,
+        800,
+        i,
+        None,
+        None,
+        secondary=False,
+        category=category,
+    )
+    wf.name = "ea:{}:{}:".format(j, ir)+wf.name
+    wf = add_modify_incar(wf, {"incar_update":{"LMAXMIX":4, "ENCUT":320}})
+    wf = clear_to_db(wf)
     wf = add_additional_fields_to_taskdocs(wf, {"excite_config": j, "ks_config": "ea", "ir_c3":ir, "PS":"ZPL"})
     LPAD = LaunchPad.from_file(
         os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"

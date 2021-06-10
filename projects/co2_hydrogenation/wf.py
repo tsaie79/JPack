@@ -77,7 +77,7 @@ for tkid, name, n in zip([12,13,14], ["hollow", "top", "bridge"], range(3)):
     )
     dipole = {"LDIPOL": True, "IDIPOL": 3, "DIPOL": center_of_mass}
     uis = dipole.copy()
-    uis.updarlsqte({"ENCUT":500})
+    uis.update({"ENCUT":500})
 
     wf = get_wf_lobster(st, user_incar_settings=uis)
     wf.name = "{}:{}:".format(st.formula, name)+wf.name

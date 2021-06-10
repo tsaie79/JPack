@@ -1,4 +1,6 @@
 #%% IMPORT
+import math
+
 from fireworks import LaunchPad, Workflow
 
 from atomate.vasp.database import VaspCalcDb
@@ -16,6 +18,7 @@ from atomate.vasp.powerups import (
 from atomate.vasp.jpowerups import *
 
 from pymatgen import Structure
+from pymatgen.io.vasp.inputs import Kpoints
 from pymatgen.io.vasp.sets import MPScanRelaxSet, MPRelaxSet
 
 from pycdt.core.defectsmaker import ChargedDefectsStructures
@@ -73,13 +76,14 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
 
     mx2s = col.find(
         {
-            "nsites": 8
+            "nsites": 2,
+            "chemsys": "B-N"
         }
     )
     geo_spec = None
     aexx = 0.25
     test = []
-    for mx2 in mx2s[14:34]:
+    for mx2 in mx2s[:]: #mx2s[14:34]
         pc = Structure.from_dict(mx2["output"]["structure"])
         cat = None
 
@@ -100,6 +104,16 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
         if mx2["nsites"] == 8:
             geo_spec = {25*8: [20]}
             cat += "AB3"
+        cat = "binary_defect"
+
+        while True:
+            sc = pc.copy()
+            sc.make_supercell([math.sqrt(list(geo_spec.keys())[0]/mx2["nsites"]),
+                               math.sqrt(list(geo_spec.keys())[0]/mx2["nsites"]), 1])
+            auto_kpt = Kpoints.automatic_density_by_vol(sc, 64, force_gamma=True)
+            if auto_kpt.kpts[0] == [1, 1, 1]:
+                break
+            geo_spec = {mx2["nsites"]*(math.sqrt(list(geo_spec.keys())[0]/mx2["nsites"])+1)**2: [20]}
 
         lpad = LaunchPad.from_file(
             os.path.join(
@@ -171,25 +185,31 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
                                     category=cat,
                                 )
 
-                                def kpoints(kpts):
-                                    kpoints_kwarg = {
-                                        'comment': "Jcustom",
-                                        "style": "G",
-                                        "num_kpts": 0,
-                                        'kpts': [kpts],
-                                        'kpts_weights': None,
-                                        'kpts_shift': (0, 0, 0),
-                                        'coord_type': None,
-                                        'labels': None,
-                                        'tet_number': 0,
-                                        'tet_weight': 0,
-                                        'tet_connections': None
-                                    }
-                                    return kpoints_kwarg
+                                from pytopomat.workflows.fireworks import IrvspFW
+                                from pymatgen.analysis.structure_analyzer import SpacegroupAnalyzer
+                                fws = wf.fws
+                                fw_irvsp = IrvspFW(
+                                    structure=gen_defect.defect_st,
+                                    parents=fws[-1],
+                                    irvsptodb_kwargs={
+                                        "additional_fields":
+                                            {
+                                                "spg_pymatgen": SpacegroupAnalyzer(gen_defect.defect_st).get_space_group_symbol()
+                                            }
+                                    },
 
-                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "PBE_relax")
-                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_relax")
-                                # wf = add_modify_kpoints(wf, {"kpoints_update": kpoints([1,1,1])}, "HSE_scf")
+                                )
+                                fws.append(fw_irvsp)
+                                wf = Workflow(fws, name=wf.name)
+
+                                wf = add_modify_kpoints(wf, {
+                                    "kpoints_update": {
+                                    "style": "R",
+                                    "num_kpts": 2,
+                                    "kpts": [(0,0,0), (0,0,0)],
+                                    "kpts_weights": [1, 0],
+                                    "labels": [None, "\Gamma"]}}, fw_name_constraint="SCAN_scf")
+
                                 wf = add_additional_fields_to_taskdocs(
                                     wf,
                                     {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
@@ -208,13 +228,14 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
                                 wf = preserve_fworker(wf)
                                 wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
                                 # task_name_constraint=x meaning after x do powersup
-                                wf = scp_files(
-                                    wf,
-                                    "/home/jengyuantsai/Research/projects/defect_db",
-                                    fw_name_constraint="SCAN_scf",
-                                )
-                                wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
-                                                    fw_name_constraint="SCAN_scf")
+                                # wf = scp_files(
+                                #     wf,
+                                #     "/home/jengyuantsai/Research/projects/defect_db",
+                                #     fw_name_constraint="SCAN_scf",
+                                # )
+                                # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
+                                #                     fw_name_constraint="SCAN_scf")
+                                wf = clear_to_db(wf)
 
                                 print(wf)
                                 lpad.add_wf(wf)

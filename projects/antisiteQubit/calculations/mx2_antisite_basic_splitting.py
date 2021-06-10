@@ -71,8 +71,10 @@ class MovingZSplitting:
 
     @classmethod
     def plot(cls):
-        colors = ["powderblue", "deepskyblue", "red", "orange"]
+        # colors = ["powderblue", "deepskyblue", "red", "orange"]
         # colors = ["lightgreen", "limegreen", "red"]
+        colors = ["darkgray", "dimgray", "white", "None"]
+
         fig = plt.figure(figsize=(3,3))
         ax = fig.add_subplot(1, 1, 1)
 
@@ -164,7 +166,7 @@ class MovingZSplitting:
         # ax.legend()
 
         fig.show()
-        # fig.savefig('/Users/jeng-yuantsai/Research/qubit/plt/defect_state_configuration.eps', format="eps")
+        fig.savefig('/Users/jeng-yuantsai/Research/project/qubit/plt/in_paper/fig_1_c.eps', format="eps")
 
 MovingZSplitting.plot()
 

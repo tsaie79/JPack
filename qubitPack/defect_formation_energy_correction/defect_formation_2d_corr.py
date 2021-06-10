@@ -645,9 +645,9 @@ class FormationEnergy2D:
             print("==" * 50, "linear regression")
             # print("alpha:{}, beta:{}, IE0:{}, score:{}".format(regr.coef_[0], regr.coef_[1], regr.intercept_,
             #                                                    regr.score(X, y)))
-            return regr.intercept_, regr.coef_[0], regr
+            return regr.intercept_, regr.coef_[0], "{:.2%}".format(regr.score(X,y)), regr.predict,
 
-        fig, axes = plt.subplots(4,1,figsize=(5,10))
+        fig, axes = plt.subplots(4,1,figsize=(5,8))
         fig.subplots_adjust(hspace=1, wspace=1)
 
         areas = np.sort(pd_data.area.unique())
@@ -677,7 +677,7 @@ class FormationEnergy2D:
                     colors = dict(zip(areas, ["forestgreen", "dodgerblue", "darkorange"]))
                     axes[idx].plot(A_X, A_y, "o", color=colors[i], label=area[i])
                     axes[idx].plot(np.append(np.array([[0]]), A_X, axis=0),
-                                   A_result[-1].predict(np.append(np.array([[0]]), A_X, axis=0)), color=colors[i],
+                                   A_result[-1](np.append(np.array([[0]]), A_X, axis=0)), color=colors[i],
                                    linestyle="dotted")
                 except Exception as err:
                     print(err)
@@ -688,14 +688,14 @@ class FormationEnergy2D:
             tot_X = np.array([[1/math.sqrt(i["area"])] for i in IE_A_0])
             tot_y = np.array([[i["IE(A,0)"]] for i in IE_A_0])
             tot = linear_regression(tot_X, tot_y)
-            results.append({"charge": chg, "IE0": tot[0], "alpha": tot[1]})
+            results.append({"charge": chg, "IE0": tot[0], "alpha": tot[1], "Score":tot[2]})
             print(pd.DataFrame([{"IE(S,0)": v, "1/sqrt(A)": k} for k, v in zip(tot_X, tot_y)]))
-            print(tot[0], tot[1])
+            print("Intercept:{}, Slop:{}, Score:{}".format(tot[0], tot[1], tot[2]))
 
             # plot
             colors = ["forestgreen", "dodgerblue", "darkorange"]
             axes[idx+1].plot(np.append(np.array([[0]]), tot_X, axis=0),
-                             tot[-1].predict(np.append(np.array([[0]]), tot_X, axis=0)), linestyle="dotted", color="black")
+                             tot[-1](np.append(np.array([[0]]), tot_X, axis=0)), linestyle="dotted", color="black")
             for x, y, color in zip(tot_X, tot_y, colors):
                 axes[idx+1].plot(x, y, "o", color=color)
 
@@ -703,7 +703,7 @@ class FormationEnergy2D:
             axes[idx].set_ylabel(r"$\mathrm{IE(S, L_z)\;(eV)}$")
             axes[idx].xaxis.set_minor_locator(AutoMinorLocator())
             axes[idx].yaxis.set_minor_locator(AutoMinorLocator())
-            axes[idx].legend(loc=2, ncol=2)
+            axes[idx].legend(loc=2, ncol=3)
 
             axes[idx+1].set_xlabel(r"$\mathrm{\frac{1}{\sqrt{S}}\;(\AA^{-1})}$")
             axes[idx+1].set_ylabel(r"$\mathrm{IE(S)\;(eV)}$")
@@ -796,6 +796,7 @@ def main():
             se_antisite = FormationEnergy2D(
                 bulk_db_files=[os.path.join(path, project, collection_name, "db.json")],
                 bulk_entry_filter={
+                    # "nsites": {"$ne":48},
                     "chemsys": compound,
                     "formula_anonymous": "AB2",
                     "calcs_reversed.run_type": "HSE06",
@@ -808,6 +809,7 @@ def main():
                 },
                 bk_vbm_bg_db_files=[os.path.join(path, project, collection_name, "db.json")],
                 bk_vbm_bg_filter={
+                    # "nsites": {"$ne":48},
                     "chemsys": compound,
                     "formula_anonymous": "AB2",
                     "calcs_reversed.run_type": "HSE06",
@@ -820,9 +822,10 @@ def main():
                 },
                 defect_db_files=[os.path.join(path, project, collection_name, "db.json")],
                 defect_entry_filter={
+                    # "nsites": {"$ne":48},
                     "charge_state": {"$in": [1, 0, -1]},
                     "chemsys": compound,
-                    "formula_anonymous": {"$in": ["A26B49", "A37B71", "A17B31"]},
+                    "formula_anonymous": {"$in": ["A26B49", "A37B71", "A17B31"]}, #"A17B31"
                     "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
                     "input.incar.NSW": 0,
                     "input.incar.LASPH": True,
@@ -844,8 +847,10 @@ def main():
         # print("$$"*50, "all")
         # print(pd.DataFrame(results))
 
-    regular_antisite("antisiteQubit", "W_S_Ef", ["S-W"])
-    # SP_Kpoints_antisite()
+    # regular_antisite("antisiteQubit", "W_Se_Ef_gamma", ["Se-W"])
+    regular_antisite("antisiteQubit", "Mo_Te_Ef_gamma", ["Mo-Te"])
+
+
 
 if __name__ == '__main__':
     main()
