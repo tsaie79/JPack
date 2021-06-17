@@ -10,7 +10,7 @@ from collections import Counter
 
 
 def get_defect_state(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboard="tot", locpot=None,
-                     threshold=0.1, locpot_c2db=None):
+                     threshold=0.1, locpot_c2db=None) -> object:
     """
     When one is using "db_cori_tasks_local", one must set ssh-tunnel as following:
     "ssh -f tsaie79@cori.nersc.gov -L 2222:mongodb07.nersc.gov:27017 -N mongo -u 2DmaterialQuantumComputing_admin -p
@@ -151,24 +151,27 @@ def get_defect_state(db, db_filter, cbm, vbm, path_save_fig, plot=True, clipboar
 if __name__ == '__main__':
     from qubitPack.tool_box import get_db
     # db = get_db("owls", 'mx2_antisite_basic_aexx0.25_final')
-    # db = get_db("single_photon_emitter", "standard_defect")
-    db = get_db("antisiteQubit", "move_z")
+    db = get_db("single_photon_emitter", "standard_defect")
+    # db = get_db("antisiteQubit", "move_z")
 
     c2db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="adminUser", password="qiminyan")
     tot, proj, d_df = get_defect_state(
         db,
-        {"dz": -0.3, "chemsys": "S-W"},
+        {"task_id": 266},
         1, -5,
         None,
-        False,
+        True,
         "proj",
         None, #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
-        0.1,
+        0.2,
         locpot_c2db=None #(c2db, "WTe2-MoS2-NM", 0)
     )
-    proj = proj.loc[[328, 329], [5, 6, 0, 25, "orbital", "spin", "adjacent", "antisite"]]
-    proj = proj.loc[proj["spin"] == "1"]
-    proj = proj.round(3)
-    print(proj)
-    proj.loc[proj["spin"] == "1", :].to_clipboard("\t")
+    # proj = proj.loc[[317, 325, 326], [5, 6, 0, 25, "orbital", "spin", "adjacent", "antisite"]]
+    # proj = proj.loc[(proj["spin"] == "1") & (proj["orbital"] == "dz2")]
+    # proj = proj.loc[(proj["spin"] == "1") & (proj["orbital"] == "dxy") & (proj.index < 328) & (315 < proj.index)]
+    # proj.sort_values(["adjacent", 25], inplace=True, ascending=False)
+    # proj = proj[25]
+    # proj = proj.round(3)
+    # print(proj)
+    # proj.loc[proj["spin"] == "1", :].to_clipboard("\t")
 

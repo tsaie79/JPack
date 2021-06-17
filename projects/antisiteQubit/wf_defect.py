@@ -1541,17 +1541,29 @@ class COHP:
 class MoveZ:
     def __init__(self):
         self.db = get_db("antisiteQubit", "move_z")
-        self.ws2 = [
-            {"a1": 317, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": 0.1, "chemsys": "S-W"},
-            {"a1": 317, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": 0, "chemsys": "S-W"},
-            {"a1": 315, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": -0.1, "chemsys": "S-W"},
-            {"a1": 315, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": -0.2, "chemsys": "S-W"},
-            {"a1": 315, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": -0.25, "chemsys": "S-W"},
-            {"a1": 327, "a1e": 329, "e1": 313, "e2": 314, "e2e": 330, "e1e": 328, "dz": -0.3, "chemsys": "S-W"},
-            {"a1": 327, "a1e": 328, "e1": 313, "e2": 314, "e2e": 330, "e1e": 329, "dz": -0.4, "chemsys": "S-W"},
-            {"a1": 327, "a1e": 328, "e1": 313, "e2": 315, "e2e": 330, "e1e": 329, "dz": -0.5, "chemsys": "S-W"},
-            {"a1": 327, "a1e": 328, "e1": 313, "e2": 315, "e2e": 330, "e1e": 329, "dz": -0.75, "chemsys": "S-W"},
+        # self.ws2 = [
+        #     {"a1": 317, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0.1, "chemsys": "S-W"},
+        #     {"a1": 317, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0, "chemsys": "S-W"},
+        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.1, "chemsys": "S-W"},
+        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.2, "chemsys": "S-W"},
+        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.25, "chemsys": "S-W"},
+        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.275, "chemsys": "S-W"},
+        #     {"a1": 327, "e1": 313, "e2": 314, "a1e": 329, "e2e": 330, "e1e": 328, "dz": -0.3, "chemsys": "S-W"},
+        #     {"a1": 327, "e1": 313, "e2": 314, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.4, "chemsys": "S-W"},
+        #     {"a1": 327, "e1": 313, "e2": 315, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.5, "chemsys": "S-W"},
+        # ]
+
+        self.charged_ws2 = [
+            {"a1": 316, "e1": 319, "e2": 320, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0.1, "chemsys": "S-W"},
+            {"a1": 315, "e1": 319, "e2": 320, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0, "chemsys": "S-W"},
+            {"a1": 315, "e1": 319, "e2": 320, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.1, "chemsys": "S-W"},
+            {"a1": 315, "e1": 319, "e2": 320, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.2, "chemsys": "S-W"},
+            {"a1": 315, "e1": 316, "e2": 317, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.25, "chemsys": "S-W"},
+            {"a1": 309, "e1": 307, "e2": 308, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.3, "chemsys": "S-W"},
+            {"a1": 309, "e1": 307, "e2": 308, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.4, "chemsys": "S-W"},
+            # {"a1": 327, "a1e": 328, "e1": 313, "e2": 315, "e2e": 330, "e1e": 329, "dz": -0.5, "chemsys": "S-W"},
         ]
+
         self.wte2 = [
             {"a1": 310, "a1e": 328, "e1": 258, "e2": 259, "e2e": 330, "e1e": 329, "dz": -0.1, "chemsys": "Te-W"},
             {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0, "chemsys": "Te-W"},
@@ -1565,10 +1577,9 @@ class MoveZ:
         import pandas as pd
         from matplotlib import pyplot as plt
         data = []
-        for eigv in self.ws2:
-            e = self.db.collection.find_one({"chemsys": eigv["chemsys"], "dz": eigv["dz"]})
+        for eigv in self.charged_ws2:
+            e = self.db.collection.find_one({"chemsys": eigv["chemsys"], "dz": eigv["dz"], "charge_state":-1})
             locpot = max(e["calcs_reversed"][0]["output"]["locpot"]["2"])
-            locpot = 0
             eig = self.db.get_eigenvals(e["task_id"])
             eig_a1e = eig["1"][0][eigv["a1e"]][0]-locpot
             eig_e1e = eig["1"][0][eigv["e1e"]][0]-locpot

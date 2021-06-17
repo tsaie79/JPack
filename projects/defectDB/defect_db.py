@@ -1,10 +1,6 @@
 #%% IMPORT
-import math
-
 from fireworks import LaunchPad, Workflow
 
-from atomate.vasp.database import VaspCalcDb
-from atomate.vasp.workflows.jcustom.wf_full import get_wf_full_scan
 from atomate.vasp.fireworks.core import ScanOptimizeFW
 from atomate.vasp.powerups import (
     add_additional_fields_to_taskdocs,
@@ -13,290 +9,23 @@ from atomate.vasp.powerups import (
     set_queue_options,
     set_execution_options,
     clean_up_files,
-    add_modify_kpoints
 )
-from atomate.vasp.jpowerups import *
 
-from pymatgen import Structure
+from my_atomate_jyt.vasp.powerups import *
+from my_atomate_jyt.vasp.workflows.wf_full import get_wf_full_scan
+
 from pymatgen.io.vasp.inputs import Kpoints
-from pymatgen.io.vasp.sets import MPScanRelaxSet, MPRelaxSet
+from pymatgen.io.vasp.sets import MPRelaxSet
 
-from pycdt.core.defectsmaker import ChargedDefectsStructures
 
 from qubitPack.tool_box import *
+
+from mpinterfaces.utils import *
 
 from monty.serialization import loadfn
 import os
 import pandas as pd
 
-
-#%%
-def relax_pc():
-    lpad = LaunchPad.from_file(os.path.expanduser(
-        os.path.join("~", "config/project/symBaseBinaryQubit/scan_relax_pc/my_launchpad.yaml")))
-
-    mx2s = loadfn(os.path.expanduser(os.path.join("~", "config/project/symBaseBinaryQubit/"
-                  "scan_relax_pc/gap_gt1-binary-NM.json")))
-
-    for mx2 in mx2s:
-        # if mx2["irreps"] and mx2["formula"] == "Rh2Br6" and mx2["spacegroup"] == "P3":
-        if mx2["formula"] == "BN":
-            pc = mx2["structure"]
-            pc = modify_vacuum(pc, 30)
-            scan_opt = ScanOptimizeFW(structure=pc, name="SCAN_relax")
-            wf = Workflow([scan_opt], name="{}:SCAN_opt".format(mx2["formula"]))
-            wf = add_modify_incar(wf)
-            wf = add_modify_incar(
-                wf,
-                {
-                    "incar_update": {
-                        "LCHARG": False,
-                        "LWAVE": False
-                    }
-                }
-            )
-            mx2.pop("structure")
-            wf = add_additional_fields_to_taskdocs(
-                wf,
-                {"c2db_info": mx2}
-            )
-            wf = add_modify_incar(wf)
-            wf = set_execution_options(wf, category="scan_relax_pc")
-            wf = preserve_fworker(wf)
-            lpad.add_wf(wf)
-relax_pc()
-
-#%%
-def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_vac
-
-    col = VaspCalcDb.from_db_file(
-        os.path.join(
-            os.path.expanduser("~"),
-            "config/project/symBaseBinaryQubit/scan_relax_pc/db.json")).collection
-
-    mx2s = col.find(
-        {
-            "nsites": 2,
-            "chemsys": "B-N"
-        }
-    )
-    geo_spec = None
-    aexx = 0.25
-    test = []
-    for mx2 in mx2s[:]: #mx2s[14:34]
-        pc = Structure.from_dict(mx2["output"]["structure"])
-        cat = None
-
-        if defect_choice == "substitutions":
-            cat = "binary_defect_antisite_"
-        elif defect_choice == "vacancies":
-            cat = "bincary_defect_vac_"
-
-        if mx2["nsites"] == 2:
-            geo_spec = {25*2: [20]}
-            cat += "AB"
-        if mx2["nsites"] == 3:
-            geo_spec = {25*3: [20]}
-            cat += "AB2"
-        if mx2["nsites"] == 4:
-            geo_spec = {25*4: [20]}
-            cat += "AB"
-        if mx2["nsites"] == 8:
-            geo_spec = {25*8: [20]}
-            cat += "AB3"
-        cat = "binary_defect"
-
-        while True:
-            sc = pc.copy()
-            sc.make_supercell([math.sqrt(list(geo_spec.keys())[0]/mx2["nsites"]),
-                               math.sqrt(list(geo_spec.keys())[0]/mx2["nsites"]), 1])
-            auto_kpt = Kpoints.automatic_density_by_vol(sc, 64, force_gamma=True)
-            if auto_kpt.kpts[0] == [1, 1, 1]:
-                break
-            geo_spec = {mx2["nsites"]*(math.sqrt(list(geo_spec.keys())[0]/mx2["nsites"])+1)**2: [20]}
-
-        lpad = LaunchPad.from_file(
-            os.path.join(
-                os.path.expanduser("~"),
-                "config/project/defect_db/{}/my_launchpad.yaml".format(cat)))
-        print(cat)
-
-        defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
-
-        cation, anion = find_cation_anion(pc)
-
-        combo = mx2["sym_data"]["combo"]
-
-        good_sym_site_symbols = get_good_ir_sites(combo["species"], combo["syms"])
-
-        # Exclude those element in irrep
-        # species = list(dict.fromkeys(mx2["sym_data"]["species"]))
-        # for tgt in good_sym_site_symbols:
-        #     species.remove(tgt)
-        # good_sym_site_symbols = species
-
-        print(good_sym_site_symbols)
-        for good_sym_site_symbol in good_sym_site_symbols[0]:
-            # substitutions or vacancies
-            defect_type = (defect_choice, "{}".format(good_sym_site_symbol))
-
-            for de_idx in range(len(defect[defect_type[0]])):
-                print(cation, anion)
-
-                if defect_type[1] == defect[defect_type[0]][de_idx]["name"].split("_")[-1]:
-                    for na, thicks in geo_spec.items():
-                        for thick in thicks:
-                            for dtort in [0]:
-                                if not impurity_on_nn:
-                                    impurity_on_nn = []
-                                gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick, distort=dtort,
-                                                       sub_on_side=list(impurity_on_nn))
-                                # gen_defect.vacancies(dtort, list(impurity_on_nn))
-
-                                defect_data = gen_defect.defect_entry
-
-                                # add charge state regarding nelect
-                                charge, nupdn = None, None
-                                if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
-                                    charge = [1,-1, 0]
-                                    nupdn = [-1,-1,-1]
-                                    print(charge)
-                                    # if odd nelect, it used to be charge=[0]
-                                else:
-                                    # continue
-                                    charge = [0]
-                                    nupdn = [-1]
-
-                                wf = get_wf_full_scan(
-                                    structure=gen_defect.defect_st,
-                                    charge_states=charge,
-                                    gamma_only=False,
-                                    gamma_mesh=True,
-                                    dos=True,
-                                    nupdowns=nupdn,
-                                    vasptodb={
-                                        "category": cat,
-                                        "NN": gen_defect.NN,
-                                        "NN_dist": gen_defect.nn_dist,
-                                        "defect_entry": defect_data,
-                                    },
-                                    wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
-                                    task="scan_relax-scan_scf",
-                                    category=cat,
-                                )
-
-                                from pytopomat.workflows.fireworks import IrvspFW
-                                from pymatgen.analysis.structure_analyzer import SpacegroupAnalyzer
-                                fws = wf.fws
-                                fw_irvsp = IrvspFW(
-                                    structure=gen_defect.defect_st,
-                                    parents=fws[-1],
-                                    irvsptodb_kwargs={
-                                        "additional_fields":
-                                            {
-                                                "spg_pymatgen": SpacegroupAnalyzer(gen_defect.defect_st).get_space_group_symbol()
-                                            }
-                                    },
-
-                                )
-                                fws.append(fw_irvsp)
-                                wf = Workflow(fws, name=wf.name)
-
-                                wf = add_modify_kpoints(wf, {
-                                    "kpoints_update": {
-                                    "style": "R",
-                                    "num_kpts": 2,
-                                    "kpts": [(0,0,0), (0,0,0)],
-                                    "kpts_weights": [1, 0],
-                                    "labels": [None, "\Gamma"]}}, fw_name_constraint="SCAN_scf")
-
-                                wf = add_additional_fields_to_taskdocs(
-                                    wf,
-                                    {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
-                                     "pc_from_id": mx2["task_id"],
-                                     "combo": mx2["sym_data"]["combo"],
-                                     "class": mx2["c2db_info"]["class"],
-                                     "perturbed": gen_defect.distort}
-                                )
-
-                                wf = add_modify_incar(wf, {"incar_update": {"NSW":150, "LCHARG":False,
-                                                                            "LWAVE":False}}, "SCAN_relax")
-                                wf = add_modify_incar(wf, {"incar_update": {"LWAVE": True, "LCHARG": False}}, "SCAN_scf")
-                                wf = set_queue_options(wf, "24:00:00")
-                                # related to directory
-                                wf = set_execution_options(wf, category=cat)
-                                wf = preserve_fworker(wf)
-                                wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
-                                # task_name_constraint=x meaning after x do powersup
-                                # wf = scp_files(
-                                #     wf,
-                                #     "/home/jengyuantsai/Research/projects/defect_db",
-                                #     fw_name_constraint="SCAN_scf",
-                                # )
-                                # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
-                                #                     fw_name_constraint="SCAN_scf")
-                                wf = clear_to_db(wf)
-
-                                print(wf)
-                                lpad.add_wf(wf)
-
-binary_scan_defect()
-
-#%% recalculate wavecar for successfull scan_scf's
-def binary_scan_defect_gen_wavecar(): #BN_vac
-    col = VaspCalcDb.from_db_file(
-            os.path.expanduser(os.path.join("~",
-            "config/project/defect_db/binary_defect/db.json"))).collection
-
-    mx2s = col.find(
-        {
-            "task_label": "SCAN_scf",
-            # "category": "binary_defect_antisite_AB3"
-            "task_id": {"$in": [1190,1848, 2262, 2263, 2266, 2268, 2269, 2273, 2274, 2275]}}
-    )
-    geo_spec = None
-    aexx = 0.25
-    test = []
-
-    for mx2 in list(mx2s)[:]: #max149
-        lpad = LaunchPad.from_file(
-            os.path.join(
-                os.path.expanduser("~"),
-                "config/project/defect_db/{}/my_launchpad.yaml".format(mx2["category"])))
-        print(mx2["task_id"])
-        wf = get_wf_full_scan(
-            structure=Structure.from_dict(mx2["input"]["structure"]),
-            charge_states=[0],
-            gamma_only=False,
-            gamma_mesh=True,
-            dos=True,
-            nupdowns=[-1],
-            vasptodb={},
-            wf_addition_name=mx2["task_id"],
-            task="scan_scf",
-            category=mx2["category"],
-        )
-        wf = write_inputs_from_db(
-            wf,
-            db_file=os.path.expanduser(
-                os.path.join("~", "config/project/defect_db/binary_defect/db.json")),
-            task_id=mx2["task_id"],
-            modify_incar={"LWAVE":True, "LCHARG":False, "ICHARG":1}
-        )
-        wf = scp_files(wf, "/home/jengyuantsai/Research/projects/", "defect_db", mx2["dir_name"].split("/")[-1])
-        # related to directory
-        wf = set_queue_options(wf, "24:00:00", fw_name_constraint="SCAN_scf")
-        wf = set_execution_options(wf, category=mx2["category"])
-        wf = preserve_fworker(wf)
-        # task_name_constraint=x meaning after x do powersup
-        wf = clean_up_files(wf, files=["CHGCAR*"],
-                            task_name_constraint="RunVasp")
-        wf = clean_up_files(wf, files=["*"],
-                            task_name_constraint="PassCalcLocs")
-        print(wf)
-        lpad.add_wf(wf)
-
-binary_scan_defect_gen_wavecar()
 #%% looking for candidate hosts
 from phonopy.phonon.irreps import character_table
 
@@ -431,3 +160,29 @@ for e in es:
     st = Structure.from_dict(e["output"]["structure"])
     st.to("POSCAR", '/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
                     'scan_relax_pc/structures/tid_{}_ehull_{}.vasp'.format(e["task_id"], e["c2db_info"]["ehull"]))
+
+#%% look for defect states
+from qubitPack.qc_searching.analysis.main import get_defect_state
+from qubitPack.tool_box import get_db
+
+defect_db = get_db("defect_db", "binary_defect")
+host_db = get_db("symBaseBinaryQubit", "scan_relax_pc")
+c2db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan")
+
+
+tk_id = 10
+pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
+c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
+
+tot, proj, d_df = get_defect_state(
+    defect_db,
+    {"task_id": tk_id},
+    1, -5,
+    None,
+    True,
+    "proj",
+    (host_db, pc_from_id, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
+    0.1,
+    locpot_c2db=None #(c2db, c2db_uid, 0)
+)
+

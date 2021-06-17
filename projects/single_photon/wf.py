@@ -50,10 +50,10 @@ class Defect:
                         wf = get_wf_full_hse(
                             structure=defect_st,
                             task_arg=dict(lcharg=True),
-                            charge_states=[0],
+                            charge_states=[-1],
                             gamma_only=False,
                             gamma_mesh=True,
-                            nupdowns=[2],
+                            nupdowns=[3],
                             task="hse_scf",
                             vasptodb={
                                 "dz": dz,
@@ -355,7 +355,7 @@ def main():
             os.path.expanduser(os.path.join("~", "config/project/antisiteQubit/{}/"
                                                  "my_launchpad.yaml".format("move_z"))))
         LPAD.add_wf(wf)
-
-    move_z(dz=-0.275)
+    for i in [-0.25]:
+        move_z(dz=i)
 if __name__ == '__main__':
     main()
