@@ -460,7 +460,7 @@ def phonopy_structure(orig_st):
     call("phonopy --symmetry --tolerance 0.01 -c POSCAR".split(" "))
     std_st = Structure.from_file("PPOSCAR")
     std_st.to("poscar", "POSCAR")
-    pos2aBR_out = check_output(["pos2aBR"], universal_newlines=True).split("/n")
+    pos2aBR_out = check_output(["pos2aBR"], universal_newlines=True).split("\n")
     std_st = Structure.from_file("POSCAR_std")
     os.chdir("..")
     shutil.rmtree("standardize_st")
