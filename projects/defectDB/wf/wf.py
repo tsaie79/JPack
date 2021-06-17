@@ -8,6 +8,7 @@ from atomate.vasp.powerups import (
     set_queue_options,
     set_execution_options,
     clean_up_files,
+    add_modify_kpoints
 )
 from atomate.vasp.workflows.base.core import get_wf
 
@@ -80,14 +81,25 @@ def bs_pc():
 
     for idx, mx2 in enumerate(mx2s[:1]):
         pc = Structure.from_dict(mx2["output"]["structure"])
-        wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scan.yaml"))
+        pc, site_info = phonopy_structure(pc)
+        wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/scan_scf_bs.yaml"))
+        wf = add_additional_fields_to_taskdocs(
+            wf,
+            {
+                "c2db_uid": mx2["c2db_info"]["uid"],
+                "pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
+                "pc_from_id": mx2["task_id"],
+                "site_info": site_info
+            },
+            task_name_constraint="ToDb"
+        )
 
-        wf = add_additional_fields_to_taskdocs(wf, {
-            "c2db_uid": mx2["c2db_info"]["uid"],
-            "pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
-            "pc_from_id": mx2["task_id"],
-        })
-
+        kpt = Kpoints.automatic_density_by_vol(pc, 144)
+        wf = add_modify_kpoints(
+            wf,
+            modify_kpoints_params={"kpoints_update": {"kpts": kpt.kpts}},
+            fw_name_constraint="SCAN_scf"
+        )
         wf = add_modify_twod_bs_kpoints(
             wf,
             modify_kpoints_params={"kpoints_line_density": 10, "reciprocal_density": 144},
@@ -102,9 +114,9 @@ def bs_pc():
         wf = set_queue_options(wf, "06:00:00", fw_name_constraint="SCAN_bs")
         wf = set_queue_options(wf, "00:30:00", fw_name_constraint="irvsp")
         wf = clean_up_files(wf, files=["WAVECAR"], task_name_constraint="IRVSPToDb", fw_name_constraint="irvsp")
-        wf = clean_up_files(wf, files=["CHGCAR"], fw_name_constraint="SCAN_bs")
+        wf = clean_up_files(wf, files=["CHGCAR*"], fw_name_constraint="SCAN_bs")
         wf = preserve_fworker(wf)
-        wf.name = "{}:SCAN_opt".format(mx2["formula"])
+        wf.name = "{}:SCAN_opt".format(mx2["formula_pretty"])
         lpad.add_wf(wf)
 
 def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_vac
@@ -229,9 +241,10 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
                                      "pc_from_id": mx2["task_id"],
                                      "combo": mx2["sym_data"]["combo"],
                                      "class": mx2["c2db_info"]["class"],
+                                     "defect_name": defect_data["name"],
+                                     "site_info": gen_defect.site_info,
                                      "perturbed": gen_defect.distort}
                                 )
-
                                 wf = add_additional_fields_to_taskdocs(
                                     wf,
                                     {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),

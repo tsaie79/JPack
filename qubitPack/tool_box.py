@@ -161,6 +161,7 @@ class GenDefect:
         self.natom = natom
         self.vacuum_thickness = vacuum_thickness
         self.distort = None
+        self.site_info = None
         self.defects = ChargedDefectsStructures(self.orig_st, cellmax=natom, antisites_flag=True).defects
         self.bulk_st = self.defects["bulk"]["supercell"]["structure"]
         self.NN_for_sudo_bulk = []
@@ -208,7 +209,7 @@ class GenDefect:
             print("!!!Please insert substitutions, vacancies, or bulk!!!")
 
         if standardize_st and self.defect_st:
-            self.defect_st = phonopy_structure(self.defect_st)
+            self.defect_st, self.site_info = phonopy_structure(self.defect_st)
 
         if defect_type[0] == "substitutions":
             self.substitutions(distort, sub_on_side)
@@ -459,7 +460,7 @@ def phonopy_structure(orig_st):
     call("phonopy --symmetry --tolerance 0.01 -c POSCAR".split(" "))
     std_st = Structure.from_file("PPOSCAR")
     std_st.to("poscar", "POSCAR")
-    pos2aBR_out = check_output(["pos2aBR"], universal_newlines=True)
+    pos2aBR_out = check_output(["pos2aBR"], universal_newlines=True).split("/n")
     std_st = Structure.from_file("POSCAR_std")
     os.chdir("..")
     shutil.rmtree("standardize_st")

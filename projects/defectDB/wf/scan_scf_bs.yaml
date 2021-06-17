@@ -13,8 +13,6 @@ fireworks:
           LCHARG: True
           LWAVE: False
           SIGMA: 0.05
-        user_kpoints_settings:
-          reciprocal_density: 144
       vasptodb_kwargs:
         additional_fields:
           task_type: ScanStaticFW
@@ -38,6 +36,7 @@ fireworks:
             LAECHG: False
             LVHAR: True
             SIGMA: 0.05
+            ISYM: 2
             METAGGA: Scan
 
   - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
