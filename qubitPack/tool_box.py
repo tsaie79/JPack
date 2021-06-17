@@ -451,7 +451,7 @@ def get_lowest_unocc_band_idx(task_id, db_obj, nbands, prevent_JT=True, second_e
         return maj_spin, occu_configs
 
 def phonopy_structure(orig_st):
-    from subprocess import call
+    from subprocess import call, check_output
     import shutil
     os.makedirs("standardize_st", exist_ok=True)
     os.chdir("standardize_st")
@@ -459,11 +459,11 @@ def phonopy_structure(orig_st):
     call("phonopy --symmetry --tolerance 0.01 -c POSCAR".split(" "))
     std_st = Structure.from_file("PPOSCAR")
     std_st.to("poscar", "POSCAR")
-    call("pos2aBR")
+    pos2aBR_out = check_output(["pos2aBR"], universal_newlines=True)
     std_st = Structure.from_file("POSCAR_std")
     os.chdir("..")
     shutil.rmtree("standardize_st")
-    return std_st
+    return std_st, pos2aBR_out
 
 def get_encut(st):
     from pymatgen.io.vasp.sets import MPRelaxSet
