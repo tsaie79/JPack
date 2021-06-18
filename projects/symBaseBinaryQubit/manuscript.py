@@ -139,8 +139,8 @@ es = db.collection.aggregate(
 )
 
 df = pd.DataFrame(es)
-df.to_json("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/xlsx/site_sym_cat/site_sym_01012021.json", indent=4)
-df.to_excel("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/xlsx/site_sym_cat/site_sym_01012021.xlsx")
+# df.to_json("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/xlsx/site_sym_cat/site_sym_01012021.json", indent=4)
+# df.to_excel("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/xlsx/site_sym_cat/site_sym_01012021.xlsx")
 
 df.plot(x="site_sym", y="counts", kind="barh", rot=0, figsize=(10,8))
 

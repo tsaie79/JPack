@@ -86,7 +86,7 @@ def bs_pc():
     for idx, mx2 in enumerate(mx2s[:1]):
         pc = Structure.from_dict(mx2["structure"])
         pc, site_info = phonopy_structure(pc)
-        wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/scan_full.yaml"))
+        wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/scan_pc.yaml"))
 
 
         wf = add_additional_fields_to_taskdocs(

@@ -166,13 +166,13 @@ from qubitPack.qc_searching.analysis.main import get_defect_state
 from qubitPack.tool_box import get_db
 
 defect_db = get_db("defect_db", "binary_defect")
-host_db = get_db("symBaseBinaryQubit", "scan_relax_pc")
+host_db = get_db("defect_db", "scan_bs_pc")
 c2db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan")
 
 
-tk_id = 10
-pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
-c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
+tk_id = 14
+# pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
+# c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
 
 tot, proj, d_df = get_defect_state(
     defect_db,
@@ -181,8 +181,9 @@ tot, proj, d_df = get_defect_state(
     None,
     True,
     "proj",
-    (host_db, pc_from_id, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
+    (host_db, 78, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
     0.1,
     locpot_c2db=None #(c2db, c2db_uid, 0)
 )
 
+#%% nsites vs
