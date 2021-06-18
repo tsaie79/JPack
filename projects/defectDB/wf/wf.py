@@ -68,29 +68,31 @@ def bs_pc():
             os.path.expanduser("~"),
             "config/project/defect_db/{}/my_launchpad.yaml".format(cat)))
 
-    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan")
+    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
 
+    # mx2s = col.find(
+    #     {
+    #         "gap_hse_nosoc":{"$gt": 0},
+    #         "nkinds": 2,
+    #         "magstate": "NM"
+    #     }
+    # )
     mx2s = col.find(
         {
-            "gap_hse_nosoc":{"$gt": 0},
-            "nkinds": 2,
-            "magstate": "NM"
+            "formula": "BN"
         }
     )
 
     for idx, mx2 in enumerate(mx2s[:1]):
-        pc = Structure.from_dict(mx2["output"]["structure"])
+        pc = Structure.from_dict(mx2["structure"])
         pc, site_info = phonopy_structure(pc)
         wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/scan_full.yaml"))
 
-        wf = remove_todb(wf, wf.fws[0])
 
         wf = add_additional_fields_to_taskdocs(
             wf,
             {
-                "c2db_uid": mx2["c2db_info"]["uid"],
-                "pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
-                "pc_from_id": mx2["task_id"],
+                "c2db_uid": mx2["uid"],
                 "site_info": site_info
             },
             task_name_constraint="ToDb"
@@ -100,17 +102,17 @@ def bs_pc():
         wf = add_modify_kpoints(
             wf,
             modify_kpoints_params={"kpoints_update": {"kpts": kpt.kpts}},
-            fw_name_constraint=wf.fws[2]
+            fw_name_constraint=wf.fws[2].name
         )
-        wf = add_modify_twod_bs_kpoints(
+        wf = add_modify_2d_nscf_kpoints(
             wf,
             modify_kpoints_params={"kpoints_line_density": 10, "reciprocal_density": 144},
-            fw_name_constraint=wf.fws[3]
+            fw_name_constraint=wf.fws[3].name
         )
-        wf = add_modify_twod_bs_kpoints(
+        wf = add_modify_2d_nscf_kpoints(
             wf,
             modify_kpoints_params={"kpoints_line_density": 10, "reciprocal_density": 144, "mode": "uniform"},
-            fw_name_constraint=wf.fws[4]
+            fw_name_constraint=wf.fws[4].name
         )
 
         if idx % 2 == 1:
@@ -131,7 +133,8 @@ def bs_pc():
         wf = remove_todb(wf, fw_name_constraint=wf.fws[0].name)
 
         wf = preserve_fworker(wf)
-        wf.name = "{}:SCAN_full".format(mx2["formula_pretty"])
+        wf = add_modify_incar(wf)
+        wf.name = "{}:SCAN_full".format(mx2["uid"])
         lpad.add_wf(wf)
 
 def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_vac

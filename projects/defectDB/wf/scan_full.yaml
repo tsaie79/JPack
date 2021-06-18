@@ -14,6 +14,7 @@ fireworks:
           LCHARG: False
           LWAVE: False
           NSW: 150
+          ISPIN: 1
         user_kpoints_settings:
           reciprocal_density: 36
       job_type: double_relaxation_run
@@ -27,7 +28,7 @@ fireworks:
 
   - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanRelaxFW
     params:
-      parent: 0
+      parents: 0
       name: SCAN_relax
       force_gamma: True
       override_default_vasp_params:
@@ -41,6 +42,7 @@ fireworks:
           LCHARG: False
           LWAVE: False
           NSW: 150
+          ISPIN: 1
         user_kpoints_settings:
           reciprocal_density: 36
       job_type: double_relaxation_run
@@ -54,7 +56,7 @@ fireworks:
 
   - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanStaticFW
     params:
-      parent: 1
+      parents: 1
       name: SCAN_scf
       force_gamma: True
       vasp_input_set_params:
@@ -76,19 +78,20 @@ fireworks:
 
   - fw: atomate.vasp.fireworks.NonSCFFW
     params:
-      name: SCAN_nscf
       parents: 2
+      name: SCAN_nscf
       mode: line
       input_set_overrides:
         other_params:
           user_incar_settings:
             ENCUT: 800
-            EDIFF: 1E-5
+            EDIFF: 1e-5
             ISPIN: 1
             LWAVE: True
-            LCHAGE: False
+            LCHARG: False
             LAECHG: False
             LVHAR: True
+            ISMEAR: 0
             SIGMA: 0.05
             ISYM: 2
             METAGGA: Scan
@@ -99,18 +102,18 @@ fireworks:
       parents: 2
       mode: uniform
       input_set_overrides:
-        reciprocal_density: 288
+        nedos: 9000
         other_params:
           user_incar_settings:
             ENCUT: 800
-            EDIFF: 1E-5
+            EDIFF: 1e-5
             ISPIN: 1
             LWAVE: True
-            LCHAGE: False
+            LCHARG: False
             LAECHG: False
             LVHAR: True
+            ISMEAR: 0
             SIGMA: 0.05
-            NEDOS: 9000
             EMAX: 10
             EMIN: -10
             METAGGA: Scan
