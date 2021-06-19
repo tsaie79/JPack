@@ -475,3 +475,28 @@ def cd_from_db(db, task_id):
     import os
     path = db.collection.find_one({"task_id": task_id})["calcs_reversed"][0]["dir_name"]
     os.chdir(path)
+
+def find_scaling_for_2d_defect(pc, min_lc=15):
+    x = 1
+    while True:
+        st = pc.copy()
+        st.make_supercell([x,1,1])
+        if st.lattice.a >= min_lc:
+            break
+        else:
+            x += 1
+
+    y = 1
+    while True:
+        st = pc.copy()
+        st.make_supercell([1, y, 1])
+        if st.lattice.b >= min_lc:
+            break
+        else:
+            y += 1
+
+    scaling = [x, y, 1]
+    st = pc.copy()
+    st.make_supercell(scaling)
+    print("scaling matrix: {}".format(scaling))
+    return scaling, st
