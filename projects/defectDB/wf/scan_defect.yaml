@@ -12,6 +12,7 @@ fireworks:
           LCHARG: False
           LWAVE: False
           EDIFFG: -0.01
+          EDIFF: 1e-04
       job_type: double_relaxation_run
       max_force_threshold: False
       vasptodb_kwargs:
@@ -41,6 +42,46 @@ fireworks:
         parse_eigenvalues: True
         parse_chgcar: False
 
+  - fw: atomate.vasp.fireworks.NonSCFFW
+    params:
+      parents: 1
+      name: SCAN_nscf
+      mode: line
+      input_set_overrides:
+        other_params:
+          user_incar_settings:
+            EDIFF: 1e-5
+            ISPIN: 2
+            LCHARG: False
+            LAECHG: False
+            LWAVE: False
+            LVHAR: True
+            ISMEAR: 0
+            SIGMA: 0.05
+            ISYM: 2
+            METAGGA: Scan
+
+  - fw: atomate.vasp.fireworks.NonSCFFW
+    params:
+      name: SCAN_nscf
+      parents: 1
+      mode: uniform
+      input_set_overrides:
+        nedos: 9000
+        other_params:
+          user_incar_settings:
+            EDIFF: 1e-5
+            ISPIN: 2
+            LWAVE: False
+            LCHARG: False
+            LAECHG: False
+            LVHAR: True
+            ISMEAR: 0
+            SIGMA: 0.05
+            EMAX: 10
+            EMIN: -10
+            METAGGA: Scan
+
   - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
     params:
       name: irvsp
@@ -49,3 +90,4 @@ fireworks:
       symprec: 0.001
       irvsptodb_kwargs:
         collection_name: ir_data
+

@@ -40,8 +40,32 @@ class Pc:
         plt.show()
 
 
+class Defect:
+    @classmethod
+    def find_defect_state(cls):
+        from qubitPack.qc_searching.analysis.main import get_defect_state
+        from qubitPack.tool_box import get_db
 
+        defect_db = get_db("defect_db", "binary_defect")
+        host_db = get_db("Scan2dMat", "calc_data")
+
+
+        tk_id = 4
+        # pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
+        # c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
+
+        tot, proj, d_df = get_defect_state(
+            defect_db,
+            {"task_id": tk_id},
+            1, -5,
+            None,
+            True,
+            "proj",
+            (host_db, 10, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
+            0.1,
+            locpot_c2db=None #(c2db, c2db_uid, 0)
+        )
 
 
 if __name__ == '__main__':
-    Pc.hist_nsites()
+    Defect.find_defect_state()
