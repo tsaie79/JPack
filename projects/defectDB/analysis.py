@@ -7,34 +7,34 @@ class Pc:
 
         db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan")
         filter = {
-            "gap_hse_nosoc":{"$gt":0},
-            "nkinds":2,
-            "magstate": "NM"
+            "magstate": "NM",
+            "gap_hse_nosoc": {"$gt":0},
+            "nkinds": 3
         }
 
         es = db.collection.aggregate(
             [
                 {"$match": filter},
                 {"$group": {
-                    "_id": {"nsites": "$nsites"},
+                    "_id": {"gap": "$gap_hse_nosoc"},
                     "count": {"$sum":1},
                     "uid": {"$push": "$uid"}
                 }},
                 {"$project":
                     {
                     "_id": 0,
-                    "nsites": "$_id.nsites",
+                    "gap": "$_id.gap",
                     "count": "$count",
                     }
                 },
-                {"$sort": {"nsites":1}}
+                {"$sort": {"gap":1}}
             ]
         )
 
         df = pd.DataFrame(es)
         print(df)
 
-        df.plot(x="nsites", y="count", kind="bar", rot=0, figsize=(10,8), title="Hist nsites under filter")
+        df.plot(x="gap", y="count", kind="bar", rot=0, figsize=(10,8), title="Hist nsites under filter")
         plt.ylabel("counts")
 
         plt.show()
@@ -50,7 +50,7 @@ class Defect:
         host_db = get_db("Scan2dMat", "calc_data")
 
 
-        tk_id = 4
+        tk_id = 17
         # pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
         # c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
 
@@ -61,7 +61,7 @@ class Defect:
             None,
             True,
             "proj",
-            (host_db, 10, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
+            (host_db, 545, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
             0.1,
             locpot_c2db=None #(c2db, c2db_uid, 0)
         )
@@ -69,3 +69,4 @@ class Defect:
 
 if __name__ == '__main__':
     Defect.find_defect_state()
+    # Pc.hist_nsites()
