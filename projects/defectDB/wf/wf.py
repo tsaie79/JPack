@@ -27,12 +27,46 @@ from monty.serialization import loadfn
 import os
 import pandas as pd
 
+def relax_pc():
+    lpad = LaunchPad.from_file(os.path.expanduser(
+        os.path.join("~", "config/project/symBaseBinaryQubit/scan_relax_pc/my_launchpad.yaml")))
+
+    mx2s = loadfn(os.path.expanduser(os.path.join("~", "config/project/symBaseBinaryQubit/"
+                                                       "scan_relax_pc/gap_gt1-binary-NM.json")))
+
+    for mx2 in mx2s:
+        # if mx2["irreps"] and mx2["formula"] == "Rh2Br6" and mx2["spacegroup"] == "P3":
+        if mx2["formula"] == "BN":
+            pc = mx2["structure"]
+            pc = ensure_vacuum(pc, 30)
+            scan_opt = ScanOptimizeFW(structure=pc, name="SCAN_relax")
+            wf = Workflow([scan_opt], name="{}:SCAN_opt".format(mx2["formula"]))
+            wf = add_modify_incar(wf)
+            wf = add_modify_incar(
+                wf,
+                {
+                    "incar_update": {
+                        "LCHARG": False,
+                        "LWAVE": False
+                    }
+                }
+            )
+            mx2.pop("structure")
+            wf = add_additional_fields_to_taskdocs(
+                wf,
+                {"c2db_info": mx2}
+            )
+            wf = add_modify_incar(wf)
+            wf = set_execution_options(wf, category="scan_relax_pc")
+            wf = preserve_fworker(wf)
+            lpad.add_wf(wf)
+
 def pc():
-    cat = "calc_data"
+    cat = "test"
     lpad = LaunchPad.from_file(
         os.path.join(
             os.path.expanduser("~"),
-            "config/project/Scan2dMat/{}/my_launchpad.yaml".format(cat)))
+            "config/project/test/{}/my_launchpad.yaml".format(cat)))
 
     col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
 
@@ -40,19 +74,25 @@ def pc():
     #     {
     #         "gap_hse_nosoc":{"$gt": 0},
     #         "nkinds": 2,
-    #         "magstate": "NM"
+    #         "magstate": "NM",
+    #         "nsites": 12,
     #     }
     # )
+
     mx2s = col.find(
         {
-            "formula": "WS2",
-            "class": "TMDC-H"
+            "uid": "C2-C-NM"
         }
     )
 
-    for idx, mx2 in enumerate(mx2s[:1]):
+
+
+    for idx, mx2 in enumerate(mx2s):
         pc = Structure.from_dict(mx2["structure"])
+        print(pc.num_sites)
+        pc = ensure_vacuum(pc, 30)
         pc, site_info = phonopy_structure(pc)
+        print(pc.num_sites)
         wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/scan_pc.yaml"))
 
 
@@ -60,6 +100,7 @@ def pc():
             wf,
             {
                 "c2db_uid": mx2["uid"],
+                "c2db_nkinds": mx2["nkinds"],
                 "site_info": site_info
             },
             task_name_constraint="ToDb"
@@ -73,20 +114,20 @@ def pc():
         )
         wf = add_modify_2d_nscf_kpoints(
             wf,
-            modify_kpoints_params={"kpoints_line_density": 10, "reciprocal_density": 144},
+            modify_kpoints_params={"kpoints_line_density": 20, "reciprocal_density": 144},
             fw_name_constraint=wf.fws[3].name
         )
         wf = add_modify_2d_nscf_kpoints(
             wf,
-            modify_kpoints_params={"kpoints_line_density": 10, "reciprocal_density": 144, "mode": "uniform"},
+            modify_kpoints_params={"kpoints_line_density": 20, "reciprocal_density": 144, "mode": "uniform"},
             fw_name_constraint=wf.fws[4].name
         )
 
         if idx % 2 == 1:
-            wf = set_execution_options(wf, category=cat, fworker_name="efrc")
+            wf = set_execution_options(wf, category=cat, fworker_name="owls")
         else:
-            wf = set_execution_options(wf, category=cat, fworker_name="efrc")
-        wf = set_queue_options(wf, "12:00:00", fw_name_constraint=wf.fws[0].name)
+            wf = set_execution_options(wf, category=cat, fworker_name="nersc")
+        wf = set_queue_options(wf, "00:30:00", fw_name_constraint=wf.fws[0].name)
         wf = set_queue_options(wf, "03:00:00", fw_name_constraint=wf.fws[1].name)
         wf = set_queue_options(wf, "03:00:00", fw_name_constraint=wf.fws[2].name)
         wf = set_queue_options(wf, "02:00:00", fw_name_constraint=wf.fws[3].name)
@@ -97,10 +138,10 @@ def pc():
         wf = clean_up_files(wf, files=["CHGCAR*"], fw_name_constraint=wf.fws[3].name)
         wf = clean_up_files(wf, files=["CHGCAR*"], fw_name_constraint=wf.fws[4].name)
 
-        wf = remove_todb(wf, fw_name_constraint=wf.fws[0].name)
-        wf = add_modify_incar(wf, {"incar_update": {"METAGGA": "SCAN"}})
+        wf = add_modify_incar(wf, {"incar_update": {"METAGGA": "R2SCAN"}})
         wf = preserve_fworker(wf)
         wf = add_modify_incar(wf)
+        wf = bash_scp_files(wf, dest="/home/tsai/Research/projects/Scan2dMat/calc_data", port=12348)
         wf.name = "{}:SCAN_full".format(mx2["uid"])
         lpad.add_wf(wf)
 
@@ -143,7 +184,7 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
         lpad = LaunchPad.from_file(
             os.path.join(
                 os.path.expanduser("~"),
-                "config/project/defect_db/{}/my_launchpad.yaml".format(cat)))
+                "config/project/Scan2dDefect/calc_data/{}/my_launchpad.yaml".format(cat)))
         print(cat)
 
         defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
@@ -162,7 +203,7 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
 
         print(good_sym_site_symbols)
         for good_sym_site_symbol in good_sym_site_symbols[0]:
-            # substitutions or vacancies
+            # substitutions or vacancies!
             defect_type = (defect_choice, "{}".format(good_sym_site_symbol))
 
             for de_idx in range(len(defect[defect_type[0]])):
@@ -207,9 +248,9 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
                                     },
                                     wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
                                     task="scan_relax-scan_scf",
-                                    category=cat,
                                     wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/scan_defect.yaml")
                                 )
+
                                 wf = add_modify_2d_nscf_kpoints(
                                     wf,
                                     modify_kpoints_params={"mode": "line"},
@@ -220,7 +261,8 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
                                     modify_kpoints_params={"mode": "uniform"},
                                     fw_name_constraint=wf.fws[3].name
                                 )
-
+                                wf = add_modify_incar(wf, {"incar_update": {"METAGGA":"SCAN"}})
+                                wf = add_modify_incar(wf)
                                 wf = add_additional_fields_to_taskdocs(
                                     wf,
                                     {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
@@ -240,28 +282,32 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
                                      },
                                     task_name_constraint="IRVSPToDb"
                                 )
-                                wf = add_modify_incar(wf, {"incar_update": {"METAGGA": "R2SCAN"}})
-                                wf = add_modify_incar(wf)
+
                                 if idx % 2 == 1:
                                     wf = set_execution_options(wf, category=cat, fworker_name="efrc")
                                 else:
                                     wf = set_execution_options(wf, category=cat, fworker_name="owls")
                                 wf = set_queue_options(wf, "24:00:00")
                                 wf = set_queue_options(wf, "00:30:00", fw_name_constraint="irvsp")
-
                                 wf = preserve_fworker(wf)
                                 wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
-                                # task_name_constraint=x meaning after x do powersup
-                                wf = scp_files(
+                                wf = bash_scp_files(
                                     wf,
-                                    "/home/jengyuantsai/Research/projects/defect_db",
+                                    dest="/home/tsai/Research/projects/Scan2dDefect/calc_data/scf",
+                                    port=12348,
                                     fw_name_constraint="SCAN_scf",
+                                    task_name_constraint="RunVasp"
                                 )
+                                wf = clean_up_files(wf, files=["WAVECAR*"], task_name_constraint="SCP",
+                                                    fw_name_constraint=wf.fws[1].name)
+                                wf = clean_up_files(wf, files=["CHGCAR*"], task_name_constraint="ToDb",
+                                                    fw_name_constraint=wf.fws[3].name)
                                 wf = clean_up_files(wf, files=["WAVECAR"], task_name_constraint="IRVSPToDb",
-                                                    fw_name_constraint="irvsp")
+                                                    fw_name_constraint=wf.fws[4].name)
+
 
                                 print(wf)
                                 lpad.add_wf(wf)
 
 if __name__ == '__main__':
-    binary_scan_defect()
+    pc()

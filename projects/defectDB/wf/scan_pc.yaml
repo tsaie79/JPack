@@ -1,12 +1,13 @@
 fireworks:
   - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanRelaxFW
     params:
-      name: SCAN_relax
+      name: SCAN_relax lc
       force_gamma: True
       override_default_vasp_params:
         user_incar_settings:
           ENCUT: 800
           ISIF: 3
+          ISPIN: 2
           ISMEAR: 0
           SIGMA: 0.05
           EDIFFG: -0.01
@@ -14,7 +15,6 @@ fireworks:
           LCHARG: False
           LWAVE: False
           NSW: 150
-          ISPIN: 1
         user_kpoints_settings:
           reciprocal_density: 36
       job_type: double_relaxation_run
@@ -29,20 +29,20 @@ fireworks:
   - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanRelaxFW
     params:
       parents: 0
-      name: SCAN_relax
+      name: SCAN_relax pos
       force_gamma: True
       override_default_vasp_params:
         user_incar_settings:
           ENCUT: 800
           ISIF: 2
           ISMEAR: 0
+          ISPIN: 2
           SIGMA: 0.05
           EDIFFG: -0.01
           EDIFF: 1e-4
           LCHARG: False
           LWAVE: False
           NSW: 150
-          ISPIN: 1
         user_kpoints_settings:
           reciprocal_density: 36
       job_type: double_relaxation_run
@@ -62,7 +62,7 @@ fireworks:
       vasp_input_set_params:
         user_incar_settings:
           ENCUT: 800
-          ISPIN: 1
+          ISPIN: 2
           LAECHG: False
           EDIFF: 1e-05
           ISMEAR: 0
@@ -86,7 +86,7 @@ fireworks:
           user_incar_settings:
             ENCUT: 800
             EDIFF: 1e-5
-            ISPIN: 1
+            ISPIN: 2
             LWAVE: True
             LCHARG: False
             LAECHG: False
@@ -102,20 +102,18 @@ fireworks:
       parents: 2
       mode: uniform
       input_set_overrides:
-        nedos: 9000
+        nedos: 0
         other_params:
           user_incar_settings:
             ENCUT: 800
             EDIFF: 1e-5
-            ISPIN: 1
-            LWAVE: True
+            ISPIN: 2
+            LWAVE: False
             LCHARG: False
             LAECHG: False
             LVHAR: True
             ISMEAR: 0
             SIGMA: 0.05
-            EMAX: 10
-            EMIN: -10
             METAGGA: Scan
 
   - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
@@ -125,6 +123,6 @@ fireworks:
       kpt_mode: all
       symprec: 0.001
       irvsptodb_kwargs:
-        collection_name: pc_ir_data
+        collection_name: ir_data
 
 
