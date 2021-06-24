@@ -19,7 +19,7 @@ Rh = Structure.from_file("/home/tug03990/config/project/CO2_hydrogenation/H_ads/
                          "Rh_mp-74_conventional_standard.cif")
 slab_100 = SlabGenerator(Rh, [1, 0, 0], 10, 15, center_slab=True).get_slab()
 
-H = Molecule("H", [[0,0,0]])
+H = Molecule(["H", "H"], [[0,0,0], [0.74, 0, 0]])
 
 wf = get_wf_slab(slab_100, False, [H], dict(find_args={"distance": 1.6}, repeat=[3,3,1]), add_molecules_in_box=True)
 
@@ -45,7 +45,7 @@ for fw in wf.fws:
                  }
             },
             fw_name_constraint=fw.name)
-
+wf = add_modify_incar(wf, {"incar_update": {"IVDW": 1}}) #DFT-D2 vdw correction
 wf = preserve_fworker(wf)
 wf = set_execution_options(wf, category=CATEGORY)
 wf = add_modify_incar(wf)

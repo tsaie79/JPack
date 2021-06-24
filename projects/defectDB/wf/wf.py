@@ -62,11 +62,11 @@ def relax_pc():
             lpad.add_wf(wf)
 
 def pc():
-    cat = "test"
+    cat = "calc_data"
     lpad = LaunchPad.from_file(
         os.path.join(
             os.path.expanduser("~"),
-            "config/project/test/{}/my_launchpad.yaml".format(cat)))
+            "config/project/Scan2dMat/{}/my_launchpad.yaml".format(cat)))
 
     col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
 
@@ -124,10 +124,10 @@ def pc():
         )
 
         if idx % 2 == 1:
-            wf = set_execution_options(wf, category=cat, fworker_name="owls")
+            wf = set_execution_options(wf, category=cat, fworker_name="nersc")
         else:
             wf = set_execution_options(wf, category=cat, fworker_name="nersc")
-        wf = set_queue_options(wf, "00:30:00", fw_name_constraint=wf.fws[0].name)
+        wf = set_queue_options(wf, "00:30:00", fw_name_constraint=wf.fws[0].name, qos="debug")
         wf = set_queue_options(wf, "03:00:00", fw_name_constraint=wf.fws[1].name)
         wf = set_queue_options(wf, "03:00:00", fw_name_constraint=wf.fws[2].name)
         wf = set_queue_options(wf, "02:00:00", fw_name_constraint=wf.fws[3].name)
@@ -141,7 +141,6 @@ def pc():
         wf = add_modify_incar(wf, {"incar_update": {"METAGGA": "R2SCAN"}})
         wf = preserve_fworker(wf)
         wf = add_modify_incar(wf)
-        wf = bash_scp_files(wf, dest="/home/tsai/Research/projects/Scan2dMat/calc_data", port=12348)
         wf.name = "{}:SCAN_full".format(mx2["uid"])
         lpad.add_wf(wf)
 

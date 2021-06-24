@@ -36,19 +36,19 @@ ads_sites = asf.find_adsorption_sites()
 from pymatgen import Molecule
 from monty.serialization import dumpfn
 
-H = Molecule("H", [[0,0,0]])
+H = Molecule(["H", "H"], [[0,0,0], [0.74, 0, 0]])
 
 ads_sts = asf.generate_adsorption_structures(H, find_args={"distance": 1.6}, repeat=[3,3,1])
 
-# fig = plt.figure()
+fig = plt.figure(dpi=500)
 for n, ads_st, name in zip(range(len(ads_sts)), ads_sts, ads_sites.keys()):
     print(ads_st.sites)
-    # ads_st.to("poscar", "/Users/jeng-yuantsai/Research/code/JPack/projects/co2_hydrogenation/H_ads/{}_100.vasp".format(name))
-    # ax = fig.add_subplot(1, 3, n+1)
-    # plot_slab(ads_st, ax, adsorption_sites=False)
+    # ads_st.to("poscar", "/Users/jeng-yuantsai/Research/code/JPack/projects/co2_hydrogenation/H_ads/H2_{}_100.vasp".format(name))
+    ax = fig.add_subplot(1, 3, n+1)
+    plot_slab(ads_st, ax, adsorption_sites=False)
     # ax.set_xlim(-10, 10)
     # ax.set_ylim(-10, 10)
-# plt.show()
+plt.show()
 #%%
 st_json = dict(zip(ads_sites.keys(), ads_sts))
 dumpfn(st_json, "ads_sts.json", indent=4)
