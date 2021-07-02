@@ -8,7 +8,8 @@ from atomate.vasp.powerups import (
     set_queue_options,
     set_execution_options,
     clean_up_files,
-    add_modify_kpoints
+    add_modify_kpoints,
+    add_tags
 )
 from atomate.vasp.workflows.base.core import get_wf
 
@@ -59,6 +60,7 @@ def relax_pc():
             wf = add_modify_incar(wf)
             wf = set_execution_options(wf, category="scan_relax_pc")
             wf = preserve_fworker(wf)
+            wf = add_
             lpad.add_wf(wf)
 
 def pc():
@@ -83,16 +85,16 @@ def pc():
     #     }
     # )
 
-    col = get_db("symBaseBinaryQubit", "scan_relax_pc", port=12345).collection
+    col = get_db("symBaseBinaryQubit", "scan_relax_pc", port=12345, user="Jeng", password="qimin").collection
     mx2s = col.find({"c2db_info.uid": {"$in": calculated_list}})
 
-    for idx, mx2 in enumerate(mx2s[:1]):
+    for idx, mx2 in enumerate(mx2s[1:2]):
         pc = Structure.from_dict(mx2["output"]["structure"])
         print(pc.num_sites)
         pc = ensure_vacuum(pc, 30)
         pc, site_info = phonopy_structure(pc)
         print(pc.num_sites)
-        wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/Scancalculated.json"))
+        wf = get_wf(pc, os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/Scan2dMat/scan_pc.yaml"))
 
         wf = add_additional_fields_to_taskdocs(
             wf,
@@ -123,7 +125,7 @@ def pc():
         if idx % 2 == 1:
             wf = set_execution_options(wf, category=cat, fworker_name="owls")
         else:
-            wf = set_execution_options(wf, category=cat, fworker_name="efrc")
+            wf = set_execution_options(wf, category=cat, fworker_name="owls")
         wf = set_queue_options(wf, "06:00:00", fw_name_constraint=wf.fws[0].name, qos="debug")
         wf = set_queue_options(wf, "02:00:00", fw_name_constraint=wf.fws[1].name)
         wf = set_queue_options(wf, "01:00:00", fw_name_constraint=wf.fws[2].name)
@@ -136,7 +138,7 @@ def pc():
 
         wf = preserve_fworker(wf)
         wf = add_modify_incar(wf)
-        wf.name = "{}:scan".format(mx2["uid"])
+        wf.name = "{}:scan".format(mx2["c2db_info"]["uid"])
         lpad.add_wf(wf)
 
 def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_vac

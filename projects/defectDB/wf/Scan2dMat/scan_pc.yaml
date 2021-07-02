@@ -14,6 +14,7 @@ fireworks:
           EDIFF: 1e-4
           LCHARG: False
           LWAVE: False
+          NELM: 300
           NSW: 150
         user_kpoints_settings:
           reciprocal_density: 36
