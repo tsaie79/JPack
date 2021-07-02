@@ -126,24 +126,30 @@ df.to_json("cori_relax_lc.json", orient="records")
 
 
 #%% scan_relax_pc update
-db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/scan_relax_pc/db.json")
+from qubitPack.tool_box import get_db, get_good_ir_sites
+from monty.json import jsanitize
+from pymatgen.io.vasp.inputs import Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-for e in db.collection.find({}):
+db = get_db("Scan2dMat", "ir_data", user="Jeng", password="qimin")
+
+for e in db.collection.find():
     st = Structure.from_dict(e["output"]["structure"])
     sym = SpacegroupAnalyzer(st, symprec=1e-1).get_symmetry_dataset()
-    d = {}
-    for k, v in sym.items():
-        if type(v).__name__ == "ndarray":
-            d[k] = v.tolist()
-        else:
-            d[k] = v
+    d = jsanitize(sym)
+    print(d)
+    # for k, v in sym.items():
+    #     if type(v).__name__ == "ndarray":
+    #         d[k] = v.tolist()
+    #     else:
+    #         d[k] = v
     d.update({"symprec":1e-1})
     species = [str(sp) for sp in st.species]
     combine = dict(zip(d["wyckoffs"], zip(species, d["site_symmetry_symbols"])))
     species, syms = get_good_ir_sites(dict(combine.values()).keys(), dict(combine.values()).values())
     combine.update({"species": species, "syms": syms})
 
-    d.update({"combo": combine})
+    d.update({"high_dim_ir_info": combine})
     print(d)
     db.collection.update_one({"task_id": e["task_id"]}, {"$set":{"sym_data":d}})
 

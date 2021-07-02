@@ -62,32 +62,26 @@ def relax_pc():
             lpad.add_wf(wf)
 
 def pc():
-    cat = "calc_data"
+    cat = "test"
     lpad = LaunchPad.from_file(
         os.path.join(
             os.path.expanduser("~"),
-            "config/project/Scan2dMat/{}/my_launchpad.yaml".format(cat)))
+            "config/project/test/{}/my_launchpad.yaml".format(cat)))
 
     col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
 
-    # mx2s = col.find(
-    #     {
-    #         "gap_hse_nosoc":{"$gt": 0},
-    #         "nkinds": 2,
-    #         "magstate": "NM",
-    #         "nsites": 12,
-    #     }
-    # )
-
     mx2s = col.find(
         {
-            "uid": "C2-C-NM"
+            "gap_hse_nosoc":{"$gt": 0},
+            "nkinds": 2,
+            "magstate": "NM",
+            # "nsites": {"$in": [4, 6,8,12]},
         }
     )
 
 
 
-    for idx, mx2 in enumerate(mx2s):
+    for idx, mx2 in enumerate(mx2s[:1]):
         pc = Structure.from_dict(mx2["structure"])
         print(pc.num_sites)
         pc = ensure_vacuum(pc, 30)
@@ -124,14 +118,14 @@ def pc():
         )
 
         if idx % 2 == 1:
-            wf = set_execution_options(wf, category=cat, fworker_name="nersc")
+            wf = set_execution_options(wf, category=cat, fworker_name="owls")
         else:
             wf = set_execution_options(wf, category=cat, fworker_name="nersc")
         wf = set_queue_options(wf, "00:30:00", fw_name_constraint=wf.fws[0].name, qos="debug")
-        wf = set_queue_options(wf, "03:00:00", fw_name_constraint=wf.fws[1].name)
-        wf = set_queue_options(wf, "03:00:00", fw_name_constraint=wf.fws[2].name)
-        wf = set_queue_options(wf, "02:00:00", fw_name_constraint=wf.fws[3].name)
-        wf = set_queue_options(wf, "02:00:00", fw_name_constraint=wf.fws[4].name)
+        wf = set_queue_options(wf, "02:00:00", fw_name_constraint=wf.fws[1].name)
+        wf = set_queue_options(wf, "01:00:00", fw_name_constraint=wf.fws[2].name)
+        wf = set_queue_options(wf, "01:00:00", fw_name_constraint=wf.fws[3].name)
+        wf = set_queue_options(wf, "01:00:00", fw_name_constraint=wf.fws[4].name)
         wf = set_queue_options(wf, "00:30:00", fw_name_constraint=wf.fws[5].name)
 
         wf = clean_up_files(wf, files=["WAVECAR"], task_name_constraint="IRVSPToDb", fw_name_constraint="irvsp")

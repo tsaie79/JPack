@@ -45,18 +45,26 @@ for fw in wf.fws:
                  }
             },
             fw_name_constraint=fw.name)
+for fw in wf.fws:
+    st = fw.tasks[0]["structure"]
+    st.to("POSCAR", "/home/tug03990/h2_rh/poscar_{}.vasp".format(fw.name))
+
+
 wf = add_modify_incar(wf, {"incar_update": {"IVDW": 1}}) #DFT-D2 vdw correction
 wf = preserve_fworker(wf)
 wf = set_execution_options(wf, category=CATEGORY)
 wf = add_modify_incar(wf)
 
-LPAD.add_wf(wf)
+# LPAD.add_wf(wf)
 
 #%% Run lobster for COHP
-
+from fireworks import LaunchPad
 from atomate.vasp.workflows.base.lobster import get_wf_lobster
+from atomate.vasp.powerups import *
 from qubitPack.tool_box import get_db
 import numpy as np
+import os
+from pymatgen import Structure
 
 CATEGORY = "H_ads"
 LPAD = LaunchPad.from_file(
@@ -67,7 +75,7 @@ d = get_db("CO2_hydrogenation", "H_ads", port=12345)
 
 
 
-for tkid, name, n in zip([12,13,14], ["hollow", "top", "bridge"], range(3)):
+for tkid, name, n in zip([23], ["top"], range(1)):
     e = d.collection.find_one({"task_id": tkid})
     st = Structure.from_dict(e["output"]["structure"])
 
@@ -75,7 +83,7 @@ for tkid, name, n in zip([12,13,14], ["hollow", "top", "bridge"], range(3)):
     center_of_mass = np.average(
         st.frac_coords, weights=weights, axis=0
     )
-    dipole = {"LDIPOL": True, "IDIPOL": 3, "DIPOL": center_of_mass}
+    dipole = {"LDIPOL": True, "IDIPOL": 3, "DIPOL": center_of_mass, "IVDW": 1}
     uis = dipole.copy()
     uis.update({"ENCUT":500})
 

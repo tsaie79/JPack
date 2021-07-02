@@ -79,7 +79,7 @@ for tk_id, n, m in zip([12,13,14], ["hollow", "top", "bridge"], range(3)):
 plt.show()
 #%%
 from pymatgen.electronic_structure.cohp import CompleteCohp
-os.chdir('/Users/jeng-yuantsai/Research/project/co2_hydrogenation/figures/cohp')
+os.chdir('/Users/jeng-yuantsai/Research/project/co2_hydrogenation/calculations/H2-Rh_cohp')
 
 hollow, bridge, top = "tkid_18_hollow", "tkid_20_bridge", "tkid_19_top"
 hollow_cohp=CompleteCohp.from_file(fmt="LOBSTER",filename=os.path.join(hollow, "COHPCAR.lobster.gz"),
@@ -95,7 +95,11 @@ top_cohp=CompleteCohp.from_file(fmt="LOBSTER",filename=os.path.join(top, "COHPCA
 import os
 from pymatgen.electronic_structure.plotter import CohpPlotter
 from pymatgen.electronic_structure.core import Orbital
+from pymatgen.electronic_structure.cohp import CompleteCohp
+os.chdir('/Users/jeng-yuantsai/Research/project/co2_hydrogenation/calculations/H-Rh_cohp')
 
+hollow_cohp=CompleteCohp.from_file(fmt="LOBSTER",filename=os.path.join(hollow, "COHPCAR.lobster.gz"),
+                                   structure_file=os.path.join(hollow, "POSCAR"))
 completecohp = hollow_cohp
 
 #search for the number of the COHP you would like to plot in ICOHPLIST.lobster (the numbers in COHPCAR.lobster are different!)

@@ -1,7 +1,7 @@
 fireworks:
   - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanRelaxFW
     params:
-      name: SCAN_relax lc
+      name: SCAN_relax
       force_gamma: True
       override_default_vasp_params:
         user_incar_settings:
@@ -26,37 +26,9 @@ fireworks:
         parse_eigenvalues: False
         parse_chgcar: False
 
-  - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanRelaxFW
-    params:
-      parents: 0
-      name: SCAN_relax pos
-      force_gamma: True
-      override_default_vasp_params:
-        user_incar_settings:
-          ENCUT: 800
-          ISIF: 2
-          ISMEAR: 0
-          ISPIN: 2
-          SIGMA: 0.05
-          EDIFFG: -0.01
-          EDIFF: 1e-4
-          LCHARG: False
-          LWAVE: False
-          NSW: 150
-        user_kpoints_settings:
-          reciprocal_density: 36
-      job_type: double_relaxation_run
-      max_force_threshold: False
-      vasptodb_kwargs:
-        additional_fields:
-          task_type: ScanRelaxFW
-        parse_dos: False
-        parse_eigenvalues: False
-        parse_chgcar: False
-
   - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanStaticFW
     params:
-      parents: 1
+      parents: 0
       name: SCAN_scf
       force_gamma: True
       vasp_input_set_params:
@@ -78,7 +50,7 @@ fireworks:
 
   - fw: atomate.vasp.fireworks.NonSCFFW
     params:
-      parents: 2
+      parents: 1
       name: SCAN_nscf
       mode: line
       input_set_overrides:
@@ -99,7 +71,7 @@ fireworks:
   - fw: atomate.vasp.fireworks.NonSCFFW
     params:
       name: SCAN_nscf
-      parents: 2
+      parents: 1
       mode: uniform
       input_set_overrides:
         nedos: 0
@@ -119,7 +91,7 @@ fireworks:
   - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
     params:
       name: irvsp
-      parents: 3
+      parents: 2
       kpt_mode: all
       symprec: 0.001
       irvsptodb_kwargs:
