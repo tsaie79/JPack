@@ -60,7 +60,6 @@ def relax_pc():
             wf = add_modify_incar(wf)
             wf = set_execution_options(wf, category="scan_relax_pc")
             wf = preserve_fworker(wf)
-            wf = add_
             lpad.add_wf(wf)
 
 def pc():
@@ -72,24 +71,25 @@ def pc():
 
     calculated_list = loadfn(os.path.join(
         os.path.dirname(os.path.abspath("__file__")),  "projects/defectDB/wf/Scan2dMat/calculated.json"))
-    print(type(calculated_list))
-    # col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
+    wait_list = loadfn(os.path.join(
+        os.path.dirname(os.path.abspath("__file__")),  "projects/defectDB/wf/Scan2dMat/not_yet_calc.json"))
+    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
 
-    # mx2s = col.find(
-    #     {
-    #         "gap_hse_nosoc":{"$gt": 0},
-    #         "nkinds": 2,
-    #         "magstate": "NM",
-    #         "uid": {"$in": calculated_list}
-    #         # "nsites": {"$in": [4, 6,8,12]},
-    #     }
-    # )
+    mx2s = col.find(
+        {
+            "gap_hse_nosoc":{"$gt": 0},
+            "nkinds": 2,
+            "magstate": "NM",
+            "uid": {"$in": wait_list},
+        }
+    )
 
-    col = get_db("symBaseBinaryQubit", "scan_relax_pc", port=12345, user="Jeng", password="qimin").collection
-    mx2s = col.find({"c2db_info.uid": {"$in": calculated_list}})
+    # col = get_db("symBaseBinaryQubit", "scan_relax_pc", port=12345, user="Jeng", password="qimin").collection
+    # mx2s = col.find({"c2db_info.uid": {"$in": wait_list}})
 
-    for idx, mx2 in enumerate(mx2s[1:2]):
-        pc = Structure.from_dict(mx2["output"]["structure"])
+    for idx, mx2 in enumerate(mx2s[100:]): #start from 100:!myq
+
+        pc = Structure.from_dict(mx2["structure"])
         print(pc.num_sites)
         pc = ensure_vacuum(pc, 30)
         pc, site_info = phonopy_structure(pc)
@@ -99,7 +99,7 @@ def pc():
         wf = add_additional_fields_to_taskdocs(
             wf,
             {
-                "c2db_info": mx2["c2db_info"],
+                "c2db_info": {"uid": mx2["uid"]},
                 "site_info": site_info
             },
             task_name_constraint="ToDb"
@@ -123,10 +123,10 @@ def pc():
         )
 
         if idx % 2 == 1:
-            wf = set_execution_options(wf, category=cat, fworker_name="owls")
+            wf = set_execution_options(wf, category=cat, fworker_name="efrc")
         else:
             wf = set_execution_options(wf, category=cat, fworker_name="owls")
-        wf = set_queue_options(wf, "06:00:00", fw_name_constraint=wf.fws[0].name, qos="debug")
+        wf = set_queue_options(wf, "06:00:00", fw_name_constraint=wf.fws[0].name)
         wf = set_queue_options(wf, "02:00:00", fw_name_constraint=wf.fws[1].name)
         wf = set_queue_options(wf, "01:00:00", fw_name_constraint=wf.fws[2].name)
         wf = set_queue_options(wf, "01:00:00", fw_name_constraint=wf.fws[3].name)
@@ -138,7 +138,7 @@ def pc():
 
         wf = preserve_fworker(wf)
         wf = add_modify_incar(wf)
-        wf.name = "{}:scan".format(mx2["c2db_info"]["uid"])
+        wf.name = "{}:scan".format(mx2["uid"])
         lpad.add_wf(wf)
 
 def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_vac
@@ -244,7 +244,7 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_
                                     },
                                     wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
                                     task="scan_relax-scan_scf",
-                                    wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/scan_defect.yaml")
+                                    wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/Scan2dDefect/scan_defect.yaml")
                                 )
 
                                 wf = add_modify_2d_nscf_kpoints(
