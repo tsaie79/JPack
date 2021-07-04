@@ -35,6 +35,7 @@ fireworks:
       force_gamma: True
       vasp_input_set_params:
         user_incar_settings:
+          ALGO: All
           ENCUT: 800
           ISPIN: 2
           LAECHG: False
