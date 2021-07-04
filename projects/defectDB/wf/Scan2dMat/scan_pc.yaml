@@ -5,6 +5,7 @@ fireworks:
       force_gamma: True
       override_default_vasp_params:
         user_incar_settings:
+          ALGO: All
           ENCUT: 800
           ISIF: 3
           ISPIN: 2
