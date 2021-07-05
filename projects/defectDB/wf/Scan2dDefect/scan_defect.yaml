@@ -56,6 +56,7 @@ fireworks:
       input_set_overrides:
         other_params:
           user_incar_settings:
+            ALGO: All
             EDIFF: 1e-5
             ISPIN: 2
             LCHARG: False
@@ -76,6 +77,7 @@ fireworks:
         nedos: 0
         other_params:
           user_incar_settings:
+            ALGO: All
             EDIFF: 1e-5
             ISPIN: 2
             LWAVE: False

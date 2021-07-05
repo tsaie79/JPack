@@ -59,6 +59,7 @@ fireworks:
       input_set_overrides:
         other_params:
           user_incar_settings:
+            ALGO: All
             ENCUT: 800
             EDIFF: 1e-5
             ISPIN: 2
@@ -80,6 +81,7 @@ fireworks:
         nedos: 0
         other_params:
           user_incar_settings:
+            ALGO: All
             ENCUT: 800
             EDIFF: 1e-5
             ISPIN: 2
