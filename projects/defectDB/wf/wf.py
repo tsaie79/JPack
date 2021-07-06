@@ -141,169 +141,163 @@ def pc():
         wf.name = "{}:scan".format(mx2["uid"])
         lpad.add_wf(wf)
 
-def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None): #BN_vac
+def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
+    os.chdir(os.path.join(os.path.dirname(os.path.abspath("__file__"))))
 
-    col = get_db("symBaseBinaryQubit", "scan_relax_pc", port=12345).collection
+    col = get_db("Scan2dMat", "calc_data", port=12347).collection
+    groups = loadfn("projects/defectDB/wf/Scan2dDefect/bg_lge_1_and_homo_07062021")
 
-    mx2s = col.find(
-        {
-            "task_id": 161,
-        }
-    )
     geo_spec = None
-    aexx = 0.25
-    test = []
-    for idx, mx2 in enumerate(mx2s[:1]): #mx2s[14:34]
-        pc = Structure.from_dict(mx2["output"]["structure"])
-        cat = None
+    for group in groups[:1]:
+        tids = group["tid"]
+        group_id = group["group_id"]
+        for idx, mx2 in enumerate(tids[:1]): #mx2s[14:34]
+            mx2 = col.find_one({"task_id": mx2})
+            pc = Structure.from_dict(mx2["output"]["structure"])
+            cat = None
 
-        if defect_choice == "substitutions":
-            cat = "binary_defect_sub_"
-        elif defect_choice == "vacancies":
-            cat = "bincary_defect_vac_"
+            if defect_choice == "substitutions":
+                cat = "binary_sub_"
+            elif defect_choice == "vacancies":
+                cat = "binary_vac_"
 
-        scaling = find_scaling_for_2d_defect(pc, 15)[0]
-        area = scaling[0]*scaling[1]
-        if mx2["nsites"] == 2:
-            geo_spec = {area*2: [20]}
-            cat += "AB"
-        if mx2["nsites"] == 3:
-            geo_spec = {area*3: [20]}
-            cat += "AB2"
-        if mx2["nsites"] == 4:
-            geo_spec = {area*4: [20]}
-            cat += "AB"
-        if mx2["nsites"] == 8:
-            geo_spec = {area*8: [20]}
-            cat += "AB3"
+            scaling = find_scaling_for_2d_defect(pc, 15)[0]
+            area = scaling[0]*scaling[1]
+            if mx2["nsites"] == 2:
+                geo_spec = {area*2: [20]}
+                cat += "AB"
+            if mx2["nsites"] == 3:
+                geo_spec = {area*3: [20]}
+                cat += "AB2"
+            if mx2["nsites"] == 4:
+                geo_spec = {area*4: [20]}
+                cat += "AB"
+            if mx2["nsites"] == 6:
+                geo_spec = {area*6: [20]}
+                cat += "AB2"
+            if mx2["nsites"] == 8:
+                geo_spec = {area*8: [20]}
+                cat += "AB3"
 
-        lpad = LaunchPad.from_file(
-            os.path.join(
-                os.path.expanduser("~"),
-                "config/project/Scan2dDefect/calc_data/{}/my_launchpad.yaml".format(cat)))
-        print(cat)
+            lpad = LaunchPad.from_file(
+                os.path.join(
+                    os.path.expanduser("~"),
+                    "config/project/Scan2dDefect/calc_data/my_launchpad.yaml"))
+            print(cat)
 
-        defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
+            defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
 
-        cation, anion = find_cation_anion(pc)
+            cation, anion = find_cation_anion(pc)
 
-        combo = mx2["sym_data"]["combo"]
+            high_dim_ir_info = mx2["sym_data"]["high_dim_ir_info"]
 
-        good_sym_site_symbols = get_good_ir_sites(combo["species"], combo["syms"])
+            good_sym_site_symbols = get_good_ir_sites(high_dim_ir_info["species"], high_dim_ir_info["syms"])
 
-        # Exclude those element in irrep
-        # species = list(dict.fromkeys(mx2["sym_data"]["species"]))
-        # for tgt in good_sym_site_symbols:
-        #     species.remove(tgt)
-        # good_sym_site_symbols = species
+            # Exclude those element in irrep
+            # species = list(dict.fromkeys(mx2["sym_data"]["species"]))
+            # for tgt in good_sym_site_symbols:
+            #     species.remove(tgt)
+            # good_sym_site_symbols = species
 
-        print(good_sym_site_symbols)
-        for good_sym_site_symbol in good_sym_site_symbols[0]:
-            # substitutions or vacancies!
-            defect_type = (defect_choice, "{}".format(good_sym_site_symbol))
+            print(good_sym_site_symbols)
+            for good_sym_site_symbol in good_sym_site_symbols[0]:
+                # substitutions or vacancies!
+                defect_type = (defect_choice, "{}".format(good_sym_site_symbol))
 
-            for de_idx in range(len(defect[defect_type[0]])):
-                print(cation, anion)
+                for de_idx in range(len(defect[defect_type[0]])):
+                    print(cation, anion)
 
-                if defect_type[1] == defect[defect_type[0]][de_idx]["name"].split("_")[-1]:
-                    for na, thicks in geo_spec.items():
-                        for thick in thicks:
-                            for dtort in [0]:
-                                if not impurity_on_nn:
-                                    impurity_on_nn = []
-                                gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick, distort=dtort,
-                                                       sub_on_side=list(impurity_on_nn))
-                                # gen_defect.vacancies(dtort, list(impurity_on_nn))
+                    if defect_type[1] == defect[defect_type[0]][de_idx]["name"].split("_")[-1]:
+                        for na, thicks in geo_spec.items():
+                            for thick in thicks:
+                                for dtort in [0]:
+                                    if not impurity_on_nn:
+                                        impurity_on_nn = []
+                                    gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick, distort=dtort,
+                                                           sub_on_side=list(impurity_on_nn))
+                                    # gen_defect.vacancies(dtort, list(impurity_on_nn))
 
-                                defect_data = gen_defect.defect_entry
+                                    defect_data = gen_defect.defect_entry
 
-                                # add charge state regarding nelect
-                                charge, nupdn = None, None
-                                if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
-                                    charge = [1,-1, 0]
-                                    nupdn = [-1,-1,-1]
-                                    print(charge)
-                                    # if odd nelect, it used to be charge=[0]
-                                else:
-                                    # continue
-                                    charge = [0]
-                                    nupdn = [-1]
+                                    # add charge state regarding nelect
+                                    charge, nupdn = None, None
+                                    if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
+                                        charge = [1,-1, 0]
+                                        nupdn = [-1,-1,-1]
+                                        print(charge)
+                                        # if odd nelect, it used to be charge=[0]
+                                    else:
+                                        # continue
+                                        charge = [0]
+                                        nupdn = [-1]
 
-                                wf = get_wf_full_scan(
-                                    structure=gen_defect.defect_st,
-                                    charge_states=charge,
-                                    gamma_only=False,
-                                    gamma_mesh=True,
-                                    dos=False,
-                                    nupdowns=nupdn,
-                                    vasptodb={
-                                        "category": cat,
-                                        "NN": gen_defect.NN,
-                                        "NN_dist": gen_defect.nn_dist,
-                                        "defect_entry": defect_data,
-                                    },
-                                    wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
-                                    task="scan_relax-scan_scf",
-                                    wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")), "projects/defectDB/wf/Scan2dDefect/scan_defect.yaml")
-                                )
+                                    wf = get_wf_full_scan(
+                                        structure=gen_defect.defect_st,
+                                        charge_states=[0],
+                                        gamma_only=True,
+                                        dos=False,
+                                        nupdowns=[-1],
+                                        vasptodb={
+                                            "category": cat,
+                                            "NN": gen_defect.NN,
+                                            "NN_dist": gen_defect.nn_dist,
+                                            "defect_entry": defect_data,
+                                        },
+                                        wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
+                                        wf_yaml="projects/defectDB/wf/Scan2dDefect/scan_defect.yaml"
+                                    )
 
-                                wf = add_modify_2d_nscf_kpoints(
-                                    wf,
-                                    modify_kpoints_params={"mode": "line"},
-                                    fw_name_constraint=wf.fws[2].name
-                                )
-                                wf = add_modify_2d_nscf_kpoints(
-                                    wf,
-                                    modify_kpoints_params={"mode": "uniform"},
-                                    fw_name_constraint=wf.fws[3].name
-                                )
-                                wf = add_modify_incar(wf, {"incar_update": {"METAGGA":"SCAN"}})
-                                wf = add_modify_incar(wf)
-                                wf = add_additional_fields_to_taskdocs(
-                                    wf,
-                                    {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
-                                     "pc_from_id": mx2["task_id"],
-                                     "combo": mx2["sym_data"]["combo"],
-                                     "class": mx2["c2db_info"]["class"],
-                                     "defect_name": defect_data["name"],
-                                     "site_info": gen_defect.site_info,
-                                     "perturbed": gen_defect.distort}
-                                )
-                                wf = add_additional_fields_to_taskdocs(
-                                    wf,
-                                    {"pc_from": "symBaseBinaryQubit/scan_relax_pc/SCAN_relax/{}".format(mx2["task_id"]),
-                                     "pc_from_id": mx2["task_id"],
-                                     "class": mx2["c2db_info"]["class"],
-                                     "defect_name": defect_data["name"],
-                                     },
-                                    task_name_constraint="IRVSPToDb"
-                                )
+                                    # wf = add_modify_2d_nscf_kpoints(
+                                    #     wf,
+                                    #     modify_kpoints_params={"mode": "line"},
+                                    #     fw_name_constraint=wf.fws[2].name
+                                    # )
+                                    wf = add_modify_2d_nscf_kpoints(
+                                        wf,
+                                        modify_kpoints_params={"mode": "uniform"},
+                                        fw_name_constraint=wf.fws[2].name
+                                    )
+                                    # wf = add_modify_incar(wf, {"incar_update": {"METAGGA":"R2SCAN"}})
+                                    wf = add_modify_incar(wf)
+                                    wf = add_additional_fields_to_taskdocs(
+                                        wf,
+                                        {
+                                            "pc_from": "Scan2dMat/calc_data/{}".format(mx2["task_id"]),
+                                            "pc_from_id": mx2["task_id"],
+                                            "host_info": {"c2db_info": mx2["c2db_info"], "sym_data": mx2["sym_data"]},
+                                            "defect_name": defect_data["name"],
+                                            "site_info": gen_defect.site_info,
+                                            "perturbed": gen_defect.distort,
+                                            "group_id": group_id
+                                         },
+                                        task_name_constraint="ToDb"
+                                    )
 
-                                if idx % 2 == 1:
-                                    wf = set_execution_options(wf, category=cat, fworker_name="efrc")
-                                else:
-                                    wf = set_execution_options(wf, category=cat, fworker_name="owls")
-                                wf = set_queue_options(wf, "24:00:00")
-                                wf = set_queue_options(wf, "00:30:00", fw_name_constraint="irvsp")
-                                wf = preserve_fworker(wf)
-                                wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
-                                wf = bash_scp_files(
-                                    wf,
-                                    dest="/home/tsai/Research/projects/Scan2dDefect/calc_data/scf",
-                                    port=12348,
-                                    fw_name_constraint="SCAN_scf",
-                                    task_name_constraint="RunVasp"
-                                )
-                                wf = clean_up_files(wf, files=["WAVECAR*"], task_name_constraint="SCP",
-                                                    fw_name_constraint=wf.fws[1].name)
-                                wf = clean_up_files(wf, files=["CHGCAR*"], task_name_constraint="ToDb",
-                                                    fw_name_constraint=wf.fws[3].name)
-                                wf = clean_up_files(wf, files=["WAVECAR"], task_name_constraint="IRVSPToDb",
-                                                    fw_name_constraint=wf.fws[4].name)
+                                    if idx % 2 == 1:
+                                        wf = set_execution_options(wf, category="calc_data", fworker_name="efrc")
+                                    else:
+                                        wf = set_execution_options(wf, category="calc_data", fworker_name="efrc")
+                                    wf = set_queue_options(wf, "12:00:00")
+                                    wf = set_queue_options(wf, "01:00:00", fw_name_constraint="irvsp")
+                                    wf = preserve_fworker(wf)
+                                    wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
+                                    wf = bash_scp_files(
+                                        wf,
+                                        dest="/home/tsai/Research/projects/Scan2dDefect/calc_data/scf",
+                                        port=12348,
+                                        fw_name_constraint="SCAN_scf",
+                                        task_name_constraint="RunVasp"
+                                    )
+                                    # wf = clean_up_files(wf, files=["WAVECAR*"], task_name_constraint="SCP",
+                                    #                     fw_name_constraint=wf.fws[1].name)
+                                    wf = clean_up_files(wf, files=["CHGCAR*"], task_name_constraint="ToDb",
+                                                        fw_name_constraint=wf.fws[2].name)
+                                    wf = clean_up_files(wf, files=["WAVECAR"], task_name_constraint="IRVSPToDb",
+                                                        fw_name_constraint=wf.fws[3].name)
 
 
-                                print(wf)
-                                lpad.add_wf(wf)
+                                    print(wf)
+                                    # lpad.add_wf(wf)
 
 if __name__ == '__main__':
-    pc()
+    binary_scan_defect()

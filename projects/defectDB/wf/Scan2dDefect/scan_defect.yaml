@@ -14,8 +14,8 @@ fireworks:
           LCHARG: False
           LWAVE: False
           EDIFFG: -0.01
-          EDIFF: 1e-04
-          METAGGA: R2SCAN
+          EDIFF: 1.0e-4
+          METAGGA: SCAN
       job_type: double_relaxation_run
       max_force_threshold: False
       vasptodb_kwargs:
@@ -39,8 +39,8 @@ fireworks:
           LCHARG: True
           LAECHG: False
           LWAVE: True
-          EDIFF: 1e-5
-          METAGGA: R2SCAN
+          EDIFF: 1.0e-5
+          METAGGA: SCAN
       vasptodb_kwargs:
         additional_fields:
           task_type: ScanStaticFW
@@ -48,25 +48,25 @@ fireworks:
         parse_eigenvalues: False
         parse_chgcar: False
 
-  - fw: atomate.vasp.fireworks.NonSCFFW
-    params:
-      parents: 1
-      name: SCAN_nscf
-      mode: line
-      input_set_overrides:
-        other_params:
-          user_incar_settings:
-            ALGO: All
-            EDIFF: 1e-5
-            ISPIN: 2
-            LCHARG: False
-            LAECHG: False
-            LWAVE: True
-            LVHAR: True
-            ISMEAR: 0
-            SIGMA: 0.05
-            ISYM: 2
-            METAGGA: R2SCAN
+#  - fw: atomate.vasp.fireworks.NonSCFFW
+#    params:
+#      parents: 1
+#      name: SCAN_nscf
+#      mode: line
+#      input_set_overrides:
+#        other_params:
+#          user_incar_settings:
+#            ALGO: All
+#            EDIFF: 1e-05
+#            ISPIN: 2
+#            LCHARG: False
+#            LAECHG: False
+#            LWAVE: True
+#            LVHAR: True
+#            ISMEAR: 0
+#            SIGMA: 0.05
+#            ISYM: 2
+#            METAGGA: SCAN
 
   - fw: atomate.vasp.fireworks.NonSCFFW
     params:
@@ -78,7 +78,7 @@ fireworks:
         other_params:
           user_incar_settings:
             ALGO: All
-            EDIFF: 1e-5
+            EDIFF: 1.0e-5
             ISPIN: 2
             LWAVE: False
             LCHARG: False
@@ -86,13 +86,13 @@ fireworks:
             LVHAR: True
             ISMEAR: 0
             SIGMA: 0.05
-            METAGGA: R2SCAN
+            METAGGA: SCAN
 
   - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
     params:
       name: irvsp
-      parents: 2
-      kpt_mode: all
+      parents: 1
+      kpt_mode: single_kpt
       symprec: 0.001
       irvsptodb_kwargs:
         collection_name: ir_data

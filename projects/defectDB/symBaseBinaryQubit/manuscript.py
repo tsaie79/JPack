@@ -110,41 +110,6 @@ es = db.collection.aggregate(
 
 df = pd.DataFrame(es)
 df.to_clipboard("/t")
-#%% site sym
-from atomate.vasp.database import VaspCalcDb
-import pandas as pd
-from matplotlib import pyplot as plt
-
-
-db = VaspCalcDb.from_db_file('/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/calculations/'
-                             'scan_relax_pc/db.json')
-
-
-es = db.collection.aggregate(
-    [
-        {"$match": {"task_label":"SCAN_relax"}},
-        {"$group": {
-            "_id": {"site_sym": "$sym_data.combo.syms", "spg": "$sym_data.international"},
-            "count": {"$sum":1},
-            "tid": {"$push": "$task_id"}
-        }},
-        {"$project": {"_id": 0,
-                      "spg": "$_id.spg",
-                      "site_sym": "$_id.site_sym",
-                      "counts": "$count",
-                      "tid": "$tid"
-                      }},
-        {"$sort": {"spg":-1}}
-    ]
-)
-
-df = pd.DataFrame(es)
-# df.to_json("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/xlsx/site_sym_cat/site_sym_01012021.json", indent=4)
-# df.to_excel("/Users/jeng-yuantsai/Research/project/symBaseBinaryQubit/xlsx/site_sym_cat/site_sym_01012021.xlsx")
-
-df.plot(x="site_sym", y="counts", kind="barh", rot=0, figsize=(10,8))
-
-plt.show()
 #%% Categorize defects by its site symmetry
 from monty.serialization import loadfn, dumpfn
 
