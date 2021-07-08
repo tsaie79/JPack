@@ -1,4 +1,8 @@
 #%% 1
+import json
+import os.path
+
+
 class Pc:
     @classmethod
     def hist_nsites(cls):
@@ -44,11 +48,14 @@ class Pc:
 from qubitPack.qc_searching.analysis.main import get_defect_state
 from qubitPack.tool_box import get_db
 
+from pymatgen import Structure
+import os
+
 defect_db = get_db("Scan2dDefect", "calc_data", port=1236)
 host_db = get_db("Scan2dMat", "calc_data", port=1236)
 
 
-tk_id = 37
+tk_id = 32
 pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
 # c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
 
@@ -63,6 +70,11 @@ tot, proj, d_df = get_defect_state(
     0.1,
     locpot_c2db=None #(c2db, c2db_uid, 0)
 )
+
+tgt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/calculations/calc_data/defect_st"
+e = defect_db.collection.find_one({"task_id": tk_id})
+st = Structure.from_dict(e["output"]["structure"])
+st.to("poscar", os.path.join(tgt_path, "{}-{}.vasp".format(e["host_info"]["c2db_info"]["uid"], tk_id)))
 
 #%% 3 site sym
 from atomate.vasp.database import VaspCalcDb
@@ -95,7 +107,7 @@ es = db.collection.aggregate(
 )
 
 df = pd.DataFrame(es)
-df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/symBaseBinaryQubit/xlsx/site_sym_cat/site_sym_07062021.json", indent=4)
+df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/site_sym_07062021.json", indent=4)
 df.to_clipboard()
 
 df.plot(x="site_sym", y="counts", kind="barh", rot=0, figsize=(10,8))
@@ -126,37 +138,38 @@ for e in db.collection.find():
 #%% 5 generate "cat_host_bg>1_and_homo" json file
 
 df = pd.read_excel(
-    "/Users/jeng-yuantsai/Research/project/defectDB/symBaseBinaryQubit/xlsx/site_sym_cat/host_scan_nscf_line_07062021.xlsx",
+    "/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/host_scan_nscf_line_07062021.xlsx",
     sheet_name="cat_host_bg>1_and_inhomo"
 )
-df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/symBaseBinaryQubit/xlsx/site_sym_cat/bg_lge_1_and_inhomo_07062021", indent=4, orient="records")
+df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/bg_lge_1_and_inhomo_07062021", indent=4, orient="records")
 
 #%% 6
 from atomate.vasp.database import VaspCalcDb
 import pandas as pd
 from matplotlib import pyplot as plt
 from qubitPack.tool_box import get_db
-
+from monty.serialization import loadfn
+from pymatgen import Structure
+from pymatgen.electronic_structure.plotter import BSDOSPlotter
+import json, os
 
 db = get_db("Scan2dMat", "calc_data", port=1236)
+tgt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/calculations/calc_data/host_st"
 
+groups = loadfn("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/bg_lge_1_and_homo_07062021")
 
-es = db.collection.aggregate(
-    [
-        {"$match": {"task_label":"SCAN_nscf line"}},
-        {"$group": {
-            "_id": {"nsites": "$nsites"},
-            "count": {"$sum":1},
-            "AB": {"$push": "$formula_anonymous"}
-        }},
-        {"$project": {"_id": 0,
-                      "nsites": "$_id.nsites",
-                      "counts": "$count",
-                      "AB": "$AB"
-                      }},
-        {"$sort": {"nsites": -1}}
-    ]
-)
+for group in groups:
+    tids = group["tid"]
+    for tid in json.loads(tids)[:1]:
+        e = db.collection.find_one({"task_id": tid})
+        uid = e["c2db_info"]["uid"]
+        st = Structure.from_dict(e["output"]["structure"])
+        st.to("poscar", os.path.join(tgt_path, "{}-{}.vasp".format(uid, tid)))
 
-df = pd.DataFrame(es)
-df.to_clipboard()
+        bs = db.get_band_structure(tid)
+        dos = db.get_dos(db.collection.find_one({"task_label": "SCAN_nscf uniform", "c2db_info.uid": uid})["task_id"])
+        plot = BSDOSPlotter()
+        plot.get_plot(bs, dos)
+        plt.suptitle("Homo-{}-{}-{}".format(group["group_id"], uid, tid))
+        plt.show()
+

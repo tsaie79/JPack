@@ -1,3 +1,5 @@
+import json
+
 from fireworks import LaunchPad, Workflow
 
 from atomate.vasp.fireworks.core import ScanOptimizeFW
@@ -25,6 +27,8 @@ from qubitPack.tool_box import *
 from mpinterfaces.utils import *
 
 from monty.serialization import loadfn
+from monty.json import jsanitize
+
 import os
 import pandas as pd
 
@@ -145,14 +149,16 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
     os.chdir(os.path.join(os.path.dirname(os.path.abspath("__file__"))))
 
     col = get_db("Scan2dMat", "calc_data", port=12347).collection
-    groups = loadfn("projects/defectDB/wf/Scan2dDefect/bg_lge_1_and_homo_07062021")
-
+    groups = loadfn(os.path.join(os.path.dirname(os.path.abspath("__file__")),
+                          "projects/defectDB/wf/Scan2dDefect/bg_lge_1_and_homo_07062021"))
     geo_spec = None
-    for group in groups[:1]:
-        tids = group["tid"]
-        group_id = group["group_id"]
-        for idx, mx2 in enumerate(tids[:1]): #mx2s[14:34]
-            mx2 = col.find_one({"task_id": mx2})
+    for group in groups:
+        tids = json.loads(group["tid"])
+        group_id = int(group["group_id"])
+        for idx, tid in enumerate(tids[:1]):
+            print(group_id, tid)
+
+            mx2 = col.find_one({"task_id": tid})
             pc = Structure.from_dict(mx2["output"]["structure"])
             cat = None
 
@@ -244,9 +250,10 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                             "defect_entry": defect_data,
                                         },
                                         wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
-                                        wf_yaml="projects/defectDB/wf/Scan2dDefect/scan_defect.yaml"
+                                        wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")),
+                                                             "projects/defectDB/wf/Scan2dDefect/scan_defect.yaml")
                                     )
-
+                                    wf.name += ":r2scan"
                                     # wf = add_modify_2d_nscf_kpoints(
                                     #     wf,
                                     #     modify_kpoints_params={"mode": "line"},
@@ -257,7 +264,7 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                         modify_kpoints_params={"mode": "uniform"},
                                         fw_name_constraint=wf.fws[2].name
                                     )
-                                    # wf = add_modify_incar(wf, {"incar_update": {"METAGGA":"R2SCAN"}})
+                                    wf = add_modify_incar(wf, {"incar_update": {"METAGGA":"R2SCAN"}})
                                     wf = add_modify_incar(wf)
                                     wf = add_additional_fields_to_taskdocs(
                                         wf,
@@ -274,11 +281,11 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                     )
 
                                     if idx % 2 == 1:
-                                        wf = set_execution_options(wf, category="calc_data", fworker_name="efrc")
+                                        wf = set_execution_options(wf, category="calc_data", fworker_name="owls")
                                     else:
-                                        wf = set_execution_options(wf, category="calc_data", fworker_name="efrc")
+                                        wf = set_execution_options(wf, category="calc_data", fworker_name="owls")
                                     wf = set_queue_options(wf, "12:00:00")
-                                    wf = set_queue_options(wf, "01:00:00", fw_name_constraint="irvsp")
+                                    wf = set_queue_options(wf, "01:30:00", fw_name_constraint="irvsp")
                                     wf = preserve_fworker(wf)
                                     wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
                                     wf = bash_scp_files(
@@ -297,7 +304,7 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
 
                                     print(wf)
-                                    # lpad.add_wf(wf)
+                                    lpad.add_wf(wf)
 
 if __name__ == '__main__':
     binary_scan_defect()

@@ -1,13 +1,17 @@
-from pymatgen import MPRester, Structure
+from pymatgen import Structure
 from pymatgen.core.surface import SlabGenerator, generate_all_slabs
 from pymatgen.analysis.adsorption import plot_slab
-
+from pymatgen.ext.matproj import MPRester
 from matplotlib import pyplot as plt
 
 import os
-os.chdir("/Users/jeng-yuantsai/Research/code/JPack/projects/co2_hydrogenation")
+# os.chdir("/Users/jeng-yuantsai/Research/code/JPack/projects/co2_hydrogenation")
+#
+# Rh = Structure.from_file("H_ads/structures/Rh_mp-74_conventional_standard.cif")
 
-Rh = Structure.from_file("H_ads/structures/Rh_mp-74_conventional_standard.cif")
+with MPRester() as m:
+    Rh = m.get_structure_by_material_id("mp-47", conventional_unit_cell=True)
+
 Rh.add_oxidation_state_by_guess()
 slabs = generate_all_slabs(Rh, 1, 10, 10)
 fig = plt.figure()
@@ -23,7 +27,9 @@ print(len(slabs))
 #%%
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder
 
-Rh = Structure.from_file("H_ads/structures/Rh_mp-74_conventional_standard.cif")
+with MPRester() as m:
+    Rh = m.get_structure_by_material_id("mp-74", conventional_unit_cell=True)
+print(Rh.lattice.abc)
 slab_100 = SlabGenerator(Rh, [1, 0, 0], 10, 15, center_slab=True).get_slab()
 
 asf = AdsorbateSiteFinder(slab_100)
@@ -44,7 +50,7 @@ fig = plt.figure(dpi=500)
 for n, ads_st, name in zip(range(len(ads_sts)), ads_sts, ads_sites.keys()):
     print(ads_st.sites)
     # ads_st.to("poscar", "/Users/jeng-yuantsai/Research/code/JPack/projects/co2_hydrogenation/H_ads/H2_{}_100.vasp".format(name))
-    ax = fig.add_subplot(1, 3, n+1)
+    ax = fig.add_subplot(1, 4, n+1)
     plot_slab(ads_st, ax, adsorption_sites=False)
     # ax.set_xlim(-10, 10)
     # ax.set_ylim(-10, 10)
