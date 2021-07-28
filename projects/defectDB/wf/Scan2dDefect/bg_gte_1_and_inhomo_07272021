@@ -1,0 +1,152 @@
+[
+    {
+        "group_id":1,
+        "spg":"P4\/nmm",
+        "spg_number":129,
+        "pg":"4\/mmm",
+        "site_sym":"['-42m', '4mm']",
+        "counts":22,
+        "uid":"['Cu2Cl2-FeSe-NM', 'Rb2I2-FeSe-NM', 'Cs2Cl2-FeSe-NM', 'Ag2Cl2-FeSe-NM', 'Rb2F2-FeSe-NM', 'K2F2-FeSe-NM', 'Rb2Br2-FeSe-NM', 'Rb2Cl2-FeSe-NM', 'Tl2I2-FeSe-NM', 'Ag2I2-FeSe-NM', 'Tl2Br2-FeSe-NM', 'Cu2I2-FeSe-NM', 'Cs2F2-FeSe-NM', 'K2I2-FeSe-NM', 'Cu2Br2-FeSe-NM', 'K2Br2-FeSe-NM', 'Cs2Br2-FeSe-NM', 'K2Cl2-FeSe-NM', 'Ga2Cl2-FeSe-NM', 'Ga2I2-FeSe-NM', 'In2I2-FeSe-NM', 'In2Cl2-FeSe-NM']",
+        "tid":"[293, 356, 394, 458, 593, 642, 681, 682, 1085, 1185, 1256, 1325, 1332, 1363, 1419, 1452, 1882, 1910, 2191, 2286, 2395, 2565]"
+    },
+    {
+        "group_id":3,
+        "spg":"P-3m1",
+        "spg_number":164,
+        "pg":"-3m",
+        "site_sym":"['-3m', '3m']",
+        "counts":48,
+        "uid":"['PdS2-CdI2-NM', 'MgCl2-CdI2-NM', 'TiO2-CdI2-NM', 'SnS2-CdI2-NM', 'SnCl2-CdI2-NM', 'SnO2-CdI2-NM', 'CdCl2-CdI2-NM', 'RuBr2-CdI2-NM', 'ZnI2-CdI2-NM', 'PtSe2-CdI2-NM', 'SnI2-CdI2-NM', 'OsI2-CdI2-NM', 'ZnBr2-CdI2-NM', 'HgBr2-CdI2-NM', 'PtS2-CdI2-NM', 'PdO2-CdI2-NM', 'BaBr2-CdI2-NM', 'SrCl2-CdI2-NM', 'GeO2-CdI2-NM', 'HfO2-CdI2-NM', 'Br2Ge-CdI2-NM', 'PtO2-CdI2-NM', 'PbCl2-CdI2-NM', 'SrI2-CdI2-NM', 'CdI2-CdI2-NM', 'BaI2-CdI2-NM', 'MgI2-CdI2-NM', 'GeI2-CdI2-NM', 'CdBr2-CdI2-NM', 'CaBr2-CdI2-NM', 'HgI2-CdI2-NM', 'OsBr2-CdI2-NM', 'HfS2-CdI2-NM', 'MgBr2-CdI2-NM', 'SrBr2-CdI2-NM', 'OsCl2-CdI2-NM', 'HgCl2-CdI2-NM', 'SnBr2-CdI2-NM', 'RuI2-CdI2-NM', 'CaCl2-CdI2-NM', 'NiO2-CdI2-NM', 'ZrO2-CdI2-NM', 'BaCl2-CdI2-NM', 'ZnCl2-CdI2-NM', 'RuCl2-CdI2-NM', 'Cl2Ge-CdI2-NM', 'PbBr2-CdI2-NM', 'PbI2-CdI2-NM']",
+        "tid":"[29, 40, 43, 66, 106, 115, 157, 176, 312, 385, 413, 424, 450, 461, 470, 477, 484, 502, 525, 574, 582, 597, 1086, 1130, 1163, 1192, 1197, 1208, 1225, 1226, 1258, 1318, 1346, 1354, 1356, 1376, 2040, 2096, 2104, 2181, 2190, 2221, 2234, 2248, 2261, 2270, 2366, 2546]"
+    },
+    {
+        "group_id":4,
+        "spg":"P-6m2",
+        "spg_number":187,
+        "pg":"-6m2",
+        "site_sym":"['-6m2', '3m']",
+        "counts":39,
+        "uid":"['MgCl2-MoS2-NM', 'ZnCl2-MoS2-NM', 'MoO2-MoS2-NM', 'GeO2-MoS2-NM', 'Cl2Ge-MoS2-NM', 'ZrO2-MoS2-NM', 'MgBr2-MoS2-NM', 'ZnI2-MoS2-NM', 'CdBr2-MoS2-NM', 'HgBr2-MoS2-NM', 'SnI2-MoS2-NM', 'ZnBr2-MoS2-NM', 'MoSe2-MoS2-NM', 'WO2-MoS2-NM', 'BaCl2-MoS2-NM', 'CaI2-MoS2-NM', 'TiO2-MoS2-NM', 'MgI2-MoS2-NM', 'CdI2-MoS2-NM', 'PbCl2-MoS2-NM', 'WSe2-MoS2-NM', 'SnBr2-MoS2-NM', 'SrI2-MoS2-NM', 'MoS2-MoS2-NM', 'WS2-MoS2-NM', 'SrBr2-MoS2-NM', 'HfO2-MoS2-NM', 'SnCl2-MoS2-NM', 'HgCl2-MoS2-NM', 'BaBr2-MoS2-NM', 'CaBr2-MoS2-NM', 'SrCl2-MoS2-NM', 'CaCl2-MoS2-NM', 'Br2Ge-MoS2-NM', 'PbI2-MoS2-NM', 'BaI2-MoS2-NM', 'PbBr2-MoS2-NM', 'PbS2-MoS2-NM', 'PbSe2-MoS2-NM']",
+        "tid":"[46, 55, 57, 63, 82, 105, 228, 229, 268, 374, 377, 383, 403, 460, 530, 612, 614, 689, 699, 1195, 1205, 1281, 1285, 1289, 1290, 1373, 2059, 2077, 2101, 2137, 2156, 2180, 2356, 2390, 2438, 2532, 2533, 2535, 2552]"
+    },
+    {
+        "group_id":5,
+        "spg":"P-6m2",
+        "spg_number":187,
+        "pg":"-6m2",
+        "site_sym":"['3m', '-6m2']",
+        "counts":2,
+        "uid":"['MoTe2-MoS2-NM', 'WTe2-MoS2-NM']",
+        "tid":"[524, 1164]"
+    },
+    {
+        "group_id":8,
+        "spg":"P-3",
+        "spg_number":147,
+        "pg":-3,
+        "site_sym":"['3']",
+        "counts":1,
+        "uid":"['Br6Sb2-BiI3-NM']",
+        "tid":"[640]"
+    },
+    {
+        "group_id":9,
+        "spg":"P-31m",
+        "spg_number":162,
+        "pg":"-3m",
+        "site_sym":"['3']",
+        "counts":27,
+        "uid":"['Rh2Cl6-BiI3-NM', 'Ir2Cl6-BiI3-NM', 'Bi2Cl6-BiI3-NM', 'Sc2Cl6-BiI3-NM', 'Bi2Br6-BiI3-NM', 'Tl2Cl6-BiI3-NM', 'Ga2I6-BiI3-NM', 'Ir2I6-BiI3-NM', 'I6Sb2-BiI3-NM', 'Tl2Br6-BiI3-NM', 'As2Br6-BiI3-NM', 'Bi2I6-BiI3-NM', 'Sc2I6-BiI3-NM', 'Y2Br6-BiI3-NM', 'Rh2I6-BiI3-NM', 'Ga2Br6-BiI3-NM', 'Y2I6-BiI3-NM', 'Sc2Br6-BiI3-NM', 'Al2I6-BiI3-NM', 'Al2Br6-BiI3-NM', 'Ir2Br6-BiI3-NM', 'In2Cl6-BiI3-NM', 'Rh2Br6-BiI3-NM', 'Ga2Cl6-BiI3-NM', 'In2Br6-BiI3-NM', 'In2I6-BiI3-NM', 'Al2Cl6-BiI3-NM']",
+        "tid":"[147, 303, 306, 311, 329, 331, 447, 552, 667, 695, 1037, 1098, 1101, 1103, 1125, 1165, 1189, 1206, 1210, 1297, 1445, 1953, 2041, 2222, 2508, 2601, 2646]"
+    },
+    {
+        "group_id":11,
+        "spg":"P6\/mmm",
+        "spg_number":191,
+        "pg":"6\/mmm",
+        "site_sym":"['-6m2']",
+        "counts":4,
+        "uid":"['Sc2Cl6-AgBr3-NM', 'Bi2Cl6-AgBr3-NM', 'Y2Br6-AgBr3-NM', 'Y2Cl6-AgBr3-NM']",
+        "tid":"[200, 1108, 1459, 2281]"
+    },
+    {
+        "group_id":12,
+        "spg":"P-62m",
+        "spg_number":189,
+        "pg":"-6m2",
+        "site_sym":"['-6']",
+        "counts":14,
+        "uid":"['Al2Cl6-TiCl3-NM', 'Bi2I6-TiCl3-NM', 'Tl2Br6-TiCl3-NM', 'Bi2Br6-AgBr3-NM', 'Ga2Br6-TiCl3-NM', 'Al2I6-TiCl3-NM', 'Tl2Cl6-AgBr3-NM', 'W2Cl6-TiCl3-NM', 'Sc2Br6-TiCl3-NM', 'Ga2Cl6-TiCl3-NM', 'Y2I6-TiCl3-NM', 'Al2Br6-TiCl3-NM', 'In2Cl6-AgBr3-NM', 'In2Br6-TiCl3-NM']",
+        "tid":"[159, 425, 1061, 1092, 1096, 1138, 1315, 1394, 1458, 1941, 2016, 2032, 2231, 2580]"
+    },
+    {
+        "group_id":13,
+        "spg":"P-4m2",
+        "spg_number":115,
+        "pg":"-42m",
+        "site_sym":"['-42m']",
+        "counts":48,
+        "uid":"['SnF2-GeS2-NM', 'ZrO2-GeS2-NM', 'GeO2-GeS2-NM', 'ZrS2-GeS2-NM', 'ZnCl2-GeS2-NM', 'GeS2-GeS2-NM', 'HgBr2-GeS2-NM', 'CaI2-GeS2-NM', 'CdI2-GeS2-NM', 'ZnI2-GeS2-NM', 'SrCl2-GeS2-NM', 'SrI2-GeS2-NM', 'GeI2-GeS2-NM', 'HfS2-GeS2-NM', 'CaBr2-GeS2-NM', 'BaF2-GeS2-NM', 'SnS2-GeS2-NM', 'BaCl2-GeS2-NM', 'CdF2-GeS2-NM', 'Cl2Ge-GeS2-NM', 'CaF2-GeS2-NM', 'ZnF2-GeS2-NM', 'SnCl2-GeS2-NM', 'PbO2-GeS2-NM', 'HgI2-GeS2-NM', 'BaI2-GeS2-NM', 'ZnBr2-GeS2-NM', 'ZrSe2-GeS2-NM', 'HfSe2-GeS2-NM', 'CdBr2-GeS2-NM', 'HfO2-GeS2-NM', 'HgF2-GeS2-NM', 'HgCl2-GeS2-NM', 'CdCl2-GeS2-NM', 'SnI2-GeS2-NM', 'CaCl2-GeS2-NM', 'PbF2-GeS2-NM', 'SnO2-GeS2-NM', 'Br2Ge-GeS2-NM', 'SrBr2-GeS2-NM', 'SrF2-GeS2-NM', 'BaBr2-GeS2-NM', 'SnBr2-GeS2-NM', 'F2Ge-GeS2-NM', 'TiO2-GeS2-NM', 'PbI2-GeS2-NM', 'PbCl2-GeS2-NM', 'PbBr2-GeS2-NM']",
+        "tid":"[127, 143, 165, 179, 183, 197, 239, 282, 297, 350, 353, 380, 389, 421, 454, 465, 493, 544, 589, 604, 616, 630, 636, 692, 1134, 1224, 1243, 1247, 1284, 1287, 1330, 1337, 1382, 1402, 1416, 1447, 2000, 2085, 2088, 2111, 2147, 2163, 2165, 2265, 2267, 2375, 2531, 2555]"
+    },
+    {
+        "group_id":14,
+        "spg":"C2\/m",
+        "spg_number":12,
+        "pg":"2\/m",
+        "site_sym":"[]",
+        "counts":5,
+        "uid":"['Tl2Cl2-CH-NM', 'Cd2Se4-WTe2-NM', 'Zn2Se4-PdS2-NM', 'Pb2S4-WTe2-NM', 'Tl2Br2-ISb-NM']",
+        "tid":"[1010, 1859, 1957, 2445, 2521]"
+    },
+    {
+        "group_id":15,
+        "spg":"P2\/m",
+        "spg_number":10,
+        "pg":"2\/m",
+        "site_sym":"[]",
+        "counts":7,
+        "uid":"['Cu2S2-AuSe-NM', 'Au2S2-AuSe-NM', 'Ag2Te2-AuSe-NM', 'Au2Se2-AuSe-NM', 'Au2Te2-AuSe-NM', 'Ag2S2-AuSe-NM', 'Cu2Se2-AuSe-NM']",
+        "tid":"[992, 1040, 1041, 1066, 1076, 1095, 2442]"
+    },
+    {
+        "group_id":16,
+        "spg":"P2_1\/c",
+        "spg_number":14,
+        "pg":"2\/m",
+        "site_sym":"[]",
+        "counts":11,
+        "uid":"['Zn2S4-PdS2-NM', 'Pd2Se4-PdS2-NM', 'Pt2Te4-PdS2-NM', 'Pt2S4-PdS2-NM', 'Ni2S4-PdS2-NM', 'Ni2Te4-PdS2-NM', 'Pt2Se4-PdS2-NM', 'Pd2S4-PdS2-NM', 'Pd2Te4-PdS2-NM', 'Ni2Se4-PdS2-NM', 'Cd2S4-PdS2-NM']",
+        "tid":"[1797, 1814, 1821, 1833, 1852, 1903, 1944, 1950, 1959, 2021, 2087]"
+    },
+    {
+        "group_id":17,
+        "spg":"P2_1\/m",
+        "spg_number":11,
+        "pg":"2\/m",
+        "site_sym":"[]",
+        "counts":12,
+        "uid":"['Ru2S4-WTe2-NM', 'Ru2Te4-WTe2-NM', 'Hf2Br4-WTe2-NM', 'Zr2Cl4-WTe2-NM', 'Ti2O4-WTe2-NM', 'Os2Te4-WTe2-NM', 'Ru2Se4-WTe2-NM', 'Os2Se4-WTe2-NM', 'Os2S4-WTe2-NM', 'Hf2Cl4-WTe2-NM', 'Ru2Se6-VTe3-NM', 'Zr2Br4-WTe2-NM']",
+        "tid":"[1480, 1495, 1506, 1519, 1521, 1534, 1540, 1545, 1552, 1595, 1752, 2451]"
+    },
+    {
+        "group_id":18,
+        "spg":"Pmmn",
+        "spg_number":59,
+        "pg":"mmm",
+        "site_sym":"[]",
+        "counts":4,
+        "uid":"['Ti2O6-TiS3-NM', 'Hf2S6-TiS3-NM', 'Zr2O6-TiS3-NM', 'Hf2O6-TiS3-NM']",
+        "tid":"[1556, 1580, 1659, 1709]"
+    },
+    {
+        "group_id":19,
+        "spg":"Pmn2_1",
+        "spg_number":31,
+        "pg":"mm2",
+        "site_sym":"[]",
+        "counts":9,
+        "uid":"['Ge2S2-SnS-NM', 'Sn2S2-SnS-NM', 'S2Si2-SnS-NM', 'Sn2Se2-SnS-NM', 'Si2Te2-SnS-NM', 'Ge2Te2-SnS-NM', 'Ge2Se2-SnS-NM', 'Se2Si2-SnS-NM', 'Pb2S2-PbS-NM']",
+        "tid":"[825, 2010, 2030, 2110, 2186, 2201, 2488, 2505, 2632]"
+    }
+]

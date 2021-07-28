@@ -1,0 +1,68 @@
+[
+    {
+        "group_id":0.0,
+        "spg":"P4\/nmm",
+        "spg_number":129.0,
+        "pg":"4\/mmm",
+        "site_sym":"['4mm', '4mm']",
+        "counts":1,
+        "uid":"['Pb2Se2-PbS-NM']",
+        "tid":"[2610]",
+        "not_calculated_yet":"[2610]"
+    },
+    {
+        "group_id":2.0,
+        "spg":"P-3m1",
+        "spg_number":164.0,
+        "pg":"-3m",
+        "site_sym":"['3m', '3m']",
+        "counts":25,
+        "uid":"['Cu2I2-CH-NM', 'Ga2Te2-GaSe-NM', 'Al2Se2-GaSe-NM', 'Ga2Se2-GaSe-NM', 'Al2S2-GaSe-NM', 'Al2Te2-GaSe-NM', 'Ga2S2-GaSe-NM', 'Pt2Cl2-GaSe-NM', 'Au2I2-CH-NM', 'Cd2Se2-CH-NM', 'Zn2S2-CH-NM', 'Pd2F2-GaSe-NM', 'Ag2Br2-CH-NM', 'Ag2I2-CH-NM', 'Ag2Cl2-CH-NM', 'Cd2S2-CH-NM', 'Cu2Br2-CH-NM', 'Zn2Se2-CH-NM', 'Tl2I2-CH-NM', 'Ge2H2-CH-NM', 'H2Si2-CH-NM', 'C2F2-CH-NM', 'In2Se2-GaSe-NM', 'In2S2-GaSe-NM', 'Pb2Te2-CH-NM']",
+        "tid":"[343, 792, 797, 810, 824, 836, 843, 911, 913, 934, 939, 950, 980, 982, 985, 991, 1015, 1018, 1053, 1350, 1892, 2129, 2467, 2572, 2643]",
+        "not_calculated_yet":"[343, 913, 934, 939, 980, 982, 985, 991, 1015, 1018, 1053, 1350, 1892, 2129, 2643]"
+    },
+    {
+        "group_id":6.0,
+        "spg":"P-6m2",
+        "spg_number":187.0,
+        "pg":"-6m2",
+        "site_sym":"['3m', '3m']",
+        "counts":11,
+        "uid":"['Al2S2-GaS-NM', 'Ga2Te2-GaS-NM', 'Al2Se2-GaS-NM', 'Al2Te2-GaS-NM', 'Ga2Se2-GaS-NM', 'Ga2O2-GaS-NM', 'Ga2S2-GaS-NM', 'Al2O2-GaS-NM', 'In2Te2-GaS-NM', 'In2Se2-GaS-NM', 'In2S2-GaS-NM']",
+        "tid":"[117, 523, 613, 1254, 1375, 1885, 2212, 2242, 2582, 2592, 2618]",
+        "not_calculated_yet":null
+    },
+    {
+        "group_id":7.0,
+        "spg":"P3m1",
+        "spg_number":156.0,
+        "pg":"3m",
+        "site_sym":"['3m', '3m']",
+        "counts":16,
+        "uid":"['GaP-GeSe-NM', 'GeS-GeSe-NM', 'GaAs-GeSe-NM', 'PbO-GeSe-NM', 'SnTe-GeSe-NM', 'GeSe-GeSe-NM', 'SnSe-GeSe-NM', 'SnS-GeSe-NM', 'SnO-GeSe-NM', 'PbSe-GeSe-NM', 'GeO-GeSe-NM', 'AlSb-GeSe-NM', 'PbS-GeSe-NM', 'InP-GeSe-NM', 'PbTe-GeSe-NM', 'GeTe-GeSe-NM']",
+        "tid":"[196, 352, 537, 577, 684, 1397, 1418, 1424, 1437, 1996, 2102, 2252, 2389, 2392, 2393, 2568]",
+        "not_calculated_yet":null
+    },
+    {
+        "group_id":10.0,
+        "spg":"P-6m2",
+        "spg_number":187.0,
+        "pg":"-6m2",
+        "site_sym":"['-6m2', '-6m2']",
+        "counts":4,
+        "uid":"['BN-BN-NM', 'AlN-BN-NM', 'GaN-BN-NM', 'AlAs-BN-NM']",
+        "tid":"[4, 124, 125, 2245]",
+        "not_calculated_yet":null
+    },
+    {
+        "group_id":null,
+        "spg":null,
+        "spg_number":null,
+        "pg":null,
+        "site_sym":null,
+        "counts":57,
+        "uid":null,
+        "tid":null,
+        "not_calculated_yet":null
+    }
+]
