@@ -150,12 +150,16 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
     col = get_db("Scan2dMat", "calc_data", port=12347).collection
     groups = loadfn(os.path.join(os.path.dirname(os.path.abspath("__file__")),
-                          "wf/Scan2dDefect/bg_lge_1_and_inhomo_07062021"))
+                          "wf/Scan2dDefect/bg_gte_1_and_homo_07272021"))
     geo_spec = None
     for group in groups:
-        tids = json.loads(group["tid"])
+        # tids = json.loads(group["tid"])
+        tids = json.loads(group["not_calculated_yet"])
+        if tids == None:
+            continue
+
         group_id = int(group["group_id"])
-        for idx, tid in enumerate(tids[5:10]):
+        for idx, tid in enumerate(tids[:1]):
             print(group_id, tid)
 
             mx2 = col.find_one({"task_id": tid})
