@@ -1,3 +1,5 @@
+import subprocess
+
 from fireworks import Workflow
 from fireworks import LaunchPad
 
@@ -1459,21 +1461,22 @@ class COHP:
         from qubitPack.tool_box import get_db
         from fireworks import LaunchPad, Workflow
         category = "cohp"
-        source_static_tk_id = 786
-        static = get_db("antisiteQubit", "move_z", port=12345)
-        static = static.collection.find_one({"task_id": source_static_tk_id})
-        static_path = static["calcs_reversed"][0]["dir_name"]
-        fw = LobsterFW(structure=Structure.from_dict(static["input"]["structure"]), prev_calc_dir=static_path)
-        wf = Workflow([fw], name=fw.name)
-        wf = add_modify_incar(wf)
-        wf = set_execution_options(wf, category=category, fworker_name="owls")
-        wf = preserve_fworker(wf)
-        print(wf)
-        LPAD = LaunchPad.from_file(
-            os.path.expanduser(os.path.join("~", "config/project/antisiteQubit/{}/"
-                                                 "my_launchpad.yaml".format(category))))
+        for dz in [0.1, 0, -0.1, -0.2, -0.25, -0.3, -0.4, -0.5]:
+            static = get_db("antisiteQubit", "move_z", port=12345)
+            static = static.collection.find_one({"charge_state": -1, "dz": dz, "task_id": {"$nin": [793]}})
+            static_path = static["calcs_reversed"][0]["dir_name"]
+            fw = LobsterFW(structure=Structure.from_dict(static["input"]["structure"]), prev_calc_dir=static_path)
+            wf = Workflow([fw], name=fw.name)
+            wf = add_modify_incar(wf)
+            wf = set_execution_options(wf, category=category, fworker_name="owls")
+            wf = preserve_fworker(wf)
+            print(wf)
+            wf.name = "{}".format(dz) + wf.name
+            LPAD = LaunchPad.from_file(
+                os.path.expanduser(os.path.join("~", "config/project/antisiteQubit/{}/"
+                                                     "my_launchpad.yaml".format(category))))
 
-        LPAD.add_wf(wf)
+            LPAD.add_wf(wf)
 
     @classmethod
     def analysis(cls):
@@ -1482,27 +1485,57 @@ class COHP:
         from pymatgen.electronic_structure.core import Orbital
         import os
         main_path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/cohp/"
-        main_path += "launcher_2021-05-25-21-22-33-177425" #"WTe2" -0.402076
+        # main_path += "launcher_2021-05-25-21-22-33-177425" #"WTe2" -0.402076
         # main_path += "launcher_2021-05-25-21-13-08-771930" #"WS2" -2.023164
         # main_path += "launcher_2021-05-26-15-51-50-934362" #V_S in WS2
         # main_path += "launcher_2021-06-02-19-57-42-192796" #W_S -0.5; EF= -1.403767
         # main_path += "launcher_2021-06-02-19-57-49-331235" #W_Te 0.5
+        def charge_ws2():
+            n025 = (-0.25, "launcher_2021-07-08-04-21-32-454333") #-0.25
+            p01 = (0.1, "launcher_2021-07-08-04-21-39-577420") # 0.1
+            n04 = (-0.4, "launcher_2021-07-08-04-21-46-698235") #-0.4
+            n03 = (-0.3, "launcher_2021-07-08-18-07-34-867272") #-0.3
+            n01 = (-0.1, "launcher_2021-07-08-18-09-45-959095") #-0.1
+            n02 = (-0.2, "launcher_2021-07-08-18-07-41-998570") #-0.2
+            p0 = (0, "launcher_2021-07-09-02-13-54-894685") #0
+            return [p01, p0, n01, n02, n025, n03, n04]
 
+        def charge_ws2_dup():
+            n025 = (-0.25, "launcher_2021-07-10-20-56-58-869458") #-0.25
+            p01 = (0.1, "launcher_2021-07-10-20-57-27-414725") # 0.1
+            n04 = (-0.4, "launcher_2021-07-10-20-56-44-596323") #-0.4
+            n03 = (-0.3, "launcher_2021-07-10-20-56-51-732938") #-0.3
+            n01 = (-0.1, "launcher_2021-07-10-20-57-13-143065") #-0.1
+            n02 = (-0.2, "launcher_2021-07-10-20-57-06-009710") #-0.2
+            p0 = (0, "launcher_2021-07-10-20-57-20-279937") #0
+            n05 = (-0.5, "launcher_2021-07-10-20-56-37-436670")
+            return [p01, p0, n01, n02, n025, n03, n04, n05]
 
-        os.chdir(main_path)
-        # completecohp = CompleteCohp.from_file(fmt="LOBSTER", filename="COHPCAR.lobster", structure_file="POSCAR")
-        completecohp = CompleteCohp.from_file(fmt="LOBSTER", filename="COOPCAR.lobster.gz", structure_file="POSCAR", are_coops=True)
-        completecohp.efermi = -0.402076
-        def summed(lobster_list, plot_label):
+        def neutral_ws2():
+            n025 = (-0.25, "launcher_2021-07-10-05-20-15-478597") #-0.25
+            p01 = (0.1, "launcher_2021-07-10-05-20-43-993104") # 0.1
+            n04 = (-0.4, "launcher_2021-07-10-05-20-01-221512") #-0.4
+            n03 = (-0.3, "launcher_2021-07-10-05-20-08-354313") #-0.3
+            n01 = (-0.1, "launcher_2021-07-10-05-20-29-733410") #-0.1
+            n02 = (-0.2, "launcher_2021-07-10-05-20-22-604426") #-0.2
+            p0 = (0, "launcher_2021-07-10-05-26-08-583579") #0
+            n05 = (-0.5, "launcher_2021-07-10-19-50-31-733009")
+            return [p01, p0, n01, n02, n025, n03, n04, n05]
+
+        def summed(lobster_list, plot_label, title, is_coop):
             labelist = lobster_list #["929", "961", "967"]
-            cp = CohpPlotter(are_coops=True)
+            cp = CohpPlotter(are_coops=is_coop)
             # get a nicer plot label
             plotlabel = plot_label #"W75-W50+W55+W56 bonds"
 
             cp.add_cohp(plotlabel, completecohp.get_summed_cohp_by_label_list(
                 label_list=labelist, divisor=1))
+            print(cp.get_cohp_dict()['W26-W1+W6+W7']["COHP"])
+
             x = cp.get_plot(integrated=False)
             x.ylim([-5, 5])
+            x.xlim([-10, 5])
+            x.title("dz={}".format(title), fontsize=20)
             x.show()
 
         def orbital_resolved(label, orbitals):
@@ -1529,8 +1562,16 @@ class COHP:
             x.ylim([-5, 5])
             x.show()
 
-        # summed([str(i) for i in [13, 184, 215]], "W26-W1+W6+W7") #WS2
-        summed([str(i) for i in [929, 961, 967]], "W75-W50+W55+W56") #WTe2
+        for path in neutral_ws2(): #p0, n01, n02, n025, n03, n04]:
+            os.chdir(main_path + path[1])
+            subprocess.call(["gunzip", "POSCAR.gz", "EIGENVAL.gz"])
+            completecohp = CompleteCohp.from_file(fmt="LOBSTER", filename="COHPCAR.lobster.gz", structure_file="POSCAR")
+            # completecohp = CompleteCohp.from_file(fmt="LOBSTER", filename="COOPCAR.lobster.gz", structure_file="POSCAR", are_coops=True)
+            # completecohp.efermi = -0.402076
+            all = [3, 4, 13, 176, 184, 215]
+            sub = [13, 184, 215]
+            summed([str(i) for i in all], "W26-W1+W6+W7", path[0], is_coop=False) #WS2
+        # summed([str(i) for i in [929, 961, 967]], "W75-W50+W55+W56") #WTe2
         # summed([str(i) for i in [3, 4, 173]], "W1+W6+W7") #Vs in WS2
         # orbital_resolved(13, orbitals=[[5, Orbital.dxy], [5, Orbital.dz2]])
         # antisite_o = [5, Orbital.dz2]
@@ -1541,17 +1582,17 @@ class COHP:
 class MoveZ:
     def __init__(self):
         self.db = get_db("antisiteQubit", "move_z")
-        # self.ws2 = [
-        #     {"a1": 317, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0.1, "chemsys": "S-W"},
-        #     {"a1": 317, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0, "chemsys": "S-W"},
-        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.1, "chemsys": "S-W"},
-        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.2, "chemsys": "S-W"},
-        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.25, "chemsys": "S-W"},
-        #     {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.275, "chemsys": "S-W"},
-        #     {"a1": 327, "e1": 313, "e2": 314, "a1e": 329, "e2e": 330, "e1e": 328, "dz": -0.3, "chemsys": "S-W"},
-        #     {"a1": 327, "e1": 313, "e2": 314, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.4, "chemsys": "S-W"},
-        #     {"a1": 327, "e1": 313, "e2": 315, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.5, "chemsys": "S-W"},
-        # ]
+        self.neutral_ws2 = [
+            {"a1": 317, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0.1, "chemsys": "S-W"},
+            {"a1": 317, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0, "chemsys": "S-W"},
+            {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.1, "chemsys": "S-W"},
+            {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.2, "chemsys": "S-W"},
+            {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.25, "chemsys": "S-W"},
+            # {"a1": 315, "e1": 325, "e2": 326, "a1e": 330, "e2e": 329, "e1e": 328, "dz": -0.275, "chemsys": "S-W"},
+            {"a1": 327, "e1": 313, "e2": 314, "a1e": 329, "e2e": 330, "e1e": 328, "dz": -0.3, "chemsys": "S-W"},
+            {"a1": 327, "e1": 313, "e2": 314, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.4, "chemsys": "S-W"},
+            {"a1": 327, "e1": 313, "e2": 315, "a1e": 328, "e2e": 330, "e1e": 329, "dz": -0.5, "chemsys": "S-W"},
+        ]
 
         self.charged_ws2 = [
             {"a1": 316, "e1": 319, "e2": 320, "a1e": 330, "e2e": 329, "e1e": 328, "dz": 0.1, "chemsys": "S-W"},
@@ -1564,21 +1605,21 @@ class MoveZ:
             # {"a1": 327, "a1e": 328, "e1": 313, "e2": 315, "e2e": 330, "e1e": 329, "dz": -0.5, "chemsys": "S-W"},
         ]
 
-        self.wte2 = [
-            {"a1": 310, "a1e": 328, "e1": 258, "e2": 259, "e2e": 330, "e1e": 329, "dz": -0.1, "chemsys": "Te-W"},
-            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0, "chemsys": "Te-W"},
-            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.1, "chemsys": "Te-W"},
-            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.2, "chemsys": "Te-W"},
-            {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.3, "chemsys": "Te-W"},
-            {"a1": 310, "a1e": 328, "e1": 269, "e2": 271, "e2e": 330, "e1e": 329, "dz": 0.4, "chemsys": "Te-W"},
-            {"a1": 302, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": 0.5, "chemsys": "Te-W"},
-        ]
+        # self.wte2 = [
+        #     {"a1": 310, "a1e": 328, "e1": 258, "e2": 259, "e2e": 330, "e1e": 329, "dz": -0.1, "chemsys": "Te-W"},
+        #     {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0, "chemsys": "Te-W"},
+        #     {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.1, "chemsys": "Te-W"},
+        #     {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.2, "chemsys": "Te-W"},
+        #     {"a1": 310, "a1e": 328, "e1": 269, "e2": 270, "e2e": 330, "e1e": 329, "dz": 0.3, "chemsys": "Te-W"},
+        #     {"a1": 310, "a1e": 328, "e1": 269, "e2": 271, "e2e": 330, "e1e": 329, "dz": 0.4, "chemsys": "Te-W"},
+        #     {"a1": 302, "a1e": 330, "e1": 325, "e2": 326, "e2e": 329, "e1e": 328, "dz": 0.5, "chemsys": "Te-W"},
+        # ]
     def get_sheet(self):
         import pandas as pd
         from matplotlib import pyplot as plt
         data = []
-        for eigv in self.charged_ws2:
-            e = self.db.collection.find_one({"chemsys": eigv["chemsys"], "dz": eigv["dz"], "charge_state":-1})
+        for eigv in self.neutral_ws2:
+            e = self.db.collection.find_one({"chemsys": eigv["chemsys"], "dz": eigv["dz"], "charge_state":0})
             locpot = max(e["calcs_reversed"][0]["output"]["locpot"]["2"])
             eig = self.db.get_eigenvals(e["task_id"])
             eig_a1e = eig["1"][0][eigv["a1e"]][0]-locpot
@@ -1587,15 +1628,17 @@ class MoveZ:
             eig_a1 = eig["1"][0][eigv["a1"]][0]-locpot
             eig_e2 = eig["1"][0][eigv["e2"]][0]-locpot
             eig_e1 = eig["1"][0][eigv["e1"]][0]-locpot
-            data.append({"dz": eigv["dz"], "a1*":eig_a1e, "e1*":eig_e1e, "e2*": eig_e2e, "e1":eig_e1, "e2":eig_e2, "a1":eig_a1,
+            data.append({"dz": eigv["dz"], "a1":eig_a1e, "e1":eig_e1e, "e2": eig_e2e, "e1*":eig_e1, "e2*":eig_e2, "a1*":eig_a1,
                          "a1_band": eigv["a1"], "a1e_band":eigv["a1e"], "e1_band":eigv["e1"], "e2_band":eigv["e2"], "e1e_band":eigv["e1e"],
                          "e2e_band": eigv["e2e"]
                          })
         df = pd.DataFrame(data).sort_values("dz")
         df.to_clipboard("\t")
-        df = df.loc[:, ["dz", "a1", "a1*", "e1", "e1*", "e2", "e2*"]]
+        #df = df.loc[:, ["dz", "a1", "a1*", "e1", "e1*", "e2", "e2*"]]
+        df = df.loc[:, ["dz", "a1", "e1","e2"]]
         fig = plt.figure(dpi=280)
-        df.plot("dz", style=["r*-", "ro-", "b*--", "bo--", "b*-", "bo-"], ax=plt.gca())
+        # df.plot("dz", style=["r*-", "ro-", "b*--", "bo--", "b*-", "bo-"], ax=plt.gca())
+        df.plot("dz", style=["ro-", "bo-", "bo--"], ax=plt.gca())
         plt.xlabel("displacement in z-direction (Å)")
         plt.ylabel("level energy relative to vacuum (eV)")
         plt.legend(loc="upper center", frameon=True, ncol=6, bbox_to_anchor=(0.5, 1.1))
@@ -1604,8 +1647,8 @@ class MoveZ:
 def main():
     # DefectWF.MX2_formation_energy()
     # FormationEnergy.formation("M_rich")
-    MoveZ().get_sheet()
-    # COHP.analysis()
+    # MoveZ().get_sheet()
+    COHP.analysis()
 
 if __name__ == '__main__':
     main()

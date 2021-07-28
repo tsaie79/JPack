@@ -25,11 +25,13 @@ from mpinterfaces.utils import *
 from monty.serialization import loadfn
 import os
 import pandas as pd
+from qubitPack.tool_box import get_db
+
 
 #%% looking for candidate hosts
 from phonopy.phonon.irreps import character_table
 
-db = VaspCalcDb.from_db_file("/Users/jeng-yuantsai/Research/code/JPack/qubitPack/database_profile/db_dk_local.json")
+db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=1234)
 col = db.collection
 
 filter = {
@@ -37,7 +39,7 @@ filter = {
     # "ehull":{"$lt":0.4},
     "nkinds":2,
     "magstate": "NM",
-    "uid": "Ga2Cl6-TiCl3-NM"
+    # "uid": "Ag2F2-FeSe-NM"
 }
 show = {
     "formula":1,
@@ -47,8 +49,10 @@ show = {
     "gap_hse_nosoc":1
 }
 
-data = []
-for e in col.find(filter):
+good_pg = []
+bad_pg = []
+host_candidates = list(col.find(filter))
+for e in host_candidates[:10]:
     st = Structure.from_dict(e["structure"])
     space_sym_analyzer = SpacegroupAnalyzer(st, symprec=1e-4)
     sites = space_sym_analyzer.get_symmetry_dataset()["std_positions"]
@@ -56,53 +60,83 @@ for e in col.find(filter):
     point_gp = space_sym_analyzer.get_symmetry_dataset()["pointgroup"]
     vw = space_sym_analyzer.get_symmetry_dataset()["wyckoffs"]
     site_irreps = []
-    for specie, site, site_sym in zip(st.species, sites, site_syms):
-        print(site_sym)
-        site = list(site.round(4))
-        site_sym = [x for x in site_sym.split(".") if x][0]
-        if site_sym == "-4m2":
-            site_sym = "-42m"
-        if site_sym == "2mm" or site_sym == "m2m":
-            site_sym = "mm2"
-        if site_sym == "1":
-            continue
-        irreps = character_table[site_sym][0]["character_table"]
-        for irrep, char_vec in irreps.items():
-            print(char_vec)
-            if char_vec[0] >= 2:
-                site_irreps.append((str(specie), site, irrep, char_vec[0]))
-                # site_irreps.append(str(specie))
-                break
+
+    good_ir_species, good_ir_syms = get_good_ir_sites(st.species, site_syms)
+    # for specie, site, site_sym in zip(st.species, sites, site_syms):
+    #     print(site_sym)
+    #     site = list(site.round(4))
+    #     site_sym = [x for x in site_sym.split(".") if x][0]
+    #     if site_sym == "-4m2":
+    #         site_sym = "-42m"
+    #     if site_sym == "2mm" or site_sym == "m2m":
+    #         site_sym = "mm2"
+    #     if site_sym == "1":
+    #         continue
+    #     irreps = character_table[site_sym][0]["character_table"]
+    #     print(irreps)
+    #     for irrep, char_vec in irreps.items():
+    #         print(char_vec)
+    #         if char_vec[0] >= 2:
+    #             site_irreps.append((str(specie), site, irrep, char_vec[0]))
+    #             # site_irreps.append(str(specie))
+    #             mark = "good"
+    #             print(mark)
+    #         else:
+    #             site_irreps.append((str(specie), site, irrep, char_vec[0]))
+    #             mark = "bad"
+    #             print(mark)
+    #             break
 
 
 
 
     print(e["uid"])
     print(site_irreps)
-    data.append(
-        {
-            "formula": e["formula"],
-            "species": [str(sp) for sp in st.species],
-            "site_sym": site_syms,
-            # "irreps": site_irreps,
-            "Wf_position": vw,
-            "spacegroup": e["spacegroup"],
-            "pmg_point_gp": point_gp,
-            "gap_hse": e["gap_hse"],
-            "gap_hse_nosoc": e["gap_hse_nosoc"],
-            "gap_nosoc": e["gap_nosoc"],
-            "soc_intensity": e["gap_hse_nosoc"] - e["gap_hse"],
-            "ehull": e["ehull"],
-            "uid":e["uid"],
-            # "structure": e["structure"]
-        }
-    )
+    if good_ir_syms:
+        good_pg.append(
+            {
+                "formula": e["formula"],
+                "species": [str(sp) for sp in st.species],
+                "site_sym": site_syms,
+                # "irreps": site_irreps,
+                "Wf_position": vw,
+                "spacegroup": e["spacegroup"],
+                "pmg_point_gp": point_gp,
+                "gap_hse": e["gap_hse"],
+                "gap_hse_nosoc": e["gap_hse_nosoc"],
+                "gap_nosoc": e["gap_nosoc"],
+                # "soc_intensity": e["gap_hse_nosoc"] - e["gap_hse"],
+                "ehull": e["ehull"],
+                "uid":e["uid"],
+                # "structure": e["structure"]
+            }
+        )
+    else:
+        bad_pg.append(
+            {
+                "formula": e["formula"],
+                "species": [str(sp) for sp in st.species],
+                "site_sym": site_syms,
+                # "irreps": site_irreps,
+                "Wf_position": vw,
+                "spacegroup": e["spacegroup"],
+                "pmg_point_gp": point_gp,
+                "gap_hse": e["gap_hse"],
+                "gap_hse_nosoc": e["gap_hse_nosoc"],
+                "gap_nosoc": e["gap_nosoc"],
+                # "soc_intensity": e["gap_hse_nosoc"] - e["gap_hse"],
+                "ehull": e["ehull"],
+                "uid":e["uid"],
+                # "structure": e["structure"]
+            }
+        )
+# print(bad_pg)
+good = pd.DataFrame(good_pg)
+bad = pd.DataFrame(bad_pg)
 
-
-
-df = pd.DataFrame(data)
-df = df.round(3).sort_values(["soc_intensity", "ehull"], ascending=True)
-df.set_index("uid", inplace=True)
+# print(df)
+# df = df.round(3).sort_values(["soc_intensity", "ehull"], ascending=True)
+# df.set_index("uid", inplace=True)
 # df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.json",
 #            orient="index", indent=4, index=True)
 # df.to_excel("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.xlsx", index=False)

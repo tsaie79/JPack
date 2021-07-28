@@ -52,11 +52,12 @@ from pymatgen import Structure
 import os
 
 defect_db = get_db("Scan2dDefect", "calc_data", port=1236)
-host_db = get_db("Scan2dMat", "calc_data", port=1236)
+defect_db = get_db("antisiteQubit", "perturbed", port=1234)
+# host_db = get_db("Scan2dMat", "calc_data", port=1236)
 
 
-tk_id = 32
-pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
+tk_id = 489
+# pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
 # c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
 
 tot, proj, d_df = get_defect_state(
@@ -66,15 +67,15 @@ tot, proj, d_df = get_defect_state(
     None,
     True,
     "proj",
-    (host_db, pc_from_id, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
-    0.1,
+    None, #(host_db, pc_from_id, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
+    0.01,
     locpot_c2db=None #(c2db, c2db_uid, 0)
 )
 
-tgt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/calculations/calc_data/defect_st"
-e = defect_db.collection.find_one({"task_id": tk_id})
-st = Structure.from_dict(e["output"]["structure"])
-st.to("poscar", os.path.join(tgt_path, "{}-{}.vasp".format(e["host_info"]["c2db_info"]["uid"], tk_id)))
+# tgt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/calculations/calc_data/defect_st"
+# e = defect_db.collection.find_one({"task_id": tk_id})
+# st = Structure.from_dict(e["output"]["structure"])
+# st.to("poscar", os.path.join(tgt_path, "{}-{}.vasp".format(e["host_info"]["c2db_info"]["uid"], tk_id)))
 
 #%% 3 site sym
 from atomate.vasp.database import VaspCalcDb
@@ -113,28 +114,6 @@ df.to_clipboard()
 df.plot(x="site_sym", y="counts", kind="barh", rot=0, figsize=(10,8))
 
 #%% 4 update entries by including info of site sym
-from qubitPack.tool_box import get_db, get_good_ir_sites
-from monty.json import jsanitize
-from pymatgen.io.vasp.inputs import Structure
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-
-db = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=1236)
-
-for e in db.collection.find():
-    st = Structure.from_dict(e["output"]["structure"])
-    sym = SpacegroupAnalyzer(st, symprec=1e-1).get_symmetry_dataset()
-    d = jsanitize(sym)
-    print(d)
-    d.update({"symprec":1e-1})
-    species = [str(sp) for sp in st.species]
-    combine = dict(zip(d["wyckoffs"], zip(species, d["site_symmetry_symbols"])))
-    species, syms = get_good_ir_sites(dict(combine.values()).keys(), dict(combine.values()).values())
-    combine.update({"species": species, "syms": syms})
-
-    d.update({"high_dim_ir_info": combine})
-    print(d)
-    db.collection.update_one({"task_id": e["task_id"]}, {"$set":{"sym_data":d}})
-
 #%% 5 generate "cat_host_bg>1_and_homo" json file
 
 df = pd.read_excel(

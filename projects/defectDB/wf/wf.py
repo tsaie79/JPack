@@ -150,12 +150,12 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
     col = get_db("Scan2dMat", "calc_data", port=12347).collection
     groups = loadfn(os.path.join(os.path.dirname(os.path.abspath("__file__")),
-                          "projects/defectDB/wf/Scan2dDefect/bg_lge_1_and_homo_07062021"))
+                          "wf/Scan2dDefect/bg_lge_1_and_inhomo_07062021"))
     geo_spec = None
     for group in groups:
         tids = json.loads(group["tid"])
         group_id = int(group["group_id"])
-        for idx, tid in enumerate(tids[:1]):
+        for idx, tid in enumerate(tids[5:10]):
             print(group_id, tid)
 
             mx2 = col.find_one({"task_id": tid})
@@ -228,21 +228,21 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                     # add charge state regarding nelect
                                     charge, nupdn = None, None
                                     if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
-                                        charge = [1,-1, 0]
-                                        nupdn = [-1,-1,-1]
+                                        charge = [0]
+                                        nupdn = [-1]
                                         print(charge)
                                         # if odd nelect, it used to be charge=[0]
                                     else:
-                                        # continue
-                                        charge = [0]
-                                        nupdn = [-1]
+                                        continue
+                                        # charge = [0]
+                                        # nupdn = [-1]
 
                                     wf = get_wf_full_scan(
                                         structure=gen_defect.defect_st,
-                                        charge_states=[0],
+                                        charge_states=charge,
                                         gamma_only=True,
                                         dos=False,
-                                        nupdowns=[-1],
+                                        nupdowns=nupdn,
                                         vasptodb={
                                             "category": cat,
                                             "NN": gen_defect.NN,
@@ -251,7 +251,7 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                         },
                                         wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
                                         wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")),
-                                                             "projects/defectDB/wf/Scan2dDefect/scan_defect.yaml")
+                                                             "wf/Scan2dDefect/scan_defect.yaml")
                                     )
                                     wf.name += ":r2scan"
                                     # wf = add_modify_2d_nscf_kpoints(
@@ -275,13 +275,14 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                             "defect_name": defect_data["name"],
                                             "site_info": gen_defect.site_info,
                                             "perturbed": gen_defect.distort,
-                                            "group_id": group_id
+                                            "group_id": group_id,
+                                            "site_symmetry_uniform": False, # before run further, update entries for True
                                          },
                                         task_name_constraint="ToDb"
                                     )
 
                                     if idx % 2 == 1:
-                                        wf = set_execution_options(wf, category="calc_data", fworker_name="owls")
+                                        wf = set_execution_options(wf, category="calc_data", fworker_name="efrc")
                                     else:
                                         wf = set_execution_options(wf, category="calc_data", fworker_name="owls")
                                     wf = set_queue_options(wf, "12:00:00")
