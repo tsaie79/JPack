@@ -1,8 +1,8 @@
 [
     {
-        "group_id":0.0,
+        "group_id":1,
         "spg":"P4\/nmm",
-        "spg_number":129.0,
+        "spg_number":129,
         "pg":"4\/mmm",
         "site_sym":"['4mm', '4mm']",
         "counts":1,
@@ -11,20 +11,20 @@
         "not_calculated_yet":"[2610]"
     },
     {
-        "group_id":2.0,
+        "group_id":4,
         "spg":"P-3m1",
-        "spg_number":164.0,
+        "spg_number":164,
         "pg":"-3m",
         "site_sym":"['3m', '3m']",
         "counts":25,
         "uid":"['Cu2I2-CH-NM', 'Ga2Te2-GaSe-NM', 'Al2Se2-GaSe-NM', 'Ga2Se2-GaSe-NM', 'Al2S2-GaSe-NM', 'Al2Te2-GaSe-NM', 'Ga2S2-GaSe-NM', 'Pt2Cl2-GaSe-NM', 'Au2I2-CH-NM', 'Cd2Se2-CH-NM', 'Zn2S2-CH-NM', 'Pd2F2-GaSe-NM', 'Ag2Br2-CH-NM', 'Ag2I2-CH-NM', 'Ag2Cl2-CH-NM', 'Cd2S2-CH-NM', 'Cu2Br2-CH-NM', 'Zn2Se2-CH-NM', 'Tl2I2-CH-NM', 'Ge2H2-CH-NM', 'H2Si2-CH-NM', 'C2F2-CH-NM', 'In2Se2-GaSe-NM', 'In2S2-GaSe-NM', 'Pb2Te2-CH-NM']",
         "tid":"[343, 792, 797, 810, 824, 836, 843, 911, 913, 934, 939, 950, 980, 982, 985, 991, 1015, 1018, 1053, 1350, 1892, 2129, 2467, 2572, 2643]",
-        "not_calculated_yet":"[343, 913, 934, 939, 980, 982, 985, 991, 1015, 1018, 1053, 1350, 1892, 2129, 2643]"
+        "not_calculated_yet":"[343, 913, 934, 939, 982, 985, 991, 1015, 1018, 1053, 1350, 1892, 2129, 2643]"
     },
     {
-        "group_id":6.0,
+        "group_id":6,
         "spg":"P-6m2",
-        "spg_number":187.0,
+        "spg_number":187,
         "pg":"-6m2",
         "site_sym":"['3m', '3m']",
         "counts":11,
@@ -33,9 +33,9 @@
         "not_calculated_yet":null
     },
     {
-        "group_id":7.0,
+        "group_id":8,
         "spg":"P3m1",
-        "spg_number":156.0,
+        "spg_number":156,
         "pg":"3m",
         "site_sym":"['3m', '3m']",
         "counts":16,
@@ -44,25 +44,14 @@
         "not_calculated_yet":null
     },
     {
-        "group_id":10.0,
+        "group_id":11,
         "spg":"P-6m2",
-        "spg_number":187.0,
+        "spg_number":187,
         "pg":"-6m2",
         "site_sym":"['-6m2', '-6m2']",
         "counts":4,
         "uid":"['BN-BN-NM', 'AlN-BN-NM', 'GaN-BN-NM', 'AlAs-BN-NM']",
         "tid":"[4, 124, 125, 2245]",
-        "not_calculated_yet":null
-    },
-    {
-        "group_id":null,
-        "spg":null,
-        "spg_number":null,
-        "pg":null,
-        "site_sym":null,
-        "counts":57,
-        "uid":null,
-        "tid":null,
         "not_calculated_yet":null
     }
 ]

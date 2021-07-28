@@ -121,12 +121,12 @@ df.plot(x="site_sym", y="counts", kind="barh", rot=0, figsize=(10,8))
 
 #%% 4 update entries by including info of site sym
 #%% 5 generate "cat_host_bg>1_and_homo" json file
-
+import pandas as pd
 df = pd.read_excel(
     "/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/site_sym_07272021.xlsx",
-    sheet_name="cat_host_bg>=1_and_inhomo"
+    sheet_name="cat_host_bg>=1_and_homo"
 )
-df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/bg_gte_1_and_inhomo_07272021", indent=4, orient="records")
+df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/bg_gte_1_and_homo_07272021", indent=4, orient="records")
 
 #%% 6
 from atomate.vasp.database import VaspCalcDb
