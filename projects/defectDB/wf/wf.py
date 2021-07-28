@@ -160,6 +160,7 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
             mx2 = col.find_one({"task_id": tid})
             pc = Structure.from_dict(mx2["output"]["structure"])
+            good_ir_info = mx2["sym_data"]["good_ir_info"]
             cat = None
 
             if defect_choice == "substitutions":
@@ -191,39 +192,32 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                     "config/project/Scan2dDefect/calc_data/my_launchpad.yaml"))
             print(cat)
 
-            defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
+            defects = ChargedDefectsStructures(pc, antisites_flag=True).defects
 
-            cation, anion = find_cation_anion(pc)
-
-            high_dim_ir_info = mx2["sym_data"]["high_dim_ir_info"]
-
-            good_sym_site_symbols = get_good_ir_sites(high_dim_ir_info["species"], high_dim_ir_info["syms"])
-
-            # Exclude those element in irrep
-            # species = list(dict.fromkeys(mx2["sym_data"]["species"]))
-            # for tgt in good_sym_site_symbols:
-            #     species.remove(tgt)
-            # good_sym_site_symbols = species
-
-            print(good_sym_site_symbols)
-            for good_sym_site_symbol in good_sym_site_symbols[0]:
-                # substitutions or vacancies!
-                defect_type = (defect_choice, "{}".format(good_sym_site_symbol))
-
-                for de_idx in range(len(defect[defect_type[0]])):
-                    print(cation, anion)
-
-                    if defect_type[1] == defect[defect_type[0]][de_idx]["name"].split("_")[-1]:
+            # substitutions or vacancies!
+            defect_type = defect_choice
+            for de_idx, defect in enumerate(defects[defect_type]):
+                for specie, site_sym, wy, site_idx in zip(*good_ir_info.values()):
+                    if defect["unique_site"] == pc[site_idx]:
                         for na, thicks in geo_spec.items():
                             for thick in thicks:
                                 for dtort in [0]:
                                     if not impurity_on_nn:
                                         impurity_on_nn = []
-                                    gen_defect = GenDefect(pc, [defect_type[0], de_idx], na, thick, distort=dtort,
+                                    gen_defect = GenDefect(pc, [defect_type, de_idx], na, thick, distort=dtort,
                                                            sub_on_side=list(impurity_on_nn))
                                     # gen_defect.vacancies(dtort, list(impurity_on_nn))
 
                                     defect_data = gen_defect.defect_entry
+                                    defect_data.update({
+                                        "from_host_sym_data":{
+                                            "specie": specie,
+                                            "site_sym": site_sym,
+                                            "wyckoff": wy,
+                                            "site_idx": site_idx,
+                                            "site": pc[site_idx]
+                                        }
+                                    })
 
                                     # add charge state regarding nelect
                                     charge, nupdn = None, None

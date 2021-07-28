@@ -91,13 +91,19 @@ es = db.collection.aggregate(
     [
         {"$match": {"task_label":"SCAN_nscf line", "output.bandgap": {"$gte": 1}}},
         {"$group": {
-            "_id": {"site_sym": "$sym_data.high_dim_ir_info.syms", "spg": "$sym_data.international"},
+            "_id": {"site_sym": "$sym_data.good_ir_info.site_sym",
+                    "pg": "$sym_data.pmg_pg",
+                    "spg": "$sym_data.pmg_spg",
+                    "spg_number": "$sym_data.pmg_spg_number"
+                    },
             "count": {"$sum":1},
             "tid": {"$push": "$task_id"},
             "uid": {"$push": "$c2db_info.uid"},
         }},
         {"$project": {"_id": 0,
                       "spg": "$_id.spg",
+                      "spg_number": "$_id.spg_number",
+                      "pg": "$_id.pg",
                       "site_sym": "$_id.site_sym",
                       "counts": "$count",
                       "uid": "$uid",
@@ -108,7 +114,7 @@ es = db.collection.aggregate(
 )
 
 df = pd.DataFrame(es)
-df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/site_sym_07062021.json", indent=4)
+# df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/site_sym_07272021.json", indent=4)
 df.to_clipboard()
 
 df.plot(x="site_sym", y="counts", kind="barh", rot=0, figsize=(10,8))
@@ -117,10 +123,10 @@ df.plot(x="site_sym", y="counts", kind="barh", rot=0, figsize=(10,8))
 #%% 5 generate "cat_host_bg>1_and_homo" json file
 
 df = pd.read_excel(
-    "/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/host_scan_nscf_line_07062021.xlsx",
-    sheet_name="cat_host_bg>1_and_inhomo"
+    "/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/site_sym_07272021.xlsx",
+    sheet_name="cat_host_bg>=1_and_inhomo"
 )
-df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/bg_lge_1_and_inhomo_07062021", indent=4, orient="records")
+df.to_json("/Users/jeng-yuantsai/Research/project/Scan2dDefect/xlsx/site_sym_cat/bg_gte_1_and_inhomo_07272021", indent=4, orient="records")
 
 #%% 6
 from atomate.vasp.database import VaspCalcDb

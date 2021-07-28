@@ -28,10 +28,11 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 db = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=1236)
 
-for e in db.collection.find({"task_label": "SCAN_scf"}):
+for e in db.collection.find({"task_label": "SCAN_nscf line"}):
+    symprec = 1e-1
     st = Structure.from_dict(e["output"]["structure"])
-    species, site_syms, wyckoffs, pg, site_idx = get_unique_sites_from_wy(st, symprec=1e-2).values()
-    good_ir = get_good_ir_sites(st, symprec=1e-2)
+    species, site_syms, wyckoffs, pg, site_idx, spg, spg_number = get_unique_sites_from_wy(st, symprec=symprec).values()
+    good_ir = get_good_ir_sites(st, symprec=symprec)
 
     print(e["c2db_info"]["uid"])
     d = {}
@@ -61,7 +62,7 @@ for e in db.collection.find({"task_label": "SCAN_scf"}):
     d["good_ir_info"] = ir
 
     d = jsanitize(d)
-    d.update({"symprec":1e-2, "pmg_point_gp": pg})
+    d.update({"symprec":symprec, "pmg_pg": pg, "pmg_spg": spg, "pmg_spg_number": spg_number})
 
     db.collection.update_one({"task_id": e["task_id"]}, {"$set":{"sym_data":d}})
 #%% 3
