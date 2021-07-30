@@ -159,7 +159,7 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
         tids = json.loads(group["not_calculated_yet"])
 
         group_id = int(group["group_id"])
-        for idx, tid in enumerate(tids[1:]):
+        for idx, tid in enumerate(tids[:]):
             print(group_id, tid)
 
             mx2 = col.find_one({"task_id": tid})
@@ -231,15 +231,15 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
                             # add charge state regarding nelect
                             charge, nupdn = None, None
-                            if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 0:
-                                charge = [0]
+                            if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
+                                charge = [-1, 0, 1]
                                 nupdn = [-1]
                                 print(charge)
                                 # if odd nelect, it used to be charge=[0]
                             else:
-                                # continue
-                                charge = [0]
-                                nupdn = [-1]
+                                continue
+                                # charge = [0]
+                                # nupdn = [-1]
 
                             wf = get_wf_full_scan(
                                 structure=gen_defect.defect_st,
@@ -251,7 +251,6 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                     "category": cat,
                                     "NN": gen_defect.NN,
                                     "NN_dist": gen_defect.nn_dist,
-                                    "defect_entry": defect_data,
                                 },
                                 wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
                                 wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")),
@@ -280,8 +279,9 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                     "site_info": gen_defect.site_info,
                                     "perturbed": gen_defect.distort,
                                     "group_id": group_id,
-                                    "site_symmetry_uniform": False, # before run further, update entries for True
-                                 },
+                                    "site_symmetry_uniform": True,
+                                    "defect_entry": defect_data,
+                                },
                                 task_name_constraint="ToDb"
                             )
 

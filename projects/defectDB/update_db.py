@@ -28,7 +28,7 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 db = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=1236)
 
-for e in db.collection.find({"task_label": "SCAN_nscf line"}):
+for e in db.collection.find({"task_label": "SCAN_scf"}):
     symprec = 1e-1
     st = Structure.from_dict(e["output"]["structure"])
     species, site_syms, wyckoffs, pg, site_idx, spg, spg_number = get_unique_sites_from_wy(st, symprec=symprec).values()
@@ -82,3 +82,32 @@ for e in list(col.find(filter)):
     data = get_band_edges_characters(bs)
     d = jsanitize(data)
     db.collection.update_one({"task_id": e["task_id"]}, {"$set":{"band_edges":d}})
+#%% 4
+from qubitPack.tool_box import get_db, get_band_edges_characters
+from monty.json import jsanitize
+
+src = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=1236)
+tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=1236)
+
+col = tgt.collection
+filter = {"task_label": "SCAN_scf",}
+# filter = {"task_id": 10}
+
+for e in list(col.find(filter)):
+    try:
+        print(e["task_id"], e["host_info"]["c2db_info"]["uid"])
+        src_entry = src.collection.find_one({"task_id": e["pc_from_id"]})
+        locpot = src_entry["calcs_reversed"][0]["output"]["locpot"]["2"]
+        vacuum = max(locpot)
+        sym_data = src_entry["sym_data"]
+        scan_bs_output = src_entry["output"]
+        for remove in ["structure", "density", "energy", "energy_per_atom", "forces", "stress", "spacegroup"]:
+            scan_bs_output.pop(remove)
+        band_edges = src_entry["band_edges"]
+        scan_bs_output.update({"band_edges": band_edges, "vacuum_level": vacuum})
+        tgt.collection.update_one({"task_id": e["task_id"]}, {"$set":{
+            "host_info.sym_data":sym_data,
+            "host_info.scan_bs": scan_bs_output
+        }})
+    except Exception as er:
+        print(er)
