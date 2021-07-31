@@ -49,7 +49,7 @@ class PureQuery:
                     "chemsys": {"$push": "$chemsys"},
                     "defect_name": {"$push": "$defect_name"},
                     "charge_state": {"$push": "$charge_state"},
-                    "mag": {"$push": {"$arrayElemAt": ["$calcs_reversed.output.outcar.total_magnetization", 0]}},
+                    "mag": {"$push":{"$round": [{"$arrayElemAt": ["$calcs_reversed.output.outcar.total_magnetization", 0]}, 3]}},
                     "pg": {"$push": "$output.spacegroup.point_group"},
                     "host_vbm_cbm_same": {"$push": "$host_info.scan_bs.band_edges.is_vbm_cbm_from_same_element"},
                     "scan_bg": {"$push": {"$round": ["$host_info.scan_bs.bandgap",3]}},
@@ -142,7 +142,7 @@ for j in [24]:
 
 
 
-f#%%
+#%%
 def main():
     # ExtractStructure.defect_structure()
     dd = PureQuery.aggregate()

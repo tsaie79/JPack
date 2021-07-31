@@ -150,13 +150,14 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
     col = get_db("Scan2dMat", "calc_data", port=12347).collection
     groups = loadfn(os.path.join(os.path.dirname(os.path.abspath("__file__")),
-                          "wf/Scan2dDefect/bg_gte_1_and_homo_07272021"))
+                          "wf/Scan2dDefect/bg_lge_1_and_inhomo_07062021"))
+    wf_stat = []
     geo_spec = None
-    for group in groups[1:2]:
+    for group in groups[7:8]:
         # tids = json.loads(group["tid"])
-        if group["not_calculated_yet"] == None:
+        if group["tid"] == None:
             continue
-        tids = json.loads(group["not_calculated_yet"])
+        tids = json.loads(group["tid"])
 
         group_id = int(group["group_id"])
         for idx, tid in enumerate(tids[:]):
@@ -218,25 +219,56 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                             gen_defect = GenDefect(pc, [defect_type, de_idx], na, thick, distort=dtort,
                                                    sub_on_side=list(impurity_on_nn))
                             # gen_defect.vacancies(dtort, list(impurity_on_nn))
-                            defect_data = gen_defect.defect_entry
-                            defect_data.update({
-                                "from_host_sym_data":{
-                                    "site": defect_site[0],
-                                    "specie": defect_site[1],
-                                    "site_sym": defect_site[2],
-                                    "wyckoff": defect_site[3],
-                                    "site_idx": defect_site[4],
+
+                            def data_to_db():
+                                d = {}
+                                # defect data
+                                defect_data = gen_defect.defect_entry.copy()
+                                defect_data.update({
+                                    "from_host_sym_data":{
+                                        "site": defect_site[0],
+                                        "specie": defect_site[1],
+                                        "site_sym": defect_site[2],
+                                        "wyckoff": defect_site[3],
+                                        "site_idx": defect_site[4],
+                                    }
+                                })
+                                d.update({
+                                    "NN": gen_defect.NN,
+                                    "NN_dist": gen_defect.nn_dist,
+                                    "site_info": gen_defect.site_info,
+                                    "perturbed": gen_defect.distort,
+                                    "defect_entry": defect_data,
+                                    "defect_name": defect_data["name"],
+                                })
+                                # host data
+                                host_data = {
+                                    "pc_from": "Scan2dMat/calc_data/{}".format(mx2["task_id"]),
+                                    "pc_from_id": mx2["task_id"],
+                                    "host_info": {"c2db_info": mx2["c2db_info"], "sym_data": mx2["sym_data"]},
                                 }
-                            })
+                                locpot = mx2["calcs_reversed"][0]["output"]["locpot"]["2"]
+                                vacuum = max(locpot)
+
+                                scan_bs_output = mx2["output"].copy()
+                                for remove in ["structure", "density", "energy", "energy_per_atom", "forces", "stress", "spacegroup"]:
+                                    scan_bs_output.pop(remove)
+                                band_edges = mx2["band_edges"]
+                                scan_bs_output.update({"band_edges": band_edges, "vacuum_level": vacuum})
+                                host_data["host_info"].update({"scan_bs": scan_bs_output})
+
+                                d.update(host_data)
+                                return d
 
                             # add charge state regarding nelect
                             charge, nupdn = None, None
                             if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
-                                charge = [-1, 0, 1]
+                                charge = [0]
                                 nupdn = [-1]
-                                print(charge)
+                                print("odd charge")
                                 # if odd nelect, it used to be charge=[0]
                             else:
+                                print("even charge")
                                 continue
                                 # charge = [0]
                                 # nupdn = [-1]
@@ -248,15 +280,12 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                 dos=False,
                                 nupdowns=nupdn,
                                 vasptodb={
-                                    "category": cat,
-                                    "NN": gen_defect.NN,
-                                    "NN_dist": gen_defect.nn_dist,
                                 },
                                 wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
                                 wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")),
                                                      "wf/Scan2dDefect/scan_defect.yaml")
                             )
-                            wf.name += ":r2scan"
+                            wf.name += ":{}".format(gen_defect.defect_entry["name"])
                             # wf = add_modify_2d_nscf_kpoints(
                             #     wf,
                             #     modify_kpoints_params={"mode": "line"},
@@ -269,19 +298,15 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                             )
                             wf = add_modify_incar(wf, {"incar_update": {"METAGGA":"R2SCAN"}})
                             wf = add_modify_incar(wf)
+                            d = data_to_db()
+                            d.update({
+                                "category": cat,
+                                "group_id": group_id,
+                                "site_symmetry_uniform": True,
+                            })
                             wf = add_additional_fields_to_taskdocs(
                                 wf,
-                                {
-                                    "pc_from": "Scan2dMat/calc_data/{}".format(mx2["task_id"]),
-                                    "pc_from_id": mx2["task_id"],
-                                    "host_info": {"c2db_info": mx2["c2db_info"], "sym_data": mx2["sym_data"]},
-                                    "defect_name": defect_data["name"],
-                                    "site_info": gen_defect.site_info,
-                                    "perturbed": gen_defect.distort,
-                                    "group_id": group_id,
-                                    "site_symmetry_uniform": True,
-                                    "defect_entry": defect_data,
-                                },
+                                d,
                                 task_name_constraint="ToDb"
                             )
 
@@ -308,8 +333,10 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                                 fw_name_constraint=wf.fws[3].name)
 
 
-                            print(wf)
-                            lpad.add_wf(wf)
-
+                            print(wf.name)
+                            # lpad.add_wf(wf)
+                            wf_stat.append(wf.name)
+    return  wf_stat
 if __name__ == '__main__':
-    binary_scan_defect()
+    a = binary_scan_defect()
+    print(len(a))

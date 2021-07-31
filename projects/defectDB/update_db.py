@@ -111,3 +111,49 @@ for e in list(col.find(filter)):
         }})
     except Exception as er:
         print(er)
+
+#%% 5
+from qubitPack.tool_box import get_db, get_band_edges_characters
+from monty.json import jsanitize
+
+tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=1236)
+
+col = tgt.collection
+filter = {"group_id": 4}
+
+for e in list(col.find(filter)):
+    try:
+        print(e["task_id"], e["host_info"]["c2db_info"]["uid"])
+        tgt.collection.update_one({"task_id": e["task_id"]}, {"$set":{
+            "site_symmetry_uniform": True,
+        }})
+    except Exception as er:
+        print(er)
+
+
+#%%
+import pandas as pd
+import os, json
+from qubitPack.tool_box import remove_entry_in_db
+
+tgt = get_db("Scan2dDefect", "ir_data", user="Jeng", password="qimin", port=1236)
+
+gp_id = [0,
+         3,
+         5,
+         7,
+         9,
+         10,
+         12,
+         13,
+         14,
+         15,
+         16,
+         17,
+         18,
+         19,
+         20]
+for  i in tgt.collection.find({"group_id": {"$in": gp_id}}):
+        tk_id = i["task_id"]
+        remove_entry_in_db(tk_id, tgt, pmg_file=False)
+
