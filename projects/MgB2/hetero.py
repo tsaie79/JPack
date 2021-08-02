@@ -1,3 +1,43 @@
+#%%
+from pymatgen import Structure, Molecule
+from pymatgen.transformations.standard_transformations import RotationTransformation
+
+import os
+
+from mpinterfaces.interface import Ligand, Interface
+from mpinterfaces.old_transformations import *
+from mpinterfaces.utils import *
+# os.chdir(os.path.dirname(os.path.abspath("__file__")))
+
+sic = Structure.from_file("models/unit_cell/SiC_terminated.vasp")
+
+# si_terminate
+sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,1]) for site in sic.sites])
+
+sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
+
+mgb2 = Structure.from_file("models/unit_cell/MgB2_mp-763_computed.cif")
+mgb2_slab = Interface(mgb2, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
+
+mgo = Structure.from_file("models/unit_cell/MgO_mp-1265_conventional_standard.cif")
+mgo_slab = Interface(mgo, hkl=[1,1,1], min_thick=4, min_vac=40, primitive=False, from_ase=True)
+mgo_slab.get_primitive_structure()
+mgo_slab.to("poscar", "models/unit_cell/mgo.vasp")
+
+substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
+    sic_slab,
+    mgo_slab,
+    max_area=40
+)
+
+substrate_slab_aligned.to("poscar", "models/heter/subs.vasp")
+mat2d_slab_aligned.to("poscar", "models/heter/mat2d.vasp")
+
+hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
+                                         nlayers_substrate=1, nlayers_2d=1, seperation=2)
+for idx, i in enumerate(hetero_interfaces):
+    i.to("poscar", "models/heter/{}.vasp".format(idx))
+
 #%% hetero
 from pymatgen import Structure, Molecule
 from pymatgen.transformations.standard_transformations import RotationTransformation
@@ -15,7 +55,7 @@ sic = Structure.from_file("/Users/jeng-yuantsai/Research/project/MgB2/model/SiC_
 sic.to("poscar", "/Users/jeng-yuantsai/Research/project/MgB2/model/SiC_6H/SiC_mp-7631_computed_cut.vasp")
 
 # si_terminate
-sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,-1]) for site in sic.sites])
+sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,1]) for site in sic.sites])
 
 sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
 

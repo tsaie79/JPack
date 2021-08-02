@@ -39,11 +39,14 @@ LPAD = LaunchPad.from_file(
     os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/my_launchpad.yaml".format(CATEGORY)))
 
 terminate = "si_terminate"
-st_p = "/home/tug03990/work/mgb2/hetero"
 
-heter = Structure.from_file(os.path.join(st_p, terminate, "0.vasp"))
-mgb2 = Structure.from_file(os.path.join(st_p, terminate, "mat2d.vasp"))
-sic = Structure.from_file(os.path.join(st_p, terminate, "subs.vasp"))
+c_term = Structure.from_file(os.path.join("models/heter", "two_MgO-C_term_SiC.vasp"))
+si_term = Structure.from_file(os.path.join("models/heter", "two_MgO-Si_term_SiC.vasp"))
+
+mgo = Structure.from_file(os.path.join("models/unit_cell", "mgo.vasp"))
+
+# mgb2 = Structure.from_file(os.path.join(st_p, terminate, "mat2d.vasp"))
+# sic = Structure.from_file(os.path.join(st_p, terminate, "subs.vasp"))
 
 def dp(structure):
     weights = [s.species.weight for s in structure]
@@ -54,51 +57,31 @@ def dp(structure):
     return {"IDIPOL":3, "LDIPOL": True, "DIPOL": center_of_mass}
 
 
-uis = {"ISIF": 2, "EDIFFG":-0.01}
-uis.update(dp(heter))
-
-opt_vdw = OptimizeFW(heter, override_default_vasp_params={"user_incar_settings": uis})
-uis = {}
-uis.update({"EDIFF":1E-5})
-static = StaticFW(heter, parents=opt_vdw, vasp_input_set_params={"user_incar_settings": uis})
-
-hetero_fws = [opt_vdw, static]
-wf = Workflow(hetero_fws, name=terminate)
-
-add_additional_fields_to_taskdocs(wf, {"terminate": terminate})
-wf = add_modify_incar(wf, {"incar_update": dict(ISPIN=1, MAGMOM=MPRelaxSet(heter).incar.get("MAGMOM"))})
-wf = preserve_fworker(wf)
-wf = set_execution_options(wf, category=CATEGORY)
-
-print(wf)
-# LPAD.add_wf(wf)
-
-
-for st in [heter]:
+for st, term in zip([c_term, si_term], ["c_terminate", "si_terminate"]):
     fws = []
 
-    opt = OptimizeFW(st, override_default_vasp_params={"user_incar_settings":uis}, vasp_input_set=MPMetalRelaxSet(st))
+    opt = OptimizeFW(st, vasp_input_set=MPMetalRelaxSet(st,  vdw="optPBE"))
 
-    static = StaticFW(st, parents=opt, vasp_input_set_params={"user_incar_settings": uis},
+    static = StaticFW(st, parents=opt,
                       vasptodb_kwargs={
                           "parse_eigenvalues": False,
                           "parse_dos": False
                       })
 
-    bs = NonSCFFW(parents=static, mode="uniform", input_set_overrides=dict(reciprocal_density=250, nedos=9000), structure=st)
+    # bs = NonSCFFW(parents=static, mode="uniform", input_set_overrides=dict(reciprocal_density=250, nedos=9000), structure=st)
 
-    fws.extend([static, opt, bs])
+    fws.extend([static, opt])
     wf = Workflow(fws, name=terminate+":{}".format(st.formula))
 
-    wf = add_additional_fields_to_taskdocs(wf, {"terminate": terminate, "metal":True})
-
-    uis = {"EDIFF":1E-5, "EDIFFG":-0.01, "ISIF":2}
+    wf = add_additional_fields_to_taskdocs(wf, {"terminate": term, "metal":True, "project": "MgO"})
+    wf = add_tags(wf, [{"terminate": term, "metal":True, "project": "MgO"}])
+    uis = {"EDIFF":1E-4, "EDIFFG":-0.01, "ISIF":2}
     uis.update(dp(st))
 
     wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[0].name)
-    uis.update({"EDIFF":1E-6})
+    uis.update({"EDIFF":1E-5})
     wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[1].name)
-    wf = add_modify_incar(wf, {"incar_update": {"ENMAX":-15, "ENMAX":15}},fw_name_constraint=fws[-1].name)
+    # wf = add_modify_incar(wf, {"incar_update": {"ENMAX":-15, "ENMAX":15}},fw_name_constraint=fws[-1].name)
     wf = add_modify_incar(wf, {"incar_update": dict(ISPIN=1, MAGMOM=MPRelaxSet(st).incar.get("MAGMOM"))})
     wf = preserve_fworker(wf)
     wf = set_execution_options(wf, category=CATEGORY)
