@@ -14,6 +14,7 @@ def make_interface(subs, mat2d):
 
     sic = Structure.from_file("models/unit_cell/SiC_terminated.vasp")
     sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,subs]) for site in sic.sites])
+    subs_for_save = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=15, primitive=False, from_ase=True)
     sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=30+0.55-5.098, primitive=False, from_ase=True)
 
     # mgb2 = Structure.from_file("models/unit_cell/MgB2_mp-763_computed.cif")
@@ -23,10 +24,10 @@ def make_interface(subs, mat2d):
     mgo_slab = Interface(mgo, hkl=[1,1,1], min_thick=8, min_vac=0.1, primitive=False, from_ase=True)
 
     mgo_slab = Structure(mgo_slab.lattice, mgo_slab.species, [np.multiply(site.frac_coords, [1,1,mat2d]) for site in mgo_slab.sites])
+    mgo_slab = make_it_120(mgo_slab)
+    mat2d_for_save = Interface(mgo_slab, hkl=[0, 0, 1], min_thick=8, min_vac=15, primitive=False, from_ase=True)
     mgo_slab = Interface(mgo_slab, hkl=[0, 0, 1], min_thick=8, min_vac=0.1, primitive=False, from_ase=True)
 
-
-    mgo_slab.to("poscar", "models/unit_cell/mgo.vasp")
 
     substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
         sic_slab,
@@ -37,13 +38,12 @@ def make_interface(subs, mat2d):
         # r1r2_tol=0.2
     )
 
-    # substrate_slab_aligned.to("poscar", "models/heter/subs.vasp")
-    # mat2d_slab_aligned.to("poscar", "models/heter/mat2d.vasp")
+
 
     hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
                                              nlayers_substrate=2, nlayers_2d=2, seperation=2)
 
-    return hetero_interfaces
+    return hetero_interfaces, subs_for_save, mat2d_for_save
 
 def make_it_120(st):
     mat = st.lattice.matrix.copy()
@@ -55,65 +55,19 @@ def make_it_120(st):
 config = {"subs": {-1: "si_term", 1: "c_term"}, "mat2d": {-1: "o_first", 1: "mg_first"}}
 for subs in config["subs"]:
     for mat2d in config["mat2d"]:
-        for idx, st in enumerate(make_interface(subs, mat2d)):
+        hetero_interfaces, subs_for_save, mat2d_for_save = make_interface(subs, mat2d)
+        for idx, st in enumerate(hetero_interfaces):
             print(idx)
             path = "models/heter/{}/{}".format(config["subs"][subs], config["mat2d"][mat2d])
             os.makedirs(path, exist_ok=True)
             st = make_it_120(st)
             st.to("poscar", "models/heter/{}/{}/{}.vasp".format(config["subs"][subs], config["mat2d"][mat2d], idx))
 
-#%% hetero
-from pymatgen import Structure, Molecule
-from pymatgen.transformations.standard_transformations import RotationTransformation
+            subs_for_save.to("poscar", "models/heter/{}/subs.vasp".format(config["subs"][subs]))
+            mat2d_for_save.to("poscar", "models/heter/{}/mat2d.vasp".format(config["subs"][subs]))
 
-import os
 
-from mpinterfaces.interface import Ligand, Interface
-from mpinterfaces.old_transformations import *
-from mpinterfaces.utils import *
 
-p = "/Users/jeng-yuantsai/Research/project/MgB2/model/new"
-
-sic = Structure.from_file("/Users/jeng-yuantsai/Research/project/MgB2/model/SiC_6H/SiC_mp-7631_computed.cif")
-# sic.remove_sites([5, 11])
-sic.to("poscar", "/Users/jeng-yuantsai/Research/project/MgB2/model/SiC_6H/SiC_mp-7631_computed_cut.vasp")
-
-# si_terminate
-sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,1]) for site in sic.sites])
-
-sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
-
-mgb2 = slab_from_file([0,0,1], "/Users/jeng-yuantsai/Research/project/MgB2/model/MgB2/MgB2_mp-763_computed.cif")
-# mgb2 = slab_from_file([0,0,1], '/Users/jeng-yuantsai/Research/project/MgB2/model/new/mgb2_112.vasp')
-# mgb2 = Structure.from_file('/Users/jeng-yuantsai/Research/project/MgB2/model/new/mgb2_112.vasp')
-# mgb2 = Structure.from_file('/Users/jeng-yuantsai/Research/project/MgB2/model/new/hetero/si_terminate_b/mat2d.vasp')
-# mgb2 = Structure(mgb2.lattice, mgb2.species, [np.multiply(site.frac_coords, [1,1,-1]) for site in mgb2.sites])
-mgb2_slab = Interface(mgb2, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
-#
-# AlN = Structure.from_file('/Users/jeng-yuantsai/Research/project/MgB2/model/AlN/AlN_mp-661_computed.cif')
-# AlN = Interface(AlN, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
-
-# graphene = Structure.from_file('/Users/jeng-yuantsai/Research/project/MgB2/model/new/hetero/graphene/C_mp-568806_computed.cif')
-# graphene = Interface(graphene, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
-
-# mgb2_slab.to("poscar", os.path.join(p, "mgb2_slab.vasp"))
-# sic_slab.to("poscar", os.path.join(p, "sic_slab.vasp"))
-
-substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
-    sic_slab,
-    mgb2_slab,
-    max_area=20
-)
-# s = "/Users/jeng-yuantsai/Research/project/MgB2/model/new/hetero/si_terminate_top"
-# s = '/Users/jeng-yuantsai/Research/project/MgB2/model/new/hetero/graphene'
-s = "/Users/jeng-yuantsai/Research/project/MgB2/model/new/hetero/test"
-substrate_slab_aligned.to("poscar", os.path.join(s, "subs.vasp"))
-mat2d_slab_aligned.to("poscar", os.path.join(s, "mat2d.vasp"))
-
-hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
-                                         nlayers_substrate=1, nlayers_2d=1, seperation=2)
-for idx, i in enumerate(hetero_interfaces):
-    i.to("poscar", os.path.join(s, "{}.vasp".format(idx)))
 
 #%% WF
 import numpy as np
