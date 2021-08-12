@@ -1,4 +1,6 @@
 #%% get dos wf
+import glob
+
 from atomate.vasp.fireworks import NonSCFFW
 from atomate.vasp.powerups import *
 import os
@@ -39,13 +41,14 @@ LPAD = LaunchPad.from_file(
     os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/my_launchpad.yaml".format(CATEGORY)))
 
 
-c_term = Structure.from_file(os.path.join("models/heter", "two_MgO-C_term_SiC-O_bottom.vasp"))
-si_term = Structure.from_file(os.path.join("models/heter", "two_MgO-Si_term_SiC-O_bottom.vasp"))
+# c_term = Structure.from_file(os.path.join("models/heter", "two_MgO-C_term_SiC-O_bottom.vasp"))
+# si_term = Structure.from_file(os.path.join("models/heter", "two_MgO-Si_term_SiC-O_bottom.vasp"))
 # sic = Structure.from_file(os.path.join("models/unit_cell", "SiC_terminated.vasp"))
 # mgo = Structure.from_file(os.path.join("models/unit_cell", "mgo.vasp"))
 
-sic = Structure.from_file(os.path.join("models/heter", "subs.vasp"))
-mgo = Structure.from_file(os.path.join("models/heter", "mat2d.vasp"))
+# sic = Structure.from_file(os.path.join("models/heter", "subs.vasp"))
+mgo = Structure.from_file(os.path.join("models/heter/c_term", "mat2d.vasp"))
+
 
 def dp(structure):
     weights = [s.species.weight for s in structure]
@@ -56,36 +59,51 @@ def dp(structure):
     return {"IDIPOL":3, "LDIPOL": True, "DIPOL": center_of_mass}
 
 
-for st, term in zip([c_term, si_term], ["c_term-o_bottom", "si_term-o_bottom"]):
-    fws = []
+config = {"subs": {-1: "si_term", 1: "c_term"}, "mat2d": {-1: "o_first", 1: "mg_first"}}
 
-    opt = OptimizeFW(st, vasp_input_set=MPMetalRelaxSet(st)) # vdw="optPBE"
+for subs in config["subs"]:
+    for mat2d in config["mat2d"]:
+        path = "models/heter/{}/{}".format(config["subs"][subs], config["mat2d"][mat2d])
+        term = config["subs"][subs]
+        first_layer = config["mat2d"][mat2d]
+        for st in glob.glob(os.path.join(path, ".vasp")):
+            st = Structure.from_file(st)
 
-    static = StaticFW(st, parents=opt,
-                      vasptodb_kwargs={
-                          "parse_eigenvalues": False,
-                          "parse_dos": False
-                      })
+            fws = []
 
-    # bs = NonSCFFW(parents=static, mode="uniform", input_set_overrides=dict(reciprocal_density=250, nedos=9000), structure=st)
+            opt = OptimizeFW(st, vasp_input_set=MPRelaxSet(st), vdw="optPBE")
 
-    fws.extend([static, opt])
-    wf = Workflow(fws, name=term+":{}".format(st.formula))
+            static = StaticFW(st, parents=opt,
+                              vasptodb_kwargs={
+                                  "parse_eigenvalues": False,
+                                  "parse_dos": False
+                              })
 
-    wf = add_additional_fields_to_taskdocs(wf, {"terminate": term, "metal":False, "project": "MgO", "spin":1, "vdw":False})
-    wf = add_tags(wf, [{"terminate": term, "metal":False, "project": "MgO", "spin":1, "vdw":False}])
-    uis = {"EDIFF":1E-4, "EDIFFG":-0.01, "ISIF":2}
-    uis.update(dp(st))
+            # bs = NonSCFFW(parents=static, mode="uniform", input_set_overrides=dict(reciprocal_density=250, nedos=9000), structure=st)
 
-    wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[0].name)
-    uis.update({"EDIFF":1E-5})
-    wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[1].name)
-    # wf = add_modify_incar(wf, {"incar_update": {"ENMAX":-15, "ENMAX":15}},fw_name_constraint=fws[-1].name)
-    wf = add_modify_incar(wf, {"incar_update": dict(ISPIN=1, MAGMOM=MPRelaxSet(st).incar.get("MAGMOM"))})
-    wf = preserve_fworker(wf)
-    wf = set_execution_options(wf, category=CATEGORY)
+            fws.extend([static, opt])
+            wf = Workflow(fws, name=term+":{}".format(st.formula))
 
-    print(wf)
-    LPAD.add_wf(wf)
+            wf = add_additional_fields_to_taskdocs(wf, {
+                "terminate": term, "first_layer": first_layer, "metal":False, "project": "MgO", "spin":1, "vdw":True
+            })
+
+            wf = add_tags(wf, [{
+                "terminate": term, "first_layer": first_layer, "metal":False, "project": "MgO", "spin":1, "vdw":True
+            }])
+
+            uis = {"EDIFF":1E-4, "EDIFFG":-0.01, "ISIF":2}
+            uis.update(dp(st))
+
+            wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[0].name)
+            uis.update({"EDIFF":1E-5})
+            wf = add_modify_incar(wf, {"incar_update": uis}, fw_name_constraint=fws[1].name)
+            # wf = add_modify_incar(wf, {"incar_update": {"ENMAX":-15, "ENMAX":15}},fw_name_constraint=fws[-1].name)
+            wf = add_modify_incar(wf, {"incar_update": dict(ISPIN=1, MAGMOM=MPRelaxSet(st).incar.get("MAGMOM"))})
+            wf = preserve_fworker(wf)
+            wf = set_execution_options(wf, category=CATEGORY)
+
+            print(wf)
+            # LPAD.add_wf(wf)
 
 
