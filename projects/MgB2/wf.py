@@ -38,15 +38,14 @@ CATEGORY = "hetero"
 LPAD = LaunchPad.from_file(
     os.path.join(os.path.expanduser("~"), "config/project/mgb2/{}/my_launchpad.yaml".format(CATEGORY)))
 
-terminate = "si_terminate"
 
-c_term = Structure.from_file(os.path.join("models/heter", "two_MgO-C_term_SiC.vasp"))
-si_term = Structure.from_file(os.path.join("models/heter", "two_MgO-Si_term_SiC.vasp"))
+c_term = Structure.from_file(os.path.join("models/heter", "two_MgO-C_term_SiC-O_bottom.vasp"))
+si_term = Structure.from_file(os.path.join("models/heter", "two_MgO-Si_term_SiC-O_bottom.vasp"))
+# sic = Structure.from_file(os.path.join("models/unit_cell", "SiC_terminated.vasp"))
+# mgo = Structure.from_file(os.path.join("models/unit_cell", "mgo.vasp"))
 
-mgo = Structure.from_file(os.path.join("models/unit_cell", "mgo.vasp"))
-
-# mgb2 = Structure.from_file(os.path.join(st_p, terminate, "mat2d.vasp"))
-# sic = Structure.from_file(os.path.join(st_p, terminate, "subs.vasp"))
+sic = Structure.from_file(os.path.join("models/heter", "subs.vasp"))
+mgo = Structure.from_file(os.path.join("models/heter", "mat2d.vasp"))
 
 def dp(structure):
     weights = [s.species.weight for s in structure]
@@ -57,10 +56,10 @@ def dp(structure):
     return {"IDIPOL":3, "LDIPOL": True, "DIPOL": center_of_mass}
 
 
-for st, term in zip([c_term, si_term], ["c_terminate", "si_terminate"]):
+for st, term in zip([c_term, si_term], ["c_term-o_bottom", "si_term-o_bottom"]):
     fws = []
 
-    opt = OptimizeFW(st, vasp_input_set=MPMetalRelaxSet(st,  vdw="optPBE"))
+    opt = OptimizeFW(st, vasp_input_set=MPMetalRelaxSet(st)) # vdw="optPBE"
 
     static = StaticFW(st, parents=opt,
                       vasptodb_kwargs={
@@ -71,10 +70,10 @@ for st, term in zip([c_term, si_term], ["c_terminate", "si_terminate"]):
     # bs = NonSCFFW(parents=static, mode="uniform", input_set_overrides=dict(reciprocal_density=250, nedos=9000), structure=st)
 
     fws.extend([static, opt])
-    wf = Workflow(fws, name=terminate+":{}".format(st.formula))
+    wf = Workflow(fws, name=term+":{}".format(st.formula))
 
-    wf = add_additional_fields_to_taskdocs(wf, {"terminate": term, "metal":True, "project": "MgO"})
-    wf = add_tags(wf, [{"terminate": term, "metal":True, "project": "MgO"}])
+    wf = add_additional_fields_to_taskdocs(wf, {"terminate": term, "metal":False, "project": "MgO", "spin":1, "vdw":False})
+    wf = add_tags(wf, [{"terminate": term, "metal":False, "project": "MgO", "spin":1, "vdw":False}])
     uis = {"EDIFF":1E-4, "EDIFFG":-0.01, "ISIF":2}
     uis.update(dp(st))
 

@@ -9,34 +9,51 @@ from mpinterfaces.old_transformations import *
 from mpinterfaces.utils import *
 # os.chdir(os.path.dirname(os.path.abspath("__file__")))
 
-sic = Structure.from_file("models/unit_cell/SiC_terminated.vasp")
 
-# si_terminate
-sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,1]) for site in sic.sites])
+def make_interface(subs, mat2d):
 
-sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
+    sic = Structure.from_file("models/unit_cell/SiC_terminated.vasp")
+    sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,subs]) for site in sic.sites])
+    sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=30+0.55-5.098, primitive=False, from_ase=True)
 
-mgb2 = Structure.from_file("models/unit_cell/MgB2_mp-763_computed.cif")
-mgb2_slab = Interface(mgb2, hkl=[0,0,1], min_thick=1, min_vac=40, primitive=False, from_ase=True)
+    # mgb2 = Structure.from_file("models/unit_cell/MgB2_mp-763_computed.cif")
+    # mgb2_slab = Interface(mgb2, hkl=[0,0,1], min_thick=1, min_vac=30+0.55-5.098, primitive=False, from_ase=True)
 
-mgo = Structure.from_file("models/unit_cell/MgO_mp-1265_conventional_standard.cif")
-mgo_slab = Interface(mgo, hkl=[1,1,1], min_thick=4, min_vac=40, primitive=False, from_ase=True)
-mgo_slab.get_primitive_structure()
-mgo_slab.to("poscar", "models/unit_cell/mgo.vasp")
+    mgo = Structure.from_file("models/unit_cell/MgO_mp-1265_conventional_standard.cif")
+    mgo_slab = Interface(mgo, hkl=[1,1,1], min_thick=8, min_vac=0.1, primitive=False, from_ase=True)
 
-substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
-    sic_slab,
-    mgo_slab,
-    max_area=40
-)
+    mgo_slab = Structure(mgo_slab.lattice, mgo_slab.species, [np.multiply(site.frac_coords, [1,1,mat2d]) for site in mgo_slab.sites])
+    mgo_slab = Interface(mgo_slab, hkl=[0, 0, 1], min_thick=8, min_vac=0.1, primitive=False, from_ase=True)
 
-substrate_slab_aligned.to("poscar", "models/heter/subs.vasp")
-mat2d_slab_aligned.to("poscar", "models/heter/mat2d.vasp")
 
-hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
-                                         nlayers_substrate=1, nlayers_2d=1, seperation=2)
-for idx, i in enumerate(hetero_interfaces):
-    i.to("poscar", "models/heter/{}.vasp".format(idx))
+    mgo_slab.to("poscar", "models/unit_cell/mgo.vasp")
+
+    substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
+        sic_slab,
+        mgo_slab,
+        max_area=100,
+        # max_mismatch=1,
+        # max_angle_diff=1,
+        # r1r2_tol=0.2
+    )
+
+    # substrate_slab_aligned.to("poscar", "models/heter/subs.vasp")
+    # mat2d_slab_aligned.to("poscar", "models/heter/mat2d.vasp")
+
+    hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
+                                             nlayers_substrate=2, nlayers_2d=2, seperation=2)
+
+    return hetero_interfaces
+
+
+config = {"subs": {-1: "si_term", 1: "c_term"}, "mat2d": {-1: "o_first", 1: "mg_first"}}
+for subs in config["subs"]:
+    for mat2d in config["mat2d"]:
+        for idx, st in enumerate(make_interface(subs, mat2d)):
+            print(idx)
+            path = "models/heter/{}/{}".format(config["subs"][subs], config["mat2d"][mat2d])
+            os.makedirs(path, exist_ok=True)
+            st.to("poscar", "models/heter/{}/{}/{}.vasp".format(config["subs"][subs], config["mat2d"][mat2d], idx))
 
 #%% hetero
 from pymatgen import Structure, Molecule
@@ -195,7 +212,7 @@ def energy(tids):
 # c = energy([140, 137, 149])
 
 
-locpot(136)
+energy(136)
 
 #%% get dos
 from qubitPack.tool_box import get_db
@@ -350,3 +367,53 @@ for e in [si, c]:
     b = pd.DataFrame(e["calcs_reversed"][0]["bader"])
     df = pd.concat([b,a], axis=1)
     df.to_excel("/Users/jeng-yuantsai/Research/project/MgB2/calculations/mgb2/hetero/bader/{}.xlsx".format(e["terminate"]), index_label=False)
+
+
+#%% re-orient strucutre from 60 to 120
+import numpy as np
+from pymatgen import Structure
+from qubitPack.tool_box import get_db
+
+db = get_db("mgb2", "hetero", port=1234)
+
+st = Structure.from_dict(db.collection.find_one({"task_id": 192})["output"]["structure"])
+mat = st.lattice.matrix.copy()
+mat[1,0] = mat[1, 0]*-1
+lattice = Lattice(mat)
+st = Structure(lattice, st.species, [np.multiply(site.frac_coords, [1,-1, 1]) for site in st.sites])
+st.to("poscar", "models/heter/results/test.vasp")
+
+#%% check the unit cell
+from pymatgen import Structure, Molecule
+from pymatgen.analysis.structure_analyzer import SpacegroupAnalyzer
+
+import os
+
+from mpinterfaces.interface import Ligand, Interface
+from mpinterfaces.old_transformations import *
+from mpinterfaces.utils import *
+
+sic = Structure.from_file("models/unit_cell/SiC_terminated.vasp")
+mgo = Structure.from_file("models/unit_cell/mgo.vasp")
+
+coords = np.array([site.coords for site in sic])
+z = coords[:, 2]
+z = np.around(z, decimals=4)
+zu, zuind = np.unique(z, return_index=True)
+print(z, zu, zuind)
+z_nthlayer = z[zuind[-1]]
+zfilter = (z >= z_nthlayer)
+print(z_nthlayer, zfilter)
+indices_layers = np.argwhere(zfilter).ravel()
+
+sa = SpacegroupAnalyzer(sic)
+symm_data = sa.get_symmetry_dataset()
+eq_struct = symm_data["equivalent_atoms"]
+eq_layers = eq_struct[indices_layers]
+print(indices_layers, eq_layers)
+sic_sym = SpacegroupAnalyzer(sic).get_symmetry_dataset()
+mgo_sym = SpacegroupAnalyzer(mgo).get_symmetry_dataset()
+
+
+
+print("SiC:{}, MgO:{}".format(sic_sym["wyckoffs"][5], mgo_sym["wyckoffs"][0]))
