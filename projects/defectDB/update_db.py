@@ -90,8 +90,8 @@ src = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=1236)
 tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=1236)
 
 col = tgt.collection
-filter = {"task_label": "SCAN_scf",}
-# filter = {"task_id": 10}
+# filter = {"task_label": "SCAN_scf",}
+filter = {"task_id": {"$in":[1309, 1311, 1315, 1349, 1351]}}
 
 for e in list(col.find(filter)):
     try:

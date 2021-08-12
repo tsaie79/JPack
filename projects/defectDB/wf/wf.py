@@ -150,12 +150,12 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
     col = get_db("Scan2dMat", "calc_data", port=12347).collection
     groups = loadfn(os.path.join(os.path.dirname(os.path.abspath("__file__")),
-                          "wf/Scan2dDefect/bg_lge_1_and_inhomo_07062021"))
-    wf_stat = []
+                          "wf/Scan2dDefect/bg_gte_1_and_homo_07272021"))
+    wfs_stat = []
     geo_spec = None
-    for group in groups[7:8]:
-        # tids = json.loads(group["tid"])
-        if group["tid"] == None:
+    for group in groups[1:2]:
+        tids = json.loads(group["tid"])
+        if group["not_calculated_yet"] == None:
             continue
         tids = json.loads(group["tid"])
 
@@ -261,17 +261,18 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                 return d
 
                             # add charge state regarding nelect
-                            charge, nupdn = None, None
-                            if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
+                            charge, nupdn, n_of_e = None, None, None
+                            if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 0:
+                                continue
                                 charge = [0]
                                 nupdn = [-1]
-                                print("odd charge")
+                                n_of_e = "even"
                                 # if odd nelect, it used to be charge=[0]
                             else:
-                                print("even charge")
-                                continue
-                                # charge = [0]
-                                # nupdn = [-1]
+                                charge = [1]
+                                nupdn = [-1]
+                                n_of_e = "odd"
+
 
                             wf = get_wf_full_scan(
                                 structure=gen_defect.defect_st,
@@ -309,6 +310,12 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                 d,
                                 task_name_constraint="ToDb"
                             )
+                            wf = add_tags(wf, [{"pc_from_id": d["pc_from_id"],
+                                                "group_id": group_id,
+                                                "defect_name": d["defect_name"],
+                                                "n_of_e": n_of_e,
+                                                "charge_state": charge
+                                                }])
 
                             if idx % 2 == 1:
                                 wf = set_execution_options(wf, category="calc_data", fworker_name="efrc")
@@ -332,11 +339,9 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                             wf = clean_up_files(wf, files=["WAVECAR"], task_name_constraint="IRVSPToDb",
                                                 fw_name_constraint=wf.fws[3].name)
 
-
+                            wfs_stat.append(wf)
                             print(wf.name)
-                            # lpad.add_wf(wf)
-                            wf_stat.append(wf.name)
-    return  wf_stat
+                            lpad.add_wf(wf)
+    return  wfs_stat
 if __name__ == '__main__':
-    a = binary_scan_defect()
-    print(len(a))
+    wfs = binary_scan_defect()
