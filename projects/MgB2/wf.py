@@ -34,7 +34,7 @@ from atomate.vasp.fireworks import NonSCFFW
 from atomate.vasp.powerups import *
 import os
 from fireworks import LaunchPad, Workflow
-import os
+import os, glob
 
 CATEGORY = "hetero"
 LPAD = LaunchPad.from_file(
@@ -66,17 +66,17 @@ for subs in config["subs"]:
         path = "models/heter/{}/{}".format(config["subs"][subs], config["mat2d"][mat2d])
         term = config["subs"][subs]
         first_layer = config["mat2d"][mat2d]
-        for st in glob.glob(os.path.join(path, ".vasp")):
+        for st in glob.glob(os.path.join(path, "*.vasp")):
+            print(st)
             st = Structure.from_file(st)
-
             fws = []
 
-            opt = OptimizeFW(st, vasp_input_set=MPRelaxSet(st), vdw="optPBE")
+            opt = OptimizeFW(st, vasp_input_set=MPRelaxSet(st, vdw="optPBE"))
 
             static = StaticFW(st, parents=opt,
                               vasptodb_kwargs={
                                   "parse_eigenvalues": False,
-                                  "parse_dos": False
+                                  "parse_dos": False,
                               })
 
             # bs = NonSCFFW(parents=static, mode="uniform", input_set_overrides=dict(reciprocal_density=250, nedos=9000), structure=st)
