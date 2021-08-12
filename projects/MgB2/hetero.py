@@ -45,6 +45,12 @@ def make_interface(subs, mat2d):
 
     return hetero_interfaces
 
+def make_it_120(st):
+    mat = st.lattice.matrix.copy()
+    mat[1,0] = mat[1, 0]*-1
+    lattice = Lattice(mat)
+    st = Structure(lattice, st.species, [np.multiply(site.frac_coords, [1,-1, 1]) for site in st.sites])
+    return st
 
 config = {"subs": {-1: "si_term", 1: "c_term"}, "mat2d": {-1: "o_first", 1: "mg_first"}}
 for subs in config["subs"]:
@@ -53,6 +59,7 @@ for subs in config["subs"]:
             print(idx)
             path = "models/heter/{}/{}".format(config["subs"][subs], config["mat2d"][mat2d])
             os.makedirs(path, exist_ok=True)
+            st = make_it_120(st)
             st.to("poscar", "models/heter/{}/{}/{}.vasp".format(config["subs"][subs], config["mat2d"][mat2d], idx))
 
 #%% hetero
@@ -369,51 +376,4 @@ for e in [si, c]:
     df.to_excel("/Users/jeng-yuantsai/Research/project/MgB2/calculations/mgb2/hetero/bader/{}.xlsx".format(e["terminate"]), index_label=False)
 
 
-#%% re-orient strucutre from 60 to 120
-import numpy as np
-from pymatgen import Structure
-from qubitPack.tool_box import get_db
 
-db = get_db("mgb2", "hetero", port=1234)
-
-st = Structure.from_dict(db.collection.find_one({"task_id": 192})["output"]["structure"])
-mat = st.lattice.matrix.copy()
-mat[1,0] = mat[1, 0]*-1
-lattice = Lattice(mat)
-st = Structure(lattice, st.species, [np.multiply(site.frac_coords, [1,-1, 1]) for site in st.sites])
-st.to("poscar", "models/heter/results/test.vasp")
-
-#%% check the unit cell
-from pymatgen import Structure, Molecule
-from pymatgen.analysis.structure_analyzer import SpacegroupAnalyzer
-
-import os
-
-from mpinterfaces.interface import Ligand, Interface
-from mpinterfaces.old_transformations import *
-from mpinterfaces.utils import *
-
-sic = Structure.from_file("models/unit_cell/SiC_terminated.vasp")
-mgo = Structure.from_file("models/unit_cell/mgo.vasp")
-
-coords = np.array([site.coords for site in sic])
-z = coords[:, 2]
-z = np.around(z, decimals=4)
-zu, zuind = np.unique(z, return_index=True)
-print(z, zu, zuind)
-z_nthlayer = z[zuind[-1]]
-zfilter = (z >= z_nthlayer)
-print(z_nthlayer, zfilter)
-indices_layers = np.argwhere(zfilter).ravel()
-
-sa = SpacegroupAnalyzer(sic)
-symm_data = sa.get_symmetry_dataset()
-eq_struct = symm_data["equivalent_atoms"]
-eq_layers = eq_struct[indices_layers]
-print(indices_layers, eq_layers)
-sic_sym = SpacegroupAnalyzer(sic).get_symmetry_dataset()
-mgo_sym = SpacegroupAnalyzer(mgo).get_symmetry_dataset()
-
-
-
-print("SiC:{}, MgO:{}".format(sic_sym["wyckoffs"][5], mgo_sym["wyckoffs"][0]))
