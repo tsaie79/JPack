@@ -9,13 +9,14 @@ from mpinterfaces.old_transformations import *
 from mpinterfaces.utils import *
 # os.chdir(os.path.dirname(os.path.abspath("__file__")))
 
+from qubitPack.tool_box import set_vacuum
+
 
 def make_interface(subs, mat2d):
 
     sic = Structure.from_file("models/unit_cell/SiC_terminated.vasp")
     sic = Structure(sic.lattice, sic.species, [np.multiply(site.frac_coords, [1,1,subs]) for site in sic.sites])
-    subs_for_save = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=15, primitive=False, from_ase=True)
-    sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=30+0.55-5.098, primitive=False, from_ase=True)
+    sic_slab = Interface(sic, hkl=[0,0,1], min_thick=1, min_vac=35, primitive=False, from_ase=True)
 
     # mgb2 = Structure.from_file("models/unit_cell/MgB2_mp-763_computed.cif")
     # mgb2_slab = Interface(mgb2, hkl=[0,0,1], min_thick=1, min_vac=30+0.55-5.098, primitive=False, from_ase=True)
@@ -23,10 +24,11 @@ def make_interface(subs, mat2d):
     mgo = Structure.from_file("models/unit_cell/MgO_mp-1265_conventional_standard.cif")
     mgo_slab = Interface(mgo, hkl=[1,1,1], min_thick=8, min_vac=0.1, primitive=False, from_ase=True)
 
-    mgo_slab = Structure(mgo_slab.lattice, mgo_slab.species, [np.multiply(site.frac_coords, [1,1,mat2d]) for site in mgo_slab.sites])
+    mgo_slab = Structure(mgo_slab.lattice, mgo_slab.species,
+                         [np.multiply(site.frac_coords, [1,1,mat2d]) for site in mgo_slab.sites])
+
     mgo_slab = make_it_120(mgo_slab)
-    mat2d_for_save = Interface(mgo_slab, hkl=[0, 0, 1], min_thick=8, min_vac=15, primitive=False, from_ase=True)
-    mgo_slab = Interface(mgo_slab, hkl=[0, 0, 1], min_thick=8, min_vac=0.1, primitive=False, from_ase=True)
+    mgo_slab = Interface(mgo_slab, hkl=[0,0,1], min_thick=8, min_vac=0.1, primitive=False, from_ase=True)
 
 
     substrate_slab_aligned, mat2d_slab_aligned = get_aligned_lattices(
@@ -38,12 +40,16 @@ def make_interface(subs, mat2d):
         # r1r2_tol=0.2
     )
 
+    # mat2d_slab_aligned = set_vacuum(mat2d_slab_aligned, 15)
+    mat2d_slab_aligned = make_it_120(mat2d_slab_aligned)
 
+    # substrate_slab_aligned = set_vacuum(substrate_slab_aligned, 15)
+    substrate_slab_aligned = make_it_120(substrate_slab_aligned)
 
     hetero_interfaces = generate_all_configs(mat2d_slab_aligned, substrate_slab_aligned,
                                              nlayers_substrate=2, nlayers_2d=2, seperation=2)
 
-    return hetero_interfaces, subs_for_save, mat2d_for_save
+    return hetero_interfaces, substrate_slab_aligned, mat2d_slab_aligned
 
 def make_it_120(st):
     mat = st.lattice.matrix.copy()
@@ -60,7 +66,7 @@ for subs in config["subs"]:
             print(idx)
             path = "models/heter/{}/{}".format(config["subs"][subs], config["mat2d"][mat2d])
             os.makedirs(path, exist_ok=True)
-            st = make_it_120(st)
+            # st = make_it_120(st)
             st.to("poscar", "models/heter/{}/{}/{}.vasp".format(config["subs"][subs], config["mat2d"][mat2d], idx))
 
             subs_for_save.to("poscar", "models/heter/{}/subs.vasp".format(config["subs"][subs]))
@@ -331,3 +337,64 @@ for e in [si, c]:
 
 
 
+#%% look for energy
+import pandas as pd
+from qubitPack.tool_box import get_db
+
+mgb2 = get_db("mgb2", "hetero")
+col = mgb2.collection
+
+mat2d = col.find({"metal":False, "project": "MgO", "spin":1, "vdw":True, "nlayer": 4})
+
+data = []
+for term in ["si_term", "c_term"]:
+    for layer in ["o_first", "mg_first"]:
+        interfaces = col.find(
+            {
+                "terminate": term, "first_layer": layer, "metal":False, "project": "MgO", "spin":1, "vdw":True,
+                "task_label": {"$regex": "static"}
+            }
+        )
+        for e in interfaces:
+            data.append(
+                {
+                    "task_id": e["task_id"], "E": e["output"]["energy"], "term": e["terminate"],
+                    "first_layer": e["first_layer"], "src": e["path"]
+                }
+            )
+
+df = pd.DataFrame(data)
+df.to_clipboard()
+
+#%%
+from qubitPack.tool_box import get_db
+from fireworks import LaunchPad
+
+db = get_db("mgb2", "workflows")
+lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
+
+dirs = []
+for p in df["src"]:
+    for fw_id in lpad.get_wf_ids({"metadata.tags.0.path": p, "state": "FIZZLED"}):
+        wf = lpad.get_wf_by_fw_id(fw_id)
+        for fw in wf.fws:
+            if "static" in fw.name:
+                dir_name = lpad.get_launchdir(fw.fw_id)
+                print(wf.name, fw_id, p)
+                dirs.append(fw_id)
+                # dirs.append(dir_name)
+print(len(dirs))
+
+
+#%% get structure
+from qubitPack.tool_box import get_db
+from pymatgen import Structure
+import os
+
+mgb2 = get_db("mgb2", "hetero")
+col = mgb2.collection
+
+for i in [201]:
+    e = col.find_one({"task_id": i})
+    st = Structure.from_dict(e["output"]["structure"])
+    st.to("poscar", os.path.join("models/heter/results/4_layer", "{}.vasp".format(e["task_id"])))
