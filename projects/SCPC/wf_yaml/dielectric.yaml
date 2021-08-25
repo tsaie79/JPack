@@ -1,0 +1,7 @@
+fireworks:
+  - fw: atomate.vasp.fireworks.core.LepsFW
+    params:
+      copy_vasp_outputs: False
+      user_incar_settings:
+        EDIFF: 1E-5
+        EDIFFG: -0.01
