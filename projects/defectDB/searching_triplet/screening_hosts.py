@@ -9,12 +9,12 @@ import pandas as pd
 
 from pymatgen import Spin
 
-from JPack.projects.defectDB.searching_triplet.screening_defects import IOTools
-
 C2DB = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=1234)
 SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", port=1236)
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=1236)
 C2DB_IR = get_db("C2DB_IR", "calc_data",  user="Jeng_ro", password="qimin", port=1234)
+
+PATH_EXCEL = "searching_triplet/xlsx/"
 
 class DefectStats:
     @classmethod
@@ -102,7 +102,7 @@ class DefectStats:
             # df.set_index("uid", inplace=True)
         # df.to_json("/Users/jeng-yuantsai/Research/project/defectDB/xlsx/gap_gt1-binary-NM-full.json",
         #            orient="index", indent=4, index=True)
-            IOTools(pandas_df=df).to_excel(name)
+            IOTools(output_path=PATH_EXCEL, pandas_df=df).to_excel(name)
 
     @classmethod
     def plot(cls):
