@@ -23,7 +23,7 @@ from monty.serialization import loadfn
 from unfold import find_K_from_k
 import math
 from qubitPack.tool_box import *
-
+#%%
 
 class HostWF:
     @classmethod
@@ -169,28 +169,31 @@ class DefectWF:
     @classmethod
     def relax_pc(cls):
             # lpad = LaunchPad.from_file("/home/tug03990/config/my_launchpad.efrc.yaml")
-            lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/scan_opt_test/my_launchpad.yaml")
-            col = VaspCalcDb.from_db_file("/home/tug03990/PycharmProjects/my_pycharm_projects/database/db_config/"
-                                          "db_dk_local.json").collection
-            # defect_st_col = VaspCalcDb.from_db_file("/home/tug03990/PycharmProjects/my_pycharm_projects/database/db_config/"
-            #                               "db_c2db_tmdc_bglg1.json").collection
+            lpad = LaunchPad.from_file("/home/tug03990/config/project/antisiteQubit/CBVN/my_launchpad.yaml")
+            pc_db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="adminUser", password="qiminyan", port=12345)
+            col = pc_db.collection
+            # mx2s = col.find(
+            #     {"class": {"$in": ["TMDC-T", "TMDC-H", "TMDC-T'"]},
+            #      "gap_hse": {"$gt": 1},
+            #      "ehull": {"$lt": 0.3},
+            #      "magstate": "NM",
+            #      # "formula": {"$in":["WTe2"]}
+            #      # "spacegroup": "P-6m2",
+            #      "formula": {"$in": ["MoS2", "MoSe2",  "MoTe2", "WS2", "WSe2", "WTe2"]}
+            #      # "formula": {"$in": ["WSe2"]}
+            #      }
+            # )
+
             mx2s = col.find(
-                {"class": {"$in": ["TMDC-T", "TMDC-H", "TMDC-T'"]},
-                 "gap_hse": {"$gt": 1},
-                 "ehull": {"$lt": 0.3},
-                 "magstate": "NM",
-                 # "formula": {"$in":["WTe2"]}
-                 # "spacegroup": "P-6m2",
-                 "formula": {"$in": ["MoS2", "MoSe2",  "MoTe2", "WS2", "WSe2", "WTe2"]}
-                 # "formula": {"$in": ["WSe2"]}
+                {
+                    "uid": "BN-BN-NM"
                  }
             )
-
 
             for mx2 in mx2s:
                 pc = Structure.from_dict(mx2["structure"])
                 # pc = Structure.from_file("/home/tug03990/work/sandwich_BN_mx2/structures/BN_c2db.vasp")
-                pc = modify_vacuum(pc, 20)
+                pc = set_vacuum(pc, 20)
 
                 def mphserelaxset(aexx):
                     vis_relax = MPHSERelaxSet(pc, force_gamma=True)
@@ -199,28 +202,16 @@ class DefectWF:
                     vis_relax = vis_relax.__class__.from_dict(v)
                     return vis_relax
 
-                scan_opt = ScanOptimizeFW(structure=pc, name="SCAN_relax")
+                # scan_opt = ScanOptimizeFW(structure=pc, name="SCAN_relax")
 
-                # pbe_relax = OptimizeFW(structure=pc, name="PBE_relax")
-                # hse_relax_25 = OptimizeFW(structure=pc, name="HSE_relax", vasp_input_set=mphserelaxset(0.3),
-                #                           parents=pbe_relax)
-                # hse_relax_35 = OptimizeFW(structure=pc, name="HSE_relax", vasp_input_set=mphserelaxset(0.35), parents=pbe_relax)
-                wf = Workflow([scan_opt], name="{}:SCAN_opt".format(mx2["formula"]))
-                # wf = add_modify_incar(wf, {"incar_update":{"NCORE":4, "NSW":100, "ISIF":3, "EDIFF":1E-7,
-                #                                            "EDIFFG":-0.001,
-                #                                            "LCHARG":False, "LWAVE":False}})
+                hse_relax_25 = OptimizeFW(structure=pc, name="HSE_relax", vasp_input_set=mphserelaxset(0.25))
+                wf = Workflow([hse_relax_25], name="{}:HSE_relax".format(mx2["formula"]))
+                wf = add_modify_incar(wf, {"incar_update":{"NSW":100, "ISIF":3, "EDIFF":1E-5,
+                                                           "EDIFFG":-0.01,
+                                                           "LCHARG":False, "LWAVE":False}})
                 wf = add_modify_incar(wf)
-                wf = add_modify_incar(
-                    wf,
-                    {
-                        "incar_update": {
-                            "LCHARG": False,
-                            "LWAVE": False
-                        }
-                    }
-                )
-
-                wf = set_execution_options(wf, category="scan_opt_test")
+                wf = preserve_fworker(wf)
+                wf = set_execution_options(wf, category="CBVN")
                 lpad.add_wf(wf)
 
     @classmethod
@@ -291,7 +282,7 @@ class DefectWF:
                                 "num_kpts": 2,
                                 "kpts": [(0,0,0), (0,0,0)],
                                 "kpts_weights": [1, 0],
-                                "labels": [None, "\Gamma"]}}, fw_name_constraint="HSE_scf")
+                                "labels": ["", "\Gamma"]}}, fw_name_constraint="HSE_scf")
                             wf_antisite = add_modify_incar(
                                 wf_antisite,
                                 {"incar_update":{"LWAVE": True}},
@@ -1643,7 +1634,38 @@ class MoveZ:
         plt.ylabel("level energy relative to vacuum (eV)")
         plt.legend(loc="upper center", frameon=True, ncol=6, bbox_to_anchor=(0.5, 1.1))
         plt.show()
+#%%
+class AnalyzeDefectStates:
+    @classmethod
+    def get_defect_state(cls):
+        from qubitPack.qc_searching.analysis.main import get_defect_state
+        from qubitPack.tool_box import get_db
 
+        from pymatgen import Structure
+        import os
+
+        defect_db = get_db("single_photon_emitter", "soc_standard_defect", port=1234)
+        # host_db = get_db("Scan2dMat", "calc_data", port=1236)
+
+
+        tk_id = 467
+        # pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
+        # c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
+
+        tot, proj, d_df = get_defect_state(
+            defect_db,
+            {"task_id": tk_id},
+            -3, -0,
+            None,
+            True,
+            "proj",
+            None, #(host_db, pc_from_id, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
+            0.01,
+            locpot_c2db=None #(c2db, c2db_uid, 0)
+        )
+        return tot, proj, d_df
+tot, proj, d_df = AnalyzeDefectStates.get_defect_state()
+#%%
 def main():
     # DefectWF.MX2_formation_energy()
     # FormationEnergy.formation("M_rich")
