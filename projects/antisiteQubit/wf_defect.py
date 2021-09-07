@@ -279,10 +279,11 @@ class DefectWF:
                             wf_antisite = Workflow(fws, name=wf_antisite.name)
                             wf_antisite = add_modify_kpoints(wf_antisite, {
                                 "kpoints_update" :{
+                                "style": "reciprocal",
                                 "num_kpts": 2,
                                 "kpts": [(0,0,0), (0,0,0)],
                                 "kpts_weights": [1, 0],
-                                "labels": ["", "\Gamma"]}}, fw_name_constraint="HSE_scf")
+                                "labels": [None, "\Gamma"]}}, fw_name_constraint="HSE_scf")
                             wf_antisite = add_modify_incar(
                                 wf_antisite,
                                 {"incar_update":{"LWAVE": True}},
