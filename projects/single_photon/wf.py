@@ -1,11 +1,13 @@
 from fireworks import LaunchPad
 from qubitPack.tool_box import *
-from my_atomate.workflows.wf_full import get_wf_full_hse
-from my_atomate.powerups import *
+from my_atomate_jyt.vasp.workflows.wf_full import get_wf_full_hse
+from my_atomate_jyt.vasp.powerups import *
 from atomate.vasp.powerups import *
 from atomate.vasp.config import *
+import sys
+sys.path.append("/home/tug03990//scripts/JPack")
+# sys.path.append("/home/tug03990/code/JPack/")
 from projects.antisiteQubit.wf_defect import ZPLWF
-
 
 class Defect:
     @classmethod
@@ -13,16 +15,20 @@ class Defect:
         pass
 
     @classmethod
-    def standard_defect(cls, defect_type="substitutions", distort=0.0, category="move_z", dz=0.1): #1e-4
+    def standard_defect(cls, defect_type="substitutions", distort=0.0, category="standard_defect"): #1e-4
 
         db_name, col_name = "owls", "mx2_antisite_pc"
         col = get_db(db_name, col_name, port=12345).collection
-        mx2s = col.find({"task_id":{"$in":[3091]}})
+        mx2s = col.find({"task_id":{"$in":[3102]}})
         # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
 
-        geo_spec = {5* 5 * 3: [20]}
         for mx2 in mx2s:
+
             pc = Structure.from_dict(mx2["output"]["structure"])
+            scaling = find_scaling_for_2d_defect(pc, 15)[0]
+            area = scaling[0]*scaling[1]
+            geo_spec = {area*pc.num_sites: [20]}
+
             defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
             cation, anion = find_cation_anion(pc)
 
@@ -44,19 +50,16 @@ class Defect:
                             distort=distort,
                             sub_on_side=None,
                         )
-                        e = get_db("single_photon_emitter", "standard_defect", port=12345).collection.find_one({"task_id": 459})
-                        defect_st = Structure.from_dict(e["input"]["structure"])
-                        defect_st.translate_sites([25], [0,0, dz], frac_coords=False)
+
                         wf = get_wf_full_hse(
-                            structure=defect_st,
+                            structure=gen_defect.defect_st,
                             task_arg=dict(lcharg=True),
-                            charge_states=[-1],
+                            charge_states=[0, 0],
                             gamma_only=False,
                             gamma_mesh=True,
-                            nupdowns=[3],
-                            task="hse_scf",
+                            nupdowns=[2, 0],
+                            task="hse_relax-hse_scf",
                             vasptodb={
-                                "dz": dz,
                                 "category": category, "NN": gen_defect.NN,
                                 "defect_entry": gen_defect.defect_entry,
                                 "lattice_constant": "HSE",
@@ -66,27 +69,30 @@ class Defect:
                             wf_addition_name="{}:{}".format(na, thick),
                         )
 
-                        # wf = scp_files(
-                        #     wf,
-                        #     "/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(category),
-                        #     fw_name_constraint=wf.fws[-1].name,
-                        # )
+                        wf = bash_scp_files(
+                            wf,
+                            dest="/home/jengyuantsai/Research/projects/single_photon_emitter/{}".format(category),
+                            port=12346,
+                            fw_name_constraint=wf.fws[-1].name,
+                            task_name_constraint="VaspToDb"
+                        )
+
                         # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
                         #                     fw_name_constraint="HSE_scf")
 
-                        # wf = remove_todb(wf, fw_name_constraint=wf.fws[0].name)
+                        wf = remove_todb(wf, fw_name_constraint=wf.fws[0].name)
 
-                        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="PBE_relax")
-                        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_relax")
+                        wf = set_queue_options(wf, "32:00:00", fw_name_constraint="HSE_relax")
                         wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_scf")
-                        # wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_soc")
 
                         wf = add_modify_incar(wf)
-                        wf = set_execution_options(wf, category=category, fworker_name="owls")
+                        wf = set_execution_options(wf, category=category, fworker_name="efrc")
                         wf = preserve_fworker(wf)
                         wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
                         print(wf.name)
                         return wf
+
+
     @classmethod
     def soc_standard_defect(cls, std_d_tkid, std_d_base_dir=None, category="soc_standard_defect", scp=True, saxis=(0,0,1)):
 
@@ -128,7 +134,7 @@ class Defect:
         # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb")
 
         wf = add_modify_incar(wf)
-        wf = set_execution_options(wf, category=category, fworker_name="efrc")
+        wf = set_execution_options(wf, category=category, fworker_name="owls")
         wf = preserve_fworker(wf)
         return wf
 
@@ -221,7 +227,7 @@ class Defect:
         wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up":up_occ, "dn":dn_occ},
                                                     "source_entry":"{}/{}/{}".format(std_d.db_name,
                                                                                      std_d.collection.name,
-                                                                                     std_d)
+                                                                                     std_d_tkid)
                                                     })
         print(up_occ, dn_occ)
         wf = add_modify_incar(wf)
@@ -304,13 +310,13 @@ def main():
         category = "soc_cdft"
         wf = Defect.soc_cdft(
             "B-C-D",
-            538,
-            960,
-            occ=None,
+            579,
+            940,
+            occ="643*1 1*0 1*0.5 1*0.5 294*0",
             prevent_JT=False,
             category=category,
         )
-        # wf = add_additional_fields_to_taskdocs(wf, {"PS": "prevent_JT"})
+        wf = add_additional_fields_to_taskdocs(wf, {"PS": "0-0.5-0.5"})
         wf = set_execution_options(wf, fworker_name="owls")
         LPAD = LaunchPad.from_file(
             os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
@@ -320,19 +326,20 @@ def main():
         category = "cdft"
         wf = Defect.cdft(
             "B-C-D",
-            460,
-            475,
+            264,
+            480,
             occ=None,
-            category=category
+            category=category,
+            prevent_JT=False
         )
-        wf = add_additional_fields_to_taskdocs(wf, {"PS": "prevent_JT"})
-        wf = set_execution_options(wf, fworker_name="efrc")
+        wf = add_additional_fields_to_taskdocs(wf, {"PS": "perturbed"})
+        wf = set_execution_options(wf, fworker_name="owls")
         LPAD = LaunchPad.from_file(
             os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
                                                  "my_launchpad.yaml".format(category))))
         LPAD.add_wf(wf)
     def std_defect():
-        wf = Defect.standard_defect(distort=0)
+        wf = Defect.standard_defect(distort=0.001)
         LPAD = LaunchPad.from_file(
             os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
                                              "my_launchpad.yaml".format("standard_defect"))))
@@ -340,7 +347,7 @@ def main():
 
     def soc_std_defect():
         wf = Defect.soc_standard_defect(
-            553,
+            578,
         )
         LPAD = LaunchPad.from_file(
             os.path.expanduser(os.path.join("~", "config/project/single_photon_emitter/{}/"
@@ -355,7 +362,8 @@ def main():
             os.path.expanduser(os.path.join("~", "config/project/antisiteQubit/{}/"
                                                  "my_launchpad.yaml".format("move_z"))))
         LPAD.add_wf(wf)
-    for i in [-0.25]:
-        move_z(dz=i)
+
+    std_defect()
+
 if __name__ == '__main__':
     main()
