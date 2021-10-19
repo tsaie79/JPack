@@ -23,31 +23,33 @@ from atomate.vasp.powerups import (
 
 from atomate.vasp.config import *
 import sys
-# sys.path.append("/home/tug03990//scripts/JPack")
-sys.path.append("/home/tug03990/code/JPack/")
+sys.path.append("/home/tug03990//scripts/JPack")
+# sys.path.append("/home/tug03990/code/JPack/")
 from projects.antisiteQubit.wf_defect import ZPLWF
 import numpy as np
 
 class Defect:
     @classmethod
     def standard_defect(cls, defect_type="substitutions", distort=0.0, category="monolayer_biaxial", dz=0.0,
-                        biaxial_ratio=None): #1e-4
-
+                        biaxial_ratio=None, fworker="owls"): #1e-4
+        wfs = []
         db_name, col_name = "owls", "mx2_antisite_pc"
         # db_name, col_name = "single_photon_emitter", "pc"
         col = get_db(db_name, col_name, port=12345).collection
-        mx2s = col.find({"task_id":{"$in":[3091, 3097, 3094, 3093, 3102]}})
+        mx2s = col.find({"task_id":{"$in": [3097]}})
         # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
 
         for mx2 in mx2s:
             pc = Structure.from_dict(mx2["output"]["structure"])
-
+            print("orig_lattice: {}".format(pc.lattice.matrix))
             if biaxial_ratio:
                 new_lattice = Lattice(pc.lattice.matrix.dot(np.eye(3)*(1+biaxial_ratio)))
                 pc.lattice = new_lattice
+                print("after_biax_lattice: {}".format(pc.lattice.matrix))
 
             scaling = find_scaling_for_2d_defect(pc, 15)[0]
-            area = scaling[0]*scaling[1]
+            # area = scaling[0]*scaling[1]
+            area = 25
             geo_spec = {area*pc.num_sites: [20]}
 
             defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
@@ -82,18 +84,18 @@ class Defect:
                             nupdowns=[2],
                             task="hse_relax-hse_scf",
                             vasptodb={
-                                "category": category, "NN": gen_defect.NN,
+                                "NN": gen_defect.NN,
                                 "defect_entry": gen_defect.defect_entry,
                                 "lattice_constant": "HSE",
-                                "perturbed": {"biaxial_ratio": 1+ratio},
+                                "perturbed": {"biaxial_ratio": 1+biaxial_ratio},
                                 "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["task_id"]),
                                 "PS": "test",
                             },
                             wf_addition_name="{}:{}".format(na, thick),
                         )
-
+                        wf_name = wf.name
                         fws = wf.fws
-                        pyzfsfw = PyzfsFW(parents=fws[-1].name, structure=gen_defect.defect_st)
+                        pyzfsfw = PyzfsFW(parents=fws[-1], structure=gen_defect.defect_st)
                         fws.append(pyzfsfw)
                         wf = Workflow(fws)
 
@@ -101,8 +103,8 @@ class Defect:
                                       [
                                           {
                                               "PS": "test",
-                                              "category": category, "NN": gen_defect.NN,
-                                              "perturbed": {"biaxial_ratio": 1+ratio},
+                                              "NN": gen_defect.NN,
+                                              "perturbed": {"biaxial_ratio": 1+biaxial_ratio},
                                               "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["task_id"]),
                                           }
                                       ]
@@ -119,28 +121,39 @@ class Defect:
                         # wf = clean_up_files(wf, files=["*"], task_name_constraint="VaspToDb",
                         #                     fw_name_constraint="HSE_scf")
 
-                        wf = remove_todb(wf, fw_name_constraint=wf.fws[0].name)
+                        # wf = remove_todb(wf, fw_name_constraint=wf.fws[0].name)
 
-                        wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_relax")
+                        wf = add_modify_incar(wf, {"incar_update": {"EDIFF": 1e-5, "EDIFFG": -0.02}},
+                                              fw_name_constraint=wf.fws[0].name)
+
+                        wf = set_queue_options(wf, "48:00:00", fw_name_constraint="HSE_relax")
                         wf = set_queue_options(wf, "24:00:00", fw_name_constraint="HSE_scf")
-                        wf = set_queue_options(wf, "2:00:00", fw_name_constraint=wf.fws[-1].name)
+                        wf = set_queue_options(wf, "1:30:00", fw_name_constraint=wf.fws[-1].name)
 
                         wf = add_modify_incar(wf)
-                        wf = set_execution_options(wf, category=category, fworker_name="owls", )
+                        wf = set_execution_options(wf, category=category, fworker_name=fworker, fw_name_constraint=wf.fws[
+                            0].name)
+                        wf = set_execution_options(wf, category=category, fworker_name=fworker, fw_name_constraint=wf.fws[
+                            1].name)
+                        wf = set_execution_options(wf, category="zfs", fworker_name=fworker,
+                                                   fw_name_constraint=wf.fws[2].name)
                         wf = preserve_fworker(wf)
-                        wf.name = wf.name+":biaxial[{}]".format(biaxial_ratio)
-                        print(wf.name)
-                        return wf, category
+                        wf.name = wf_name+":biaxial[{}]".format(biaxial_ratio)
+                        wfs.append(wf)
+        return wfs, category
 
     @classmethod
     def run(cls):
         def std_defect():
-            for biaxial in [0.05]:
-                wf, cat = cls.standard_defect(distort=0, biaxial_ratio=biaxial)
-                LPAD = LaunchPad.from_file(
-                os.path.expanduser(os.path.join("~", "config/project/qubit_sensor/{}/"
-                                                     "my_launchpad.yaml".format(cat))))
-                LPAD.add_wf(wf)
+            for biaxial in np.arange(-0.05, 0.075, 0.025):
+                if biaxial == 0:
+                    continue
+                wfs, cat = cls.standard_defect(distort=0, biaxial_ratio=round(biaxial, 3), fworker="efrc")
+                for wf in wfs:
+                    LPAD = LaunchPad.from_file(
+                    os.path.expanduser(os.path.join("~", "config/project/qubit_sensor/{}/"
+                                                         "my_launchpad.yaml".format(cat))))
+                    LPAD.add_wf(wf)
         std_defect()
 if __name__ == '__main__':
     Defect.run()

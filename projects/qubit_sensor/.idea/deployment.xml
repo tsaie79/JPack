@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="owls" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="efrc">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/tug03990/scripts/JPack/projects/qubit_sensor" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="owls">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/tug03990/code/JPack/projects/qubit_sensor" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>
