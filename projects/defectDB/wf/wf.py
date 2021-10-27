@@ -145,23 +145,29 @@ def pc():
         wf.name = "{}:scan".format(mx2["uid"])
         lpad.add_wf(wf)
 
-def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
-    os.chdir(os.path.join(os.path.dirname(os.path.abspath("__file__"))))
-
+def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
+    os.chdir("/home/tug03990/scripts/JPack/projects/defectDB")
     col = get_db("Scan2dMat", "calc_data", port=12347).collection
-    groups = loadfn(os.path.join(os.path.dirname(os.path.abspath("__file__")),
-                          "wf/Scan2dDefect/bg_gte_1_and_homo_07272021"))
-    wfs_stat = []
+
+    # group_json_file = "wf/Scan2dDefect/bg_gte_1_and_inhomo_07272021"
+    group_json_file = "wf/Scan2dDefect/bg_gte_1_and_homo_07272021"
+
+    groups = loadfn(group_json_file)
+
+    wfs = []
     geo_spec = None
+
+    test_idx = 0
     for group in groups[1:2]:
-        tids = json.loads(group["tid"])
-        if group["not_calculated_yet"] == None:
-            continue
+        print(group)
+        # if group["not_calculated_yet"] == None:
+        #     continue
         tids = json.loads(group["tid"])
 
         group_id = int(group["group_id"])
-        for idx, tid in enumerate(tids[:]):
+        for tid in tids[:1]:
             print(group_id, tid)
+
 
             mx2 = col.find_one({"task_id": tid})
             pc = Structure.from_dict(mx2["output"]["structure"])
@@ -192,10 +198,7 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                 geo_spec = {area*8: [20]}
                 cat += "AB3"
 
-            lpad = LaunchPad.from_file(
-                os.path.join(
-                    os.path.expanduser("~"),
-                    "config/project/Scan2dDefect/calc_data/my_launchpad.yaml"))
+
             print(cat)
 
             defects = ChargedDefectsStructures(pc, antisites_flag=True).defects
@@ -245,13 +248,14 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                 host_data = {
                                     "pc_from": "Scan2dMat/calc_data/{}".format(mx2["task_id"]),
                                     "pc_from_id": mx2["task_id"],
-                                    "host_info": {"c2db_info": mx2["c2db_info"], "sym_data": mx2["sym_data"]},
+                                    "host_info":{"c2db_info": mx2["c2db_info"], "sym_data": mx2["sym_data"]},
                                 }
                                 locpot = mx2["calcs_reversed"][0]["output"]["locpot"]["2"]
                                 vacuum = max(locpot)
 
                                 scan_bs_output = mx2["output"].copy()
-                                for remove in ["structure", "density", "energy", "energy_per_atom", "forces", "stress", "spacegroup"]:
+                                for remove in ["structure", "density", "energy", "energy_per_atom",
+                                               "forces", "stress", "spacegroup"]:
                                     scan_bs_output.pop(remove)
                                 band_edges = mx2["band_edges"]
                                 scan_bs_output.update({"band_edges": band_edges, "vacuum_level": vacuum})
@@ -262,17 +266,16 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
 
                             # add charge state regarding nelect
                             charge, nupdn, n_of_e = None, None, None
-                            if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 0:
-                                continue
-                                charge = [0]
-                                nupdn = [-1]
-                                n_of_e = "even"
-                                # if odd nelect, it used to be charge=[0]
-                            else:
+                            if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
                                 charge = [1]
                                 nupdn = [-1]
                                 n_of_e = "odd"
-
+                                # if odd nelect, it used to be charge=[0]
+                            else:
+                                # continue
+                                charge = [0]
+                                nupdn = [-1]
+                                n_of_e = "even"
 
                             wf = get_wf_full_scan(
                                 structure=gen_defect.defect_st,
@@ -283,8 +286,8 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                 vasptodb={
                                 },
                                 wf_addition_name="{}:{}".format(gen_defect.defect_st.num_sites, thick),
-                                wf_yaml=os.path.join(os.path.dirname(os.path.abspath("__file__")),
-                                                     "wf/Scan2dDefect/scan_defect.yaml")
+                                wf_yaml="/home/tug03990/scripts/JPack/projects/defectDB/wf/Scan2dDefect/scan_defect"
+                                        ".yaml"
                             )
                             wf.name += ":{}".format(gen_defect.defect_entry["name"])
                             # wf = add_modify_2d_nscf_kpoints(
@@ -303,7 +306,7 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                             d.update({
                                 "category": cat,
                                 "group_id": group_id,
-                                "site_symmetry_uniform": True,
+                                "site_symmetry_uniform": False if "inhomo" in group_json_file else True
                             })
                             wf = add_additional_fields_to_taskdocs(
                                 wf,
@@ -317,17 +320,14 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                                                 "charge_state": charge
                                                 }])
 
-                            if idx % 2 == 1:
-                                wf = set_execution_options(wf, category="calc_data", fworker_name="efrc")
-                            else:
-                                wf = set_execution_options(wf, category="calc_data", fworker_name="owls")
+
                             wf = set_queue_options(wf, "12:00:00")
                             wf = set_queue_options(wf, "01:30:00", fw_name_constraint="irvsp")
                             wf = preserve_fworker(wf)
                             wf.name = wf.name+":dx[{}]".format(gen_defect.distort)
                             wf = bash_scp_files(
                                 wf,
-                                dest="/home/tsai/Research/projects/Scan2dDefect/calc_data/scf",
+                                dest="/mnt/sdb/tsai/Research/projects/Scan2dDefect/calc_data/scf",
                                 port=12348,
                                 fw_name_constraint="SCAN_scf",
                                 task_name_constraint="RunVasp"
@@ -339,9 +339,24 @@ def binary_scan_defect(defect_choice="vacancies", impurity_on_nn=None): #BN_vac
                             wf = clean_up_files(wf, files=["WAVECAR"], task_name_constraint="IRVSPToDb",
                                                 fw_name_constraint=wf.fws[3].name)
 
-                            wfs_stat.append(wf)
+                            wfs.append(wf)
                             print(wf.name)
-                            lpad.add_wf(wf)
-    return  wfs_stat
+
+    return wfs
+
 if __name__ == '__main__':
+    lpad = LaunchPad.from_file(
+        os.path.join(
+            os.path.expanduser("~"),
+            "config/project/Scan2dDefect/calc_data/my_launchpad.yaml"))
     wfs = binary_scan_defect()
+    for idx, wf in enumerate(wfs):
+        if idx % 2 == 0:
+            wf = set_execution_options(wf,  category="calc_data", fworker_name="owls")
+        else:
+            wf = set_execution_options(wf,  category="calc_data", fworker_name="efrc")
+        # lpad.add_wf(wf)
+        print(idx, wf.name,
+              wf.fws[0].tasks[-1]["additional_fields"]["group_id"],
+              wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
+

@@ -11,10 +11,11 @@ from pymatgen.io.vasp.inputs import Structure, Incar
 from pymatgen.io.vasp.outputs import Oszicar
 from fireworks import LaunchPad
 
+db = get_db("Scan2dDefect", "calc_data", port=12347)
+wf_col = get_db("Scan2dDefect", "workflows", port=12347).collection
 
 class CheckJobs:
     def __init__(self):
-        db = get_db("Scan2dDefect", "calc_data", port=1236)
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
         self.states = ["COMPLETED", "FIZZLED", "RUNNING", "READY", "RESERVED", "ALL"]
         self.data = []
@@ -61,7 +62,6 @@ class CheckJobs:
         for f, state in zip([self.completed, self.fizzled, self.running, self.ready, self.reserved, self.all], self.states):
             print(f(filter))
             wfs = self.lpad.get_wf_ids(f(filter))
-            wf_col = get_db("Scan2dDefect", "workflows", port=1236).collection
             wf_names = [wf["name"] for wf in wf_col.find(f(filter))]
             self.data.append({"state": state, "number": len(wfs), "batch_ids": batch_ids, "wfs": wfs,
                               "wf_names": wf_names})
@@ -172,7 +172,6 @@ class CheckJobs:
 
         for f, state in zip([self.completed, self.fizzled, self.running, self.ready, self.reserved, self.all], self.states):
             wfs = self.lpad.get_wf_ids(f(filter))
-            wf_col = get_db("Scan2dDefect", "workflows", port=1236).collection
             wf_names = [wf["name"] for wf in wf_col.find(f(filter))]
             self.data.append({"state": state, "number": len(wfs), "batch_ids": batch_ids, "wfs": wfs,
                               "wf_names": wf_names})
@@ -189,7 +188,6 @@ class CheckJobs:
 
         for f, state in zip([self.completed, self.fizzled, self.running, self.ready, self.reserved, self.all], self.states):
             wfs = self.lpad.get_wf_ids(f(filter))
-            wf_col = get_db("Scan2dDefect", "workflows", port=1236).collection
             wf_names = [wf["name"] for wf in wf_col.find(f(filter))]
             self.data.append({"state": state, "number": len(wfs), "batch_ids": batch_ids, "wfs": wfs,
                               "wf_names": wf_names})
@@ -206,7 +204,6 @@ class CheckJobs:
 
         for f, state in zip([self.completed, self.fizzled, self.running, self.ready, self.reserved, self.all], self.states):
             wfs = self.lpad.get_wf_ids(f(filter))
-            wf_col = get_db("Scan2dDefect", "workflows", port=1236).collection
             wf_names = [wf["name"] for wf in wf_col.find(f(filter))]
             self.data.append({"state": state, "number": len(wfs), "batch_ids": batch_ids, "wfs": wfs,
                               "wf_names": wf_names})
@@ -223,7 +220,6 @@ class CheckJobs:
 
         for f, state in zip([self.completed, self.fizzled, self.running, self.ready, self.reserved, self.all], self.states):
             wfs = self.lpad.get_wf_ids(f(filter))
-            wf_col = get_db("Scan2dDefect", "workflows", port=1236).collection
             wf_names = [wf["name"] for wf in wf_col.find(f(filter))]
             self.data.append({"state": state, "number": len(wfs), "batch_ids": batch_ids, "wfs": wfs,
                               "wf_names": wf_names})
@@ -264,17 +260,9 @@ class CheckJobs:
         # return df
 
 class RerunJobs:
-    def __init__(self):
-        db = get_db("Scan2dDefect", "calc_data", port=12347)
+    def __init__(self, json_file):
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
-
-        self.fw_df = IOTools(cwd=os.path.join(RemainginJobs().save_xlsx_path, "jobs/existed_fws_status"),
-                              excel_file="nonuni_2021-10-25").read_excel()
-        self.unique_spg_numer = self.fw_df["spg_number"].unique()
-
-    def get_fw_id_from_host_taskid(self, host_taskid):
-        condition = (self.fw_df["state"].isin(["FIZZLED", "RUNNING"])) & (self.fw_df["host_taskid"] == host_taskid)
-        self.fw_ids = self.fw_df.loc[condition, "fw_id"].tolist()
+        self.fws_df = pd.DataFrame(monty.serialization.loadfn("wf/unfinished_jobs/{}".format(json_file)))
 
     def rerun_fw(self):
         """
@@ -282,18 +270,28 @@ class RerunJobs:
         """
         def delet_dir(dir_name):
             shutil.rmtree(dir_name)
-        def rerun_opt(fw_id): #421
-            # for f in glob("POSCAR*"):
-            #     os.remove(f)
-            lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
-            fw = lpad.get_fw_by_id(fw_id)
-            # fw.spec['_queueadapter'] = {'walltime': '06:00:00'}
-            # fw.tasks[1]["other_params"]["user_incar_settings"].update({"ALGO":"All"})
-            # fw.tasks[1]["incar_update"].update({"ALGO": "All"})
-            # lpad.update_spec([fw.fw_id], fw.as_dict()["spec"])
-            shutil.copy("CONTCAR", "POSCAR")
-            # subprocess.call("qlaunch -c {} -r singleshot -f {}".format(
-            #     os.path.join(os.path.expanduser("~"), "config/project/Scan2dDefect/calc_data/"), fw.fw_id).split(" "))
+
+        def rerun_opt(fw_id):
+            prev_path = self.lpad.get_launchdir(fw_id, 0)
+            if prev_path:
+                print(fw_id, prev_path)
+                os.chdir(prev_path)
+                try:
+                    for f_gz in glob("*.gz"):
+                        subprocess.call("gunzip {}.gz".format(f_gz).split(" "))
+                except Exception:
+                    pass
+                if glob("*") == []:
+                    self.lpad.rerun_fw(fw_id)
+                elif glob("CONTCAR.relax*") != []:
+                    shutil.copy("CONTCAR", "POSCAR")
+                    self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+                else:
+                    shutil.copy("CONTCAR", "POSCAR")
+                    self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+            else:
+                self.lpad.rerun_fw(fw_id)
+
         def rerun_scf(fw_id):
             subprocess.call("gunzip INCAR.gz".split(" "))
             incar = Incar.from_file("INCAR")
@@ -301,35 +299,28 @@ class RerunJobs:
             incar.write_file("INCAR")
             lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
 
-        for fw_id in self.fw_ids:
-            prev_fw = self.lpad.get_fw_by_id(fw_id)
-            fworker = prev_fw.spec["_fworker"]
-            if fworker != "efrc":
-                continue
-            prev_path = self.lpad.get_launchdir(fw_id, 0)
-            os.chdir(prev_path)
-            if glob("CONTCAR.relax*") != []:
+        def run():
+            conditions = (self.fws_df["state"].isin(["RUNNING", "FIZZLED"])) & \
+                         (self.fws_df["charge_state"] == 0) &\
+                         (self.fws_df["name"].str.contains("relax")) & \
+                         (self.fws_df["fworker"] == "owls")
+
+            fw_ids = self.fws_df.loc[conditions, ["fw_id", "state"]]
+            for idx, fw_status in fw_ids.iterrows():
+                if self.lpad.detect_lostruns(query={"fw_id": fw_status["fw_id"]})[1] == [] \
+                        and fw_status["state"] == "RUNNING":
+                    continue
                 try:
-                    print(fw_id, fworker, prev_path, prev_fw.name)
+                    print(fw_status["fw_id"])
                     # delet_dir(prev_path)
-                    # rerun_opt(fw_id)
+                    rerun_opt(fw_status["fw_id"])
                     # rerun_scf(fw_id)
                 except Exception as err:
                     print(err)
                     continue
-            # try:
-            #     oszicar = Oszicar("OSZICAR")
-            # except Exception as err:
-            #     print(fw_id, err)
-            #     continue
-            # if len(Oszicar("OSZICAR").ionic_steps) > 10:
-            #     a.append(fw_id)
-            #     print(fw_id, fworker, path, fw.name)
-            #     # rerun_opt(fw)
-
+        run()
 class ResetFworker:
     def __init__(self):
-        db = get_db("Scan2dDefect", "calc_data", port=1236, user="Jeng")
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
         self.init_fws = None
 
@@ -357,7 +348,6 @@ class ResetFworker:
 
 class DeleteCompleteJobs:
     def __init__(self, fworker):
-        db = get_db("Scan2dDefect", "calc_data", port=12347, user="Jeng_ro")
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
         self.fworker = fworker
         self.init_fws = []
@@ -386,9 +376,8 @@ class DeleteCompleteJobs:
         op.locate_completed_wf()
         op.delete_dirs_completed_wf()
 
-class RemainginJobs:
+class RemainingJobs:
     def __init__(self):
-        db = get_db("Scan2dDefect", "calc_data", port=1236)
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
 
         self.save_xlsx_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/latest_results/xlsx"
@@ -423,6 +412,7 @@ class RemainginJobs:
         return  result_gp
 
     def existed_fw_status(self):
+        job_states = ["FIZZLED", "RESERVED", "RUNNING"]
         def get_existed_fw_status(c2db_uids, excel_name):
             data = []
             for c2db_uid in c2db_uids[:]:
@@ -463,50 +453,70 @@ class RemainginJobs:
                         entry["charge_state"] = charge_state
                         entry["spg_number"] = spg_number
                         entry["fw_id"] = fw["fw_id"]
+                        entry["fworker"] = fw["spec"]["_fworker"]
                         entry["state"] = fw["state"]
                         entry["name"] = fw["name"]
                         data.append(entry)
 
             df = pd.DataFrame(data).drop_duplicates()
-            IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"), pandas_df=df).to_excel(
-                excel_name, index=True)
-        def existed_fw_status_run():
-            uni_host_uids, nonuni_host_uids = self.uniform_host_df["c2db_uid"].unique(), self.nonuniform_host_df[
-                "c2db_uid"].unique()
-            for name, host_sym_type in zip(["uni", "nonuni"], [uni_host_uids, nonuni_host_uids]):
-                get_existed_fw_status(host_sym_type, name)
+            df = df.loc[(df["state"].isin(job_states)), :]
+            # IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"), pandas_df=df).to_excel(
+            #     excel_name, index=True)
+            IOTools(cwd="wf/unfinished_jobs", pandas_df=df).to_json(excel_name, index=True)
+            return df
 
         def group_df(df, excel_name):
-            df = df.loc[df["state"].isin(["FIZZLED", "RUNNING"])]
-            df = df.groupby(["spg_number", "host_taskid", "c2db_uid", "defect_name", "charge_state", "name"]).agg(
+            df = df.groupby(["spg_number", "host_taskid", "c2db_uid", "defect_name", "charge_state", "name",
+                             "fworker"]).agg(
                 dict(state=["unique"], fw_id=["unique", "count"]))
             output = df.style\
                 .applymap(lambda x: "background-color:red" if x[0] == "FIZZLED" else "", subset=["state"])\
-                .applymap(lambda x: "background-color:pink" if x[0] == "WAITING" else "", subset=["state"])\
+                .applymap(lambda x: "background-color:pink" if x[0] == "RESERVED" else "", subset=["state"])\
                 .applymap(lambda x: "background-color:yellow" if x[0] == "RUNNING" else "", subset=["state"])
 
             IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"),
                     pandas_df=output).to_excel(excel_name, index=True)
 
+        def get_existed_fw_status_run():
+            uni_host_uids, nonuni_host_uids = self.uniform_host_df["c2db_uid"].unique(), self.nonuniform_host_df[
+                "c2db_uid"].unique()
+            for host_sym_type, name in zip([uni_host_uids, nonuni_host_uids], ["uni", "nonuni"]):
+                get_existed_fw_status(host_sym_type, name)
+
         def group_df_run():
-            df = IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"),
-                         excel_file="nonuni_2021-10-25").read_excel()
-            group_df(df, excel_name="nonuni_gp")
+            for i, o in zip(
+                    ["uni_fizzled_2021-10-27", "nonuni_fizzled_2021-10-27"],
+                    ["uni_fizzled_gp", "nonuni_fizzled_gp"]):
+                df = IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"),
+                             excel_file=i).read_excel()
+                group_df(df, excel_name=o)
 
-        group_df_run()
+        def run():
+            uni_host_uids, nonuni_host_uids = self.uniform_host_df["c2db_uid"].unique(), self.nonuniform_host_df[
+                "c2db_uid"].unique()
+            for host_sym_type, name in zip([uni_host_uids, nonuni_host_uids], ["uni", "nonuni"]):
+                df = get_existed_fw_status(host_sym_type, name+"_owls")
+                group_df(df, excel_name=name+"_owls_gp")
 
+        get_existed_fw_status_run()
 
+def local_main():
+    RemainingJobs().existed_fw_status()
 
-
+def remote_main():
+    rerun_list = RerunJobs("nonuni_owls_2021-10-27.json")
+    rerun_list.rerun_fw()
 
 
 if __name__ == '__main__':
+    local_main()
     # d = CheckJobs.run()
     # d = d.groupby(["c2db_uid", "defect_name", "charge_state"])
-    a = RerunJobs()
-    a.get_fw_id_from_host_taskid(127)
-    a.rerun_fw()
-    # RemainginJobs().existed_fw_status()
+    # a = RerunJobs("nonuni_owls_2021-10-27.json")
+    # a.rerun_fw()
+    # a.get_fw_ids_from_json()
+    # a.rerun_fw()
+    # RemainingJobs().existed_fw_status()
     # uni = RemainginJobs().uni_not_calculated()
     # nonuni = RemainginJobs().nonuni_not_calculated()
 

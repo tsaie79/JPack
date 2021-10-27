@@ -198,3 +198,4 @@ tot, proj, d_df = get_defect_state(
 )
 
 #%% nsites vs
+LaunchPad.delete_wf()

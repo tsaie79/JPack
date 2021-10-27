@@ -1,3 +1,4 @@
+import numpy as np
 from mpinterfaces.utils import *
 
 import pandas as pd
@@ -216,10 +217,10 @@ class ExtractDefectES:
             {"task_id": tk_id},
             5, -5,
             None,
-            True,
+            "all",
             "proj",
             (host_db, pc_from_id, 0, 0, 0),
-            0.01,
+            0.2,
             is_vacuum_aligment_on_plot=True,
             locpot_c2db=None, #(c2db, c2db_uid, 0)
             ir_db=ir_db,
@@ -227,13 +228,14 @@ class ExtractDefectES:
         )
         return tot, proj, d_df, levels
 
-for j in [3222]:
+for j in [2974]:
     tot, proj, d_df, levels = ExtractDefectES.defect_levels(j)
 
 #%%
 class Potential:
     @classmethod
     def plot_pot(cls, tk_id):
+        fig, ax = plt.subplots(figsize=(10,8), dpi=300)
         defect = SCAN2dDefect.collection.find_one({"task_id": tk_id})
         pc_from_id = defect["pc_from_id"]
         host = SCAN2dMat.collection.find_one({"task_id": pc_from_id})
@@ -241,13 +243,21 @@ class Potential:
         charge_state = defect["charge_state"]
 
         defect_pot = defect["calcs_reversed"][0]["output"]["locpot"]["2"]
+        print(defect_pot)
+        defect_pot_max, d_pot_max_index = max(defect_pot), defect_pot.index(max(defect_pot))
         host_pot = host["calcs_reversed"][0]["output"]["locpot"]["2"]
+        host_pot_max, h_pot_max_index = max(host_pot), host_pot.index(max(host_pot))
         print("defct: {:.4}, host: {:.4}, delta: {:.4}".format(min(defect_pot), min(host_pot), min(defect_pot) - min(host_pot)))
-        plt.plot(defect_pot)
-        plt.plot(host_pot)
-        plt.show()
-        return plt1, plt2
-plt1, plt2 = Potential.plot_pot(802)
+
+        ax.plot(defect_pot, color="r", label="{}-{}-q{}".format(defect["task_id"], defect_name, charge_state))
+        ax.plot(host_pot, color="blue", label="{}-{}".format(host["task_id"], host["c2db_info"]["uid"]))
+        ax.text(d_pot_max_index, defect_pot_max, round(defect_pot_max, 3))
+        ax.text(h_pot_max_index+15, host_pot_max, round(host_pot_max, 3))
+        ax.legend(loc="center right", fancybox=False, edgecolor="black")
+        fig.show()
+
+Potential.plot_pot(3590)
+
 
 
 #%%

@@ -52,12 +52,12 @@ from pymatgen import Structure
 import os
 
 defect_db = get_db("Scan2dDefect", "calc_data", port=1236)
-defect_db = get_db("antisiteQubit", "perturbed", port=1234)
-# host_db = get_db("Scan2dMat", "calc_data", port=1236)
+# defect_db = get_db("antisiteQubit", "perturbed", port=1234)
+host_db = get_db("Scan2dMat", "calc_data", port=1236)
 
 
-tk_id = 489
-# pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
+tk_id = 2153
+pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
 # c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
 
 tot, proj, d_df = get_defect_state(
@@ -67,7 +67,7 @@ tot, proj, d_df = get_defect_state(
     None,
     True,
     "proj",
-    None, #(host_db, pc_from_id, 0), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
+    (host_db, pc_from_id, 0.5), #(get_db("antisiteQubit", "W_S_Ef"), 312, 0.),
     0.01,
     locpot_c2db=None #(c2db, c2db_uid, 0)
 )
