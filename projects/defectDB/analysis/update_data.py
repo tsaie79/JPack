@@ -86,13 +86,13 @@ for e in list(col.find(filter)):
 from qubitPack.tool_box import get_db, get_band_edges_characters
 from monty.json import jsanitize
 
-src = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=1236)
-tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=1236)
+src = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=12347)
+tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=12347)
 
 col = tgt.collection
 # filter = {"task_label": "SCAN_scf",}
 # filter = {"task_id": {"$in":[1309, 1311, 1315, 1349, 1351]}}
-filter = {"task_label": {"$regex": "uniform"}}
+filter = {"task_label": {"$regex": "SCAN_scf"}}
 for e in list(col.find(filter)):
     try:
         print(e["task_id"], e["host_info"]["c2db_info"]["uid"])
