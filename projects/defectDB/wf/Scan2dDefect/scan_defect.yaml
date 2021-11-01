@@ -21,8 +21,8 @@ fireworks:
       vasptodb_kwargs:
         additional_fields:
           task_type: ScanRelaxFW
-        parse_dos: False
-        parse_eigenvalues: False
+        parse_dos: True
+        parse_eigenvalues: True
         parse_chgcar: False
 
   - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanStaticFW
