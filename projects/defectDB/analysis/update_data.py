@@ -162,8 +162,8 @@ for  i in tgt.collection.find({"group_id": {"$in": gp_id}}):
 from qubitPack.tool_box import get_db, get_band_edges_characters
 from monty.json import jsanitize
 
-src = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=1234)
-tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=1236)
+src = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=12345)
+tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=12347)
 
 col = tgt.collection
 filter = {}

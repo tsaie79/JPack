@@ -278,7 +278,7 @@ class RerunJobs:
                 os.chdir(prev_path)
                 try:
                     for f_gz in glob("*.gz"):
-                        subprocess.call("gunzip {}.gz".format(f_gz).split(" "))
+                        subprocess.call("gunzip -f {}".format(f_gz).split(" "))
                 except Exception:
                     pass
                 if glob("*") == []:
@@ -293,7 +293,7 @@ class RerunJobs:
                 self.lpad.rerun_fw(fw_id)
 
         def rerun_scf(fw_id):
-            subprocess.call("gunzip INCAR.gz".split(" "))
+            subprocess.call("gunzip -f INCAR.gz".split(" "))
             incar = Incar.from_file("INCAR")
             incar.update({"NELM": 200, "ALGO": "Fast"})
             incar.write_file("INCAR")
@@ -301,17 +301,18 @@ class RerunJobs:
 
         def run():
             conditions = (self.fws_df["state"].isin(["RUNNING", "FIZZLED"])) & \
-                         (self.fws_df["charge_state"] == 0) &\
+                         (self.fws_df["charge_state"] == 1) &\
                          (self.fws_df["name"].str.contains("relax")) & \
-                         (self.fws_df["fworker"] == "owls")
+                         (self.fws_df["fworker"] == "efrc")
 
-            fw_ids = self.fws_df.loc[conditions, ["fw_id", "state"]]
-            for idx, fw_status in fw_ids.iterrows():
+            fw_ids_df = self.fws_df.loc[conditions, ["fw_id", "state"]]
+            print(fw_ids_df)
+            for idx, fw_status in fw_ids_df.iterrows():
                 if self.lpad.detect_lostruns(query={"fw_id": fw_status["fw_id"]})[1] == [] \
                         and fw_status["state"] == "RUNNING":
+                    print(fw_status["fw_id"], "ALREADY RUNNING")
                     continue
                 try:
-                    print(fw_status["fw_id"])
                     # delet_dir(prev_path)
                     rerun_opt(fw_status["fw_id"])
                     # rerun_scf(fw_id)
@@ -416,7 +417,8 @@ class RemainingJobs:
         def get_existed_fw_status(c2db_uids, excel_name):
             data = []
             for c2db_uid in c2db_uids[:]:
-                nscf_fw_ids = self.lpad.get_fw_ids({"spec._tasks.10.additional_fields.host_info.c2db_info.uid": c2db_uid})
+                nscf_fw_ids = self.lpad.get_fw_ids({"spec._tasks.10.additional_fields.host_info.c2db_info.uid":
+                                                         c2db_uid})
                 for nscf_fw_id in nscf_fw_ids:
                     wf = self.lpad.db["workflows"].find_one({"nodes": {"$in": [nscf_fw_id]}})
                     for fw_id in wf["nodes"]:
@@ -460,14 +462,14 @@ class RemainingJobs:
 
             df = pd.DataFrame(data).drop_duplicates()
             df = df.loc[(df["state"].isin(job_states)), :]
-            # IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"), pandas_df=df).to_excel(
-            #     excel_name, index=True)
+            IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"), pandas_df=df).to_excel(
+                excel_name, index=True)
             IOTools(cwd="wf/unfinished_jobs", pandas_df=df).to_json(excel_name, index=True)
             return df
 
         def group_df(df, excel_name):
-            df = df.groupby(["spg_number", "host_taskid", "c2db_uid", "defect_name", "charge_state", "name",
-                             "fworker"]).agg(
+            df = df.groupby(["fworker", "charge_state", "spg_number", "host_taskid", "c2db_uid", "defect_name", "name",
+                             ]).agg(
                 dict(state=["unique"], fw_id=["unique", "count"]))
             output = df.style\
                 .applymap(lambda x: "background-color:red" if x[0] == "FIZZLED" else "", subset=["state"])\
@@ -485,7 +487,7 @@ class RemainingJobs:
 
         def group_df_run():
             for i, o in zip(
-                    ["uni_fizzled_2021-10-27", "nonuni_fizzled_2021-10-27"],
+                    ["uni_2021-10-27", "nonuni_2021-10-27"],
                     ["uni_fizzled_gp", "nonuni_fizzled_gp"]):
                 df = IOTools(cwd=os.path.join(self.save_xlsx_path, "jobs/existed_fws_status"),
                              excel_file=i).read_excel()
@@ -495,16 +497,16 @@ class RemainingJobs:
             uni_host_uids, nonuni_host_uids = self.uniform_host_df["c2db_uid"].unique(), self.nonuniform_host_df[
                 "c2db_uid"].unique()
             for host_sym_type, name in zip([uni_host_uids, nonuni_host_uids], ["uni", "nonuni"]):
-                df = get_existed_fw_status(host_sym_type, name+"_owls")
-                group_df(df, excel_name=name+"_owls_gp")
+                df = get_existed_fw_status(host_sym_type, name)
+                group_df(df, excel_name=name+"_gp")
 
-        get_existed_fw_status_run()
+        run()
 
 def local_main():
     RemainingJobs().existed_fw_status()
 
 def remote_main():
-    rerun_list = RerunJobs("nonuni_owls_2021-10-27.json")
+    rerun_list = RerunJobs("uni_2021-10-27.json")
     rerun_list.rerun_fw()
 
 
