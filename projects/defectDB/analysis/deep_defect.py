@@ -228,7 +228,7 @@ class ExtractDefectES:
         )
         return tot, proj, d_df, levels
 
-for j in [4]:
+for j in [5]:
     tot, proj, d_df, levels = ExtractDefectES.defect_levels(j)
 
  #%%
