@@ -69,7 +69,7 @@ for e in db.collection.find({"task_label": "SCAN_scf"}):
 from qubitPack.tool_box import get_db, get_band_edges_characters
 from monty.json import jsanitize
 
-db = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=1236)
+db = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=12347)
 col = db.collection
 filter = {"task_label": "SCAN_nscf line"}
 
@@ -106,7 +106,7 @@ for e in list(col.find(filter)):
         band_edges = src_entry["band_edges"]
         scan_bs_output.update({"band_edges": band_edges, "vacuum_level": vacuum})
         tgt.collection.update_one({"task_id": e["task_id"]}, {"$set":{
-            "host_info.sym_data":sym_data,
+            "host_info.sym_data": sym_data,
             "host_info.scan_bs": scan_bs_output
         }})
     except Exception as er:
@@ -116,49 +116,25 @@ for e in list(col.find(filter)):
 from qubitPack.tool_box import get_db, get_band_edges_characters
 from monty.json import jsanitize
 
-tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=1236)
+tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=12347)
 
 col = tgt.collection
-filter = {"group_id": 4}
+filter = {"task_label": "SCAN_scf"}
 
 for e in list(col.find(filter)):
-    try:
-        print(e["task_id"], e["host_info"]["c2db_info"]["uid"])
-        tgt.collection.update_one({"task_id": e["task_id"]}, {"$set":{
-            "site_symmetry_uniform": True,
-        }})
-    except Exception as er:
-        print(er)
+    print(e["task_id"], e["host_info"]["c2db_info"]["uid"])
+    site_syms = e["host_info"]["sym_data"]["unique_wyckoff"]["site_sym"]
+    if site_syms[0] == site_syms[1]:
+        site_symmetry_uniform = True
+    else:
+        site_symmetry_uniform = False
+
+    tgt.collection.update_one({"task_id": e["task_id"]}, {"$set":{"site_symmetry_uniform": site_symmetry_uniform}})
 
 
-#%%5
-import pandas as pd
-import os, json
-from qubitPack.tool_box import remove_entry_in_db
-
-tgt = get_db("Scan2dDefect", "ir_data", user="Jeng", password="qimin", port=1236)
-
-gp_id = [0,
-         3,
-         5,
-         7,
-         9,
-         10,
-         12,
-         13,
-         14,
-         15,
-         16,
-         17,
-         18,
-         19,
-         20]
-for  i in tgt.collection.find({"group_id": {"$in": gp_id}}):
-        tk_id = i["task_id"]
-        remove_entry_in_db(tk_id, tgt, pmg_file=False)
 
 
-#%%6
+#%% 6
 from qubitPack.tool_box import get_db, get_band_edges_characters
 from monty.json import jsanitize
 
@@ -178,3 +154,57 @@ for e in col.find({"host_info.c2db_info.prototype": {"$exists": 0}}):
     except Exception as er:
         print(er)
 
+#%% 7 update SCAN_scf with eigenstate info
+import json, os
+from monty.json import MontyEncoder, MontyDecoder
+from atomate.vasp.database import VaspCalcDb
+from atomate.vasp.drones import VaspDrone
+
+local_scf_path = "/home/qimin/tsai/Research/projects/Scan2dDefect/calc_data/scf"
+
+# run this code in db1
+mmdb = VaspCalcDb.from_db_file('/mnt/sdb/tsai/scripts/update_eigen/db.json', admin=True)
+tgt = list(mmdb.collection.find({"task_label": "SCAN_scf"}))
+
+for e in tgt:
+    t_id = e["task_id"]
+    print("++"*20 + str(t_id))
+    if e["calcs_reversed"][0].get("eigenvalues_fs_id", None):
+        continue
+    #    if t_id != 3257:
+    #        continue
+
+    path = e["dir_name"].split("/")[-1]
+    drone = VaspDrone(parse_eigenvalues=True, parse_dos=True)
+    task_doc = drone.assimilate(os.path.join(local_scf_path, path))
+
+    eigenvals = {}
+    dos = None
+    if "calcs_reversed" in task_doc:
+        for eigenvalue in ("eigenvalues", "projected_eigenvalues"):
+            if eigenvalue in task_doc["calcs_reversed"][0]["output"]:  # only store idx=0 data
+                eigenvals[eigenvalue] = json.dumps(task_doc["calcs_reversed"][0]["output"][eigenvalue],
+                                                   cls=MontyEncoder)
+                del task_doc["calcs_reversed"][0]["output"][eigenvalue]
+
+            if "dos" in task_doc["calcs_reversed"][0]:  # only store idx=0 (last step)
+                dos = json.dumps(task_doc["calcs_reversed"][0]["dos"], cls=MontyEncoder)
+                del task_doc["calcs_reversed"][0]["dos"]
+
+    if eigenvals:
+        for name, data in eigenvals.items():
+            data_gfs_id, compression_type = mmdb.insert_gridfs(data, "{}_fs".format(name), task_id=t_id)
+            mmdb.collection.update_one(
+                {"task_id": t_id}, {"$set": {"calcs_reversed.0.{}_compression".format(name): compression_type}})
+            mmdb.collection.update_one({"task_id": t_id}, {"$set": {"calcs_reversed.0.{}_fs_id".format(name): data_gfs_id}})
+    if dos:
+        dos_gfs_id, compression_type = mmdb.insert_gridfs(
+            dos, "dos_fs", task_id=t_id
+        )
+        mmdb.collection.update_one(
+            {"task_id": t_id},
+            {"$set": {"calcs_reversed.0.dos_compression": compression_type}},
+        )
+        mmdb.collection.update_one(
+            {"task_id": t_id}, {"$set": {"calcs_reversed.0.dos_fs_id": dos_gfs_id}}
+        )

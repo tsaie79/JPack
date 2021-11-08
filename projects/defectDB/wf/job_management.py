@@ -384,8 +384,8 @@ class RemainingJobs:
         self.save_xlsx_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/latest_results/xlsx"
         self.save_plt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/latest_results/plt"
 
-        self.defect_df = IOTools(cwd=self.save_xlsx_path, excel_file="defect_0_2_2021-10-22").read_excel()
-        self.host_df = IOTools(cwd=self.save_xlsx_path, excel_file="host_2021-10-25").read_excel()
+        self.defect_df = IOTools(cwd=self.save_xlsx_path, excel_file="2021-11-03/defect/defect_2021-11-03").read_excel()
+        self.host_df = IOTools(cwd=self.save_xlsx_path, excel_file="2021-11-03/host/host_2021-11-03").read_excel()
 
         self.uni = self.host_df["reduced_site_sym"].isin([("-6m2", "-6m2"), ("3m", "3m"), ("4mm", "4mm")])
         self.uniform_host_df = self.host_df.loc[self.uni, :]
@@ -394,9 +394,9 @@ class RemainingJobs:
         self.nonuniform_host_df = self.host_df.loc[self.nonuni, :]
 
         self.uniform_host_gp = self.uniform_host_df.groupby(["spg_number", "reduced_site_sym"]).agg(
-            dict(taskid=["count", "unique"], c2db_uid=["count", "unique"], spg_number=["count", "unique"]))
+            dict(host_taskid=["count", "unique"], c2db_uid=["count", "unique"], spg_number=["count", "unique"]))
         self.nonuniform_host_gp = self.nonuniform_host_df.groupby(["spg_number", "reduced_site_sym"]).agg(
-            dict(taskid=["count", "unique"], c2db_uid=["count", "unique"], spg_number=["count", "unique"]))
+            dict(host_taskid=["count", "unique"], c2db_uid=["count", "unique"], spg_number=["count", "unique"]))
 
 
     def nonuni_not_calculated(self):
@@ -413,7 +413,7 @@ class RemainingJobs:
         return  result_gp
 
     def existed_fw_status(self):
-        job_states = ["FIZZLED", "RESERVED", "RUNNING"]
+        job_states = ["FIZZLED", "RESERVED", "RUNNING", "READY"]
         def get_existed_fw_status(c2db_uids, excel_name):
             data = []
             for c2db_uid in c2db_uids[:]:
@@ -506,12 +506,13 @@ def local_main():
     RemainingJobs().existed_fw_status()
 
 def remote_main():
-    rerun_list = RerunJobs("uni_2021-10-27.json")
+    rerun_list = RerunJobs("uni_2021-11-05.json")
     rerun_list.rerun_fw()
 
 
 if __name__ == '__main__':
-    local_main()
+    # local_main()
+    remote_main()
     # d = CheckJobs.run()
     # d = d.groupby(["c2db_uid", "defect_name", "charge_state"])
     # a = RerunJobs("nonuni_owls_2021-10-27.json")

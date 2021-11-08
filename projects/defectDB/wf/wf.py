@@ -16,7 +16,8 @@ from atomate.vasp.powerups import (
 from atomate.vasp.workflows.base.core import get_wf
 
 from my_atomate_jyt.vasp.powerups import *
-from my_atomate_jyt.vasp.workflows.wf_full import get_wf_full_scan
+from my_atomate_jyt.vasp.workflows.wf_full import get_wf_full_scan, get_wf_full_hse
+from my_atomate_jyt.vasp.fireworks.pytopomat import IrvspFW
 
 from pymatgen.io.vasp.inputs import Kpoints
 from pymatgen.io.vasp.sets import MPRelaxSet
@@ -31,6 +32,10 @@ from monty.json import jsanitize
 
 import os
 import pandas as pd
+
+INPUT_PATH = "analysis/input"
+
+
 
 def relax_pc():
     lpad = LaunchPad.from_file(os.path.expanduser(
@@ -344,19 +349,149 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
 
     return wfs
 
-if __name__ == '__main__':
-    lpad = LaunchPad.from_file(
-        os.path.join(
-            os.path.expanduser("~"),
-            "config/project/Scan2dDefect/calc_data/my_launchpad.yaml"))
-    wfs = binary_scan_defect()
-    for idx, wf in enumerate(wfs):
-        if idx % 2 == 0:
-            wf = set_execution_options(wf,  category="calc_data", fworker_name="owls")
-        else:
-            wf = set_execution_options(wf,  category="calc_data", fworker_name="efrc")
-        # lpad.add_wf(wf)
-        print(idx, wf.name,
-              wf.fws[0].tasks[-1]["additional_fields"]["group_id"],
-              wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
+def binary_triplet_HSE_wf(distort=0.0, category="calc_data", irvsp_fw=False): #1e-4
+    wfs = []
+    db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
+    col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
+    defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-03").read_excel()
+    triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
+    triplet_df = triplet_df.iloc[1:, :]
+    print(triplet_df)
+    for uid, charge, defect_name, defect_type, task_id in zip(triplet_df["uid"], triplet_df["charge"],
+                                                     triplet_df["defect_name"], triplet_df["defect_type"],
+                                                              triplet_df["task_id"]
+                                                     ):
+        mx2 = col.find_one({"uid": uid})
+        pc = Structure.from_dict(mx2["structure"])
+        scaling = find_scaling_for_2d_defect(pc, 15)[0]
+        area = scaling[0]*scaling[1]
+        geo_spec = {area*pc.num_sites: [20]}
 
+        defect = ChargedDefectsStructures(pc, antisites_flag=True).defects
+        cation, anion = find_cation_anion(pc)
+
+        if defect_type == "vacancy":
+            defect_type = "vacancies"
+        else:
+            defect_type = "substitutions"
+        for sub in range(len(defect[defect_type])):
+            print(cation, anion)
+            print(defect[defect_type][sub]["name"])
+            if defect_name not in defect[defect_type][sub]["name"]:
+                continue
+            for na, thicks in geo_spec.items():
+                for thick in thicks:
+                    print(sub, na, defect_type, thick, distort)
+                    gen_defect = GenDefect(
+                        orig_st=pc,
+                        defect_type=(defect_type, sub),
+                        natom=na,
+                        vacuum_thickness=thick,
+                        distort=distort,
+                    )
+                    # special_st = Structure.from_file("/home/tug03990/wse0_456.vasp")
+                    # move_site(special_st, [25], dz)
+                    wf = get_wf_full_hse(
+                        structure=gen_defect.defect_st,
+                        task_arg=dict(lcharg=True),
+                        charge_states=[charge, charge],
+                        gamma_only=False,
+                        gamma_mesh=True,
+                        nupdowns=[2, 0],
+                        task="hse_relax-hse_scf",
+                        vasptodb={
+                            "category": category, "NN": gen_defect.NN,
+                            "defect_entry": gen_defect.defect_entry,
+                            "lattice_constant": "PBE",
+                            "taskid_Scan2dDefect": task_id,
+                            "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["uid"]),
+                        },
+                        wf_addition_name="{}:{}".format(na, thick),
+                    )
+
+                    if irvsp_fw:
+                        HSE_fws = wf.fws.copy()
+                        for idx, fw in enumerate(HSE_fws):
+                            if "HSE_scf" in fw.name:
+                                irvsp_fw = IrvspFW(structure=gen_defect.defect_st,
+                                                   kpt_mode="single_kpt", symprec=0.001,
+                                                   irvsptodb_kwargs=dict(collection_name="ir_data"),
+                                                   name="irvsp",
+                                                   parents=fw)
+                                HSE_fws.append(irvsp_fw)
+                        wf = Workflow(HSE_fws, name=wf.name)
+
+
+                    wf = add_tags(wf,
+                                  [
+                                      {
+                                          "defect_xlsx": "defect_2021-11-03",
+                                          "category": category, "NN": gen_defect.NN,
+                                          "lattice_constant": "PBE",
+                                          "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["uid"]),
+                                      }
+                                  ]
+                                  )
+
+                    wf = bash_scp_files(
+                        wf,
+                        dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data/",
+                        port=12348,
+                        task_name_constraint="RunVasp"
+                    )
+                    if irvsp_fw:
+                        wf = bash_scp_files(
+                            wf,
+                            dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/ir_data/",
+                            port=12348,
+                            task_name_constraint="RunIRVSP"
+                        )
+                        wf = set_queue_options(wf, "1:00:00", fw_name_constraint="irvsp")
+
+
+                    wf = set_queue_options(wf, "02:00:00", fw_name_constraint="HSE_relax")
+                    wf = set_queue_options(wf, "02:00:00", fw_name_constraint="HSE_scf")
+
+                    wf = add_modify_incar(wf)
+                    wf = set_execution_options(wf, category=category, fworker_name="gpu_nersc")
+                    if irvsp_fw:
+                        wf = set_execution_options(wf, category="ir_data", fworker_name="nersc",
+                                                   fw_name_constraint="irvsp")
+                    wf = preserve_fworker(wf)
+                    wf.name = "{}:{}:{}".format(mx2["uid"], defect_name, ":".join(wf.name.split(":")[3:5]))
+                    print(wf.name)
+                    wfs.append(wf)
+    return wfs
+
+
+
+def main():
+    def run_binary_scan_defect():
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/Scan2dDefect/calc_data/my_launchpad.yaml"))
+        wfs = binary_scan_defect()
+        for idx, wf in enumerate(wfs):
+            if idx % 2 == 0:
+                wf = set_execution_options(wf,  category="calc_data", fworker_name="owls")
+            else:
+                wf = set_execution_options(wf,  category="calc_data", fworker_name="efrc")
+            # lpad.add_wf(wf)
+            print(idx, wf.name,
+                  wf.fws[0].tasks[-1]["additional_fields"]["group_id"],
+                  wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
+
+    def run_triplet_HSE_wf():
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/HSE_triplets_from_Scan2dDefect/calc_data/my_launchpad.yaml"))
+        wfs = binary_triplet_HSE_wf(irvsp_fw=False)
+        for idx, wf in enumerate(wfs):
+            lpad.add_wf(wf)
+            print(idx, wf.name)
+
+    run_triplet_HSE_wf()
+if __name__ == '__main__':
+    main()

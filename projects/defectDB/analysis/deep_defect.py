@@ -13,7 +13,6 @@ from scipy.optimize import curve_fit
 
 import os
 
-
 C2DB = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=12345)
 SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
@@ -202,16 +201,16 @@ class ExtractStructure:
 class ExtractDefectES:
     @classmethod
     def defect_levels(cls, task_id):
-        defect_db = get_db("Scan2dDefect", "calc_data", port=12347)
+        defect_db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data", port=12347)
         ir_db = get_db("Scan2dDefect", "ir_data", port=12347)
         host_db = get_db("Scan2dMat", "calc_data", port=12347)
 
 
         tk_id = task_id
         defect = defect_db.collection.find_one({"task_id": tk_id})
-        pc_from_id = defect["pc_from_id"]
-        defect_name = defect["defect_name"]
-        charge_state = defect["charge_state"]
+        # pc_from_id = defect["pc_from_id"]
+        # defect_name = defect["defect_name"]
+        # charge_state = defect["charge_state"]
 
         tot, proj, d_df, levels = new_get_defect_state(
             defect_db,
@@ -219,17 +218,17 @@ class ExtractDefectES:
             -10, 10,
             None,
             "all",
-            "proj",
-            None, # (host_db, pc_from_id, 0, 0, 0),
-            0.2,
-            is_vacuum_aligment_on_plot=False,
+            None,
+            None, #(host_db, pc_from_id, 0, 0, 0),
+            0.1,
+            is_vacuum_aligment_on_plot=True,
             locpot_c2db=None, #(c2db, c2db_uid, 0)
-            ir_db=ir_db,
-            ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
+            ir_db=None,
+            ir_entry_filter=None,#{"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
         )
         return tot, proj, d_df, levels
-#
-for j in [3257]:
+
+for j in [4]:
     tot, proj, d_df, levels = ExtractDefectES.defect_levels(j)
 
  #%%

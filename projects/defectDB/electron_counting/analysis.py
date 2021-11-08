@@ -218,8 +218,9 @@ class ExtractDefectES:
             None,
             True,
             "proj",
-            (host_db, pc_from_id, 0),
+            (host_db, pc_from_id, 0, 0, 0),
             0.001,
+            is_vacuum_aligment_on_plot=True,
             locpot_c2db=None,#(c2db, c2db_uid, 0)
             ir_db=ir_db,
             ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
@@ -229,7 +230,7 @@ class ExtractDefectES:
 
         return tot, proj, d_df
 
-for j in [800]:
+for j in [3298]:
     tot, proj, d_df = ExtractDefectES.defect_levels(j)
 
 #%%

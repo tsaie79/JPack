@@ -28,14 +28,14 @@ class ReadHosts:
 
 class ReadDefects:
     def __init__(self):
-        self.good_hosts_ids = IOTools(json_file="good_hosts_ids_2021-09-02").read_json()
+        self.good_hosts_ids = IOTools(cwd=PATH_EXCEL, json_file="good_hosts_ids_2021-09-02").read_json()
         self.data = []
     def screen_defects(self):
         col = SCAN2dDefect.collection
         for good_host_id in self.good_hosts_ids:
             c2db_uid = good_host_id["uid"]
             task_id = good_host_id["tk_id"]
-            for e in col.find({"host_info.c2db_info.uid": c2db_uid, "task_label": "SCAN_nscf uniform"}):
+            for e in col.find({"host_info.c2db_info.uid": {"$ne": c2db_uid}, "task_label": "SCAN_nscf uniform"}):
                 print(e["host_info"]["c2db_info"]["uid"], e["task_id"])
                 info = {
                     "task_id": e["task_id"],
@@ -51,8 +51,8 @@ class ReadDefects:
     @classmethod
     def run_screening(cls):
         d = cls().screen_defects()
-        IOTools(output_path=PATH_EXCEL, pandas_df=d).to_excel("good_defects_nscf")
-        IOTools(output_path=PATH_EXCEL, pandas_df=d).to_json("good_defects_nscf")
+        IOTools(cwd=PATH_EXCEL, pandas_df=d).to_excel("bad_defects_nscf")
+        IOTools(cwd=PATH_EXCEL, pandas_df=d).to_json("bad_defects_nscf")
 
 
     def update_defect_entry(self):
