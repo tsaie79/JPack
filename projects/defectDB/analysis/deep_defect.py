@@ -5,7 +5,7 @@ import pandas as pd
 
 from pymatgen import Structure
 
-from qubitPack.qc_searching.analysis.main import get_defect_state, new_get_defect_state
+from qubitPack.qc_searching.analysis.main import get_defect_state_v1, get_defect_state_v2, get_defect_state_v3
 from qubitPack.tool_box import *
 
 from matplotlib import pyplot as plt
@@ -17,7 +17,7 @@ C2DB = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password
 SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 C2DB_IR = get_db("C2DB_IR", "calc_data",  user="Jeng_ro", password="qimin", port=12345)
-#%%
+
 class PureQuery:
     @classmethod
     def query(cls):
@@ -182,7 +182,6 @@ class PureQuery:
 #
 # df = PureQuery.aggregate_defect_triplet_and_sole_bandedges()
 # df.to_clipboard()
-#%%
 class ExtractStructure:
     @classmethod
     def defect_structure(cls, task_id):
@@ -197,22 +196,20 @@ class ExtractStructure:
             st.to("POSCAR","defect_structures/group_id-{}/gp_{}-tk_{}.vasp".format(e["group_id"], e["group_id"], e["task_id"]))
 
 # ExtractStructure.defect_structure(973)
-#%%
 class ExtractDefectES:
     @classmethod
     def defect_levels(cls, task_id):
-        defect_db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data", port=12347)
+        defect_db = get_db("Scan2dDefect", "calc_data", port=12347)
         ir_db = get_db("Scan2dDefect", "ir_data", port=12347)
         host_db = get_db("Scan2dMat", "calc_data", port=12347)
 
-
         tk_id = task_id
         defect = defect_db.collection.find_one({"task_id": tk_id})
-        # pc_from_id = defect["pc_from_id"]
-        # defect_name = defect["defect_name"]
-        # charge_state = defect["charge_state"]
+        pc_from_id = defect["pc_from_id"]
+        defect_name = defect["defect_name"]
+        charge_state = defect["charge_state"]
 
-        tot, proj, d_df, levels = new_get_defect_state(
+        tot, proj, d_df, levels, in_gap_levels = get_defect_state_v3(
             defect_db,
             {"task_id": tk_id},
             -10, 10,
@@ -220,18 +217,13 @@ class ExtractDefectES:
             "all",
             None,
             None, #(host_db, pc_from_id, 0, 0, 0),
-            0.1,
+            0.2,
             is_vacuum_aligment_on_plot=True,
             locpot_c2db=None, #(c2db, c2db_uid, 0)
-            ir_db=None,
-            ir_entry_filter=None,#{"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
+            ir_db=ir_db,
+            ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
         )
-        return tot, proj, d_df, levels
-
-for j in [5]:
-    tot, proj, d_df, levels = ExtractDefectES.defect_levels(j)
-
- #%%
+        return tot, proj, d_df, levels, in_gap_levels
 
 class Potential:
     def __init__(self, tk_id, defect_db, host_db):
@@ -291,12 +283,11 @@ class Potential:
                                                                                                 self.defect_pot_max])
         return host_popt, defect_popt
 
-# Potential(2961, SCAN2dDefect, SCAN2dMat).plot_pot()
-
- #%%
 def main():
-    ExtractStructure.defect_structure()
-    # dd = PureQuery.aggregate()
-    # return dd
+    for j in [751]:
+        tot, proj, d_df, levels, in_gap_levels = ExtractDefectES.defect_levels(j)    # dd = PureQuery.aggregate()
+        return tot, proj, d_df, levels, in_gap_levels
+
 if __name__ == '__main__':
-    main()
+    tot, proj, d_df, levels, in_gap_levels = main()
+    IOTools(cwd="~/Desktop", pandas_df=tot).to_excel("tot")

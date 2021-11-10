@@ -92,7 +92,8 @@ tgt = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=12
 col = tgt.collection
 # filter = {"task_label": "SCAN_scf",}
 # filter = {"task_id": {"$in":[1309, 1311, 1315, 1349, 1351]}}
-filter = {"task_label": {"$regex": "SCAN_scf"}}
+filter = {"task_label": {"$regex": "SCAN_scf"}, "host_info.scan_bs.band_edges.vbm_is_up_dn_band_idx_equal": {
+    "$exists": 0}}
 for e in list(col.find(filter)):
     try:
         print(e["task_id"], e["host_info"]["c2db_info"]["uid"])

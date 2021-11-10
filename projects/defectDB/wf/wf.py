@@ -18,6 +18,7 @@ from atomate.vasp.workflows.base.core import get_wf
 from my_atomate_jyt.vasp.powerups import *
 from my_atomate_jyt.vasp.workflows.wf_full import get_wf_full_scan, get_wf_full_hse
 from my_atomate_jyt.vasp.fireworks.pytopomat import IrvspFW
+from my_atomate_jyt.vasp.fireworks.pyzfs import PyzfsFW
 
 from pymatgen.io.vasp.inputs import Kpoints
 from pymatgen.io.vasp.sets import MPRelaxSet
@@ -349,13 +350,13 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
 
     return wfs
 
-def binary_triplet_HSE_wf(distort=0.0, category="calc_data", irvsp_fw=False): #1e-4
+def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvsp_fw=False): #1e-4
     wfs = []
     db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
     col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
     defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-03").read_excel()
     triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
-    triplet_df = triplet_df.iloc[1:, :]
+    triplet_df = triplet_df.iloc[:1, :]
     print(triplet_df)
     for uid, charge, defect_name, defect_type, task_id in zip(triplet_df["uid"], triplet_df["charge"],
                                                      triplet_df["defect_name"], triplet_df["defect_type"],
@@ -421,6 +422,15 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", irvsp_fw=False): #1
                                 HSE_fws.append(irvsp_fw)
                         wf = Workflow(HSE_fws, name=wf.name)
 
+                    if pyzfs_fw:
+                        HSE_fws = wf.fws.copy()
+                        for idx, fw in enumerate(HSE_fws):
+                            if "HSE_scf" in fw.name and fw.tasks[5]["incar_update"]["NUPDOWN"] == 2:
+                                pyzfs_fw = PyzfsFW(structure=gen_defect.defect_st, parents=fw, pyzfstodb_kwargs=dict(
+                                    collection_name="zfs_data"))
+                                HSE_fws.append(pyzfs_fw)
+                        wf = Workflow(HSE_fws, name=wf.name)
+
 
                     wf = add_tags(wf,
                                   [
@@ -448,6 +458,15 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", irvsp_fw=False): #1
                         )
                         wf = set_queue_options(wf, "1:00:00", fw_name_constraint="irvsp")
 
+                    if pyzfs_fw:
+                        wf = bash_scp_files(
+                            wf,
+                            dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/zfs_data/",
+                            port=12348,
+                            task_name_constraint="RunPyzfs"
+                        )
+                        wf = set_queue_options(wf, "00:30:00", fw_name_constraint="pyzfs")
+
 
                     wf = set_queue_options(wf, "02:00:00", fw_name_constraint="HSE_relax")
                     wf = set_queue_options(wf, "02:00:00", fw_name_constraint="HSE_scf")
@@ -457,6 +476,11 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", irvsp_fw=False): #1
                     if irvsp_fw:
                         wf = set_execution_options(wf, category="ir_data", fworker_name="nersc",
                                                    fw_name_constraint="irvsp")
+
+                    if pyzfs_fw:
+                        wf = set_execution_options(wf, category="zfs_data", fworker_name="nersc",
+                                                   fw_name_constraint="pyzfs")
+
                     wf = preserve_fworker(wf)
                     wf.name = "{}:{}:{}".format(mx2["uid"], defect_name, ":".join(wf.name.split(":")[3:5]))
                     print(wf.name)
