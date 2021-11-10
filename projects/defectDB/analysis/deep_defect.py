@@ -218,6 +218,7 @@ class ExtractDefectES:
             None,
             None, #(host_db, pc_from_id, 0, 0, 0),
             0.2,
+            edge_tol=(1, 1),
             is_vacuum_aligment_on_plot=True,
             locpot_c2db=None, #(c2db, c2db_uid, 0)
             ir_db=ir_db,
@@ -284,7 +285,7 @@ class Potential:
         return host_popt, defect_popt
 
 def main():
-    for j in [751]:
+    for j in [566]:
         tot, proj, d_df, levels, in_gap_levels = ExtractDefectES.defect_levels(j)    # dd = PureQuery.aggregate()
         return tot, proj, d_df, levels, in_gap_levels
 

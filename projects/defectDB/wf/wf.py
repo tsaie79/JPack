@@ -354,7 +354,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
     wfs = []
     db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
     col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
-    defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-03").read_excel()
+    defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-10").read_excel()
     triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
     triplet_df = triplet_df.iloc[:1, :]
     print(triplet_df)
@@ -435,7 +435,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
                     wf = add_tags(wf,
                                   [
                                       {
-                                          "defect_xlsx": "defect_2021-11-03",
+                                          "defect_xlsx": "defect_2021-11-10",
                                           "category": category, "NN": gen_defect.NN,
                                           "lattice_constant": "PBE",
                                           "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["uid"]),

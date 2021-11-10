@@ -98,6 +98,7 @@ class Tools:
                 0.2,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
+                edge_tol=(0.25, 0.25),
                 ir_db=ir_db,
                 ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
             )
@@ -107,6 +108,7 @@ class Tools:
             print(er)
             level_info = {}
             levels = {}
+            defect_levels = {}
         return level_info, levels, defect_levels
 
 class Host:
@@ -253,7 +255,9 @@ class Defect:
     def get_defect_df_v2(self):
         data = []
         col = SCAN2dDefect.collection
-        for e in list(col.find({"task_label": "SCAN_scf", "host_info.c2db_info.uid": "RuBr2-CdI2-NM"}))[:]: #
+        # condition = {"task_label": "SCAN_scf", "host_info.c2db_info.uid": "BaBr2-CdI2-NM"}
+        condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 5936}}
+        for e in list(col.find(condition)):
             print(e["task_id"])
             host_c2db_info = e["host_info"]["c2db_info"]
             for field in ["spacegroup", "pmg_point_gp", "irreps", "formula"]:
@@ -305,11 +309,11 @@ class Defect:
             info.update(in_gpa_levels)
             data.append(info)
 
-
         self.defect_df = pd.DataFrame(data)
         self.defect_df.fillna("None", inplace=True)
 
         print(self.defect_df)
+        print(os.getcwd())
         IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("defect")
 
 
@@ -330,9 +334,6 @@ class Defect:
             "cbm_down_max_el", "cbm_down_max_proj_orbital", "is_vbm_cbm_from_same_element"
         ])
         grouping.extend(["defect_type", "charge", "defect_name", "mag"])
-        # level_info = ["up_band_idx", "up_from_vbm", "up_occ", "dn_band_idx",
-        #          "dn_from_vbm", "dn_occ", "up_deg", "dn_deg", "up_tran_en", "dn_tran_en", "triplet_from", "up_ir", "dn_ir"]
-        # level_info = dict(zip(level_info, [["unique"] for i in range(len(level_info))]))
         agg_func = {"up_tran_en": ["unique"], "dn_tran_en": ["unique"], "up_from_vbm":"unique", "dn_from_vbm":
             "unique", "task_id": ["count", "unique"], }
         # agg_func.update(level_info)
@@ -498,8 +499,8 @@ class Defect:
 
     @classmethod
     def bar_plot_defect_levels_v2(cls, defect_df):
-        all_protos = ["CdI2"]#"AgBr3", "BN", "BiI3", "CH", "CdI2", "FeSe", "GaS", "GaSe", "GeS2", "GeSe", "MoS2",
-        # "TiCl3"]
+        plt.style.use(["science", "notebook", "grid"])
+        all_protos = ["AgBr3", "BN", "BiI3", "CH", "CdI2", "FeSe", "GaS", "GaSe", "GeS2", "GeSe", "MoS2", "TiCl3"]
         # defect_df_copy = defect_df.loc[defect_df["charge"] == 0, :]
         for set_prototype in all_protos:
             defect_df_copy = defect_df.copy()
@@ -529,23 +530,6 @@ class Defect:
                     mag = plot_df["mag"].iloc[0]
                     print("defect_taskid:{}, host_taskid:{}".format(defect["task_id"].iloc[0],
                                                                     defect["host_taskid"].iloc[0]))
-                    # levels = extract_defect_levels(defect["d_taskid"])
-                    # defects.append(
-                    #     {
-                    #         "cbm": defect["level_cbm"].iloc[0],
-                    #         "vbm": defect["level_vbm"].iloc[0],
-                    #         "up": defect["level_up_energy"].iloc[0],
-                    #         "dn": defect["level_dn_energy"].iloc[0],
-                    #         "up_deg": defect["level_up_deg"].iloc[0] ,
-                    #         "dn_deg": defect["level_dn_deg"].iloc[0],
-                    #         "up_ir": defect["level_up_ir"].iloc[0],
-                    #         "dn_ir": defect["level_dn_ir"].iloc[0],
-                    #         "up_occ": defect["level_up_occ"].iloc[0],
-                    #         "dn_occ": defect["level_dn_occ"].iloc[0],
-                    #         "up_id": defect["level_up_id"].iloc[0],
-                    #         "dn_id": defect["level_dn_id"].iloc[0],
-                    #     }
-                    # )
 
                     defects.append(
                         {
@@ -569,10 +553,12 @@ class Defect:
                     defect_name_labels.append(defect["defect_name"].iloc[0])
                     charge_labels.append(defect["charge"].iloc[0])
 
-
-
+                vbm_lim, cbm_lim = plot_df["level_vbm"].median(), plot_df["level_cbm"].median()
 
                 fig, ax = plt.subplots(figsize=(12,11), dpi=300)
+                fig_y_height = 5, 5
+                ax.set_ylim(vbm_lim-fig_y_height[0], cbm_lim+fig_y_height[1])
+
                 print(np.arange(0, len(defects)*2, 2))
                 print(defects)
                 for defect, x in zip(defects, np.arange(0, len(defects)*5, 5)):
@@ -600,12 +586,8 @@ class Defect:
                     if not dn_occ:
                         dn_occ = ["" for i in dn]
 
-                    print("%%"*20)
-                    print(up_occ)
-                    print(dn_occ)
-
-                    ax.bar(x, vbm--15, 4, -15, color="deepskyblue")
-                    ax.bar(x, 5-cbm, 4, cbm, color="orange")
+                    ax.bar(x, vbm-(vbm_lim-fig_y_height[0]), 4, (vbm_lim-fig_y_height[0]), color="deepskyblue")
+                    ax.bar(x, (cbm_lim+fig_y_height[1])-cbm, 4, cbm, color="orange")
 
                     dx = 0.35
                     for level, occ, deg, id in zip(up, up_occ, up_deg, up_id):
@@ -635,7 +617,7 @@ class Defect:
                             level, occ, deg, ir, band_id in zip(up, up_occ, up_deg, up_ir, up_id)
                         ]
                     )
-                    ax.text(x-1.5, cbm+2.5, up_info, bbox=dict(facecolor='white', edgecolor='black'), size=8)
+                    ax.text(x-1.5, cbm+0.45, up_info, bbox=dict(facecolor='white', edgecolor='black'), size=8)
 
                     dx = 1
                     for level, occ, deg, id in zip(dn, dn_occ, dn_deg, dn_id):
@@ -664,13 +646,13 @@ class Defect:
                             level, occupied, deg, ir, band_id in zip(dn, dn_occ, dn_deg, dn_ir, dn_id)
                         ]
                     )
-                    ax.text(x-1.5, vbm-2.5, dn_info, bbox=dict(facecolor='white', edgecolor='black'), size=8)
+                    ax.text(x-1.5, vbm_lim-fig_y_height[0]+0.1, dn_info, bbox=dict(facecolor='white',
+                                                                                   edgecolor='black'),
+                            size=8)
 
-                ax.set_ylim(-15, 5)
                 ax.yaxis.set_minor_locator(AutoMinorLocator(5))
                 for tick in ax.get_yticklabels():
                     tick.set_fontsize(15)
-
 
                 ax.tick_params(axis="x", bottom=False, labelbottom=True)
                 ax.set_xticks(np.arange(0, len(defects)*5, 5))
@@ -679,21 +661,11 @@ class Defect:
                                    fontdict={"fontsize": 10}, rotation=0)
 
                 for x, name, q in zip(np.arange(0, len(defects)*5, 5), defect_name_labels, charge_labels):
-                    ax.text(x-2, 5+0.1, "{}-{}".format(q, name), rotation=0, size=10)
+                    ax.text(x-2, cbm_lim+fig_y_height[1]+0.1, "{}-{}".format(q, name), rotation=0, size=10)
 
                 ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
                 ax.text(-0.1, 1.05, "{}-{}".format(uid, host_taskid), size=30, transform=ax.transAxes)
 
-                # fig.savefig(
-                #     os.path.join(
-                #         save_plt_path,
-                #         "triplets_levels(incorrected)",
-                #         "triplets_polarized_hosts",
-                #         "neutral_triplets_unpolarized_hosts",
-                #         "2021-10-27",
-                #         "proto_{}_triplets.png".format(set_prototype)
-                #     )
-                # )
                 os.makedirs(os.path.join(save_plt_path, set_prototype), exist_ok=True)
                 fig.savefig(
                     os.path.join(
@@ -703,16 +675,17 @@ class Defect:
                     )
                 )
 def main():
-    a = Defect(defect_xlsx=None)
+    a = Defect(defect_xlsx="defect_2021-11-10")
     a.get_defect_df_v2()
     # a.get_host_df()
     # a.get_host_gp()
     # a.get_defect_df()
     screened_df = a.get_screened_defect_df()
-    # a.get_defect_df_gp(screened_df, "triplet_far_levels_gp")
+    a.get_defect_df_gp(screened_df, "triplet_plt_gp")
 
     # print(a.defect_df["prototype"])
-    Defect.bar_plot_defect_levels_v2(screened_df)
+    # Defect.bar_plot_defect_levels_v2(screened_df)
 
 if __name__ == '__main__':
+    print(os.getcwd())
     main()
