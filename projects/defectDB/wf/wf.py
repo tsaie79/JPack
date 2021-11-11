@@ -356,7 +356,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
     col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
     defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-10").read_excel()
     triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
-    triplet_df = triplet_df.iloc[:1, :]
+    triplet_df = triplet_df.iloc[1:, :]
     print(triplet_df)
     for uid, charge, defect_name, defect_type, task_id in zip(triplet_df["uid"], triplet_df["charge"],
                                                      triplet_df["defect_name"], triplet_df["defect_type"],
@@ -465,11 +465,11 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
                             port=12348,
                             task_name_constraint="RunPyzfs"
                         )
-                        wf = set_queue_options(wf, "00:30:00", fw_name_constraint="pyzfs")
+                        wf = set_queue_options(wf, "02:00:00", fw_name_constraint="pyzfs")
 
 
-                    wf = set_queue_options(wf, "02:00:00", fw_name_constraint="HSE_relax")
-                    wf = set_queue_options(wf, "02:00:00", fw_name_constraint="HSE_scf")
+                    wf = set_queue_options(wf, "06:00:00", fw_name_constraint="HSE_relax")
+                    wf = set_queue_options(wf, "06:00:00", fw_name_constraint="HSE_scf")
 
                     wf = add_modify_incar(wf)
                     wf = set_execution_options(wf, category=category, fworker_name="gpu_nersc")
