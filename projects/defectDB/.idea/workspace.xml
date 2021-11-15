@@ -5,6 +5,7 @@
       <change beforePath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis/data_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/analysis/input/defect_2021-11-10.xlsx" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,7 +54,7 @@
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="true" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$/analysis/input" />
-    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+    <property name="settings.editor.selected.configurable" value="web.server" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -101,7 +102,7 @@
       <workItem from="1636534422017" duration="3817000" />
       <workItem from="1636562909408" duration="33000" />
       <workItem from="1636562948165" duration="35532000" />
-      <workItem from="1636819339530" duration="8693000" />
+      <workItem from="1636819339530" duration="10183000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1636403040202</created>
@@ -145,7 +146,14 @@
       <option name="project" value="LOCAL" />
       <updated>1636952947557</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="update">
+      <created>1636953566881</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1636953566881</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

@@ -255,8 +255,8 @@ class Defect:
     def get_defect_df_v2(self):
         data = []
         col = SCAN2dDefect.collection
-        condition = {"task_label": "SCAN_scf", "host_info.c2db_info.uid": "BaBr2-CdI2-NM"}
-        # condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 5936}}
+        # condition = {"task_label": "SCAN_scf", "host_info.c2db_info.uid": "BaBr2-CdI2-NM"}
+        condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 5936}}
         for e in list(col.find(condition)):
             print(e["task_id"])
             host_c2db_info = e["host_info"]["c2db_info"]
@@ -328,7 +328,8 @@ class Defect:
     def get_defect_df_gp(self, df, output_gp_name):
         # all_triplet_df = defect_df.loc[~defect_df["reduced_site_sym"].isin([("-6m2", "-6m2"), ("3m", "3m"), ("4mm", "4mm")]), :]
 
-        grouping = ["prototype", "pmg_spg", "reduced_site_sym", "reduced_site_specie", "uid", "host_taskid"]
+        grouping = ["prototype", "pmg_spg", "reduced_site_sym", "reduced_site_specie", "uid", "host_taskid",
+                    "site_oxi_state"]
         grouping.extend([
             "vbm_up_max_el", "vbm_up_max_proj_orbital", "vbm_down_max_el",
             "vbm_down_max_proj_orbital", "cbm_up_max_el", "cbm_up_max_proj_orbital",
@@ -677,12 +678,12 @@ class Defect:
                 )
 def main():
     a = Defect(defect_xlsx="defect_2021-11-10")
-    a.get_defect_df_v2()
+    # a.get_defect_df_v2()
     # a.get_host_df()
     # a.get_host_gp()
     # a.get_defect_df()
-    # screened_df = a.get_screened_defect_df()
-    # a.get_defect_df_gp(screened_df, "triplet_plt_gp")
+    screened_df = a.get_screened_defect_df()
+    a.get_defect_df_gp(screened_df, "triplet_plt_gp")
 
     # print(a.defect_df["prototype"])
     # Defect.bar_plot_defect_levels_v2(screened_df)
