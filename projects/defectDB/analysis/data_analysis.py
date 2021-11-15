@@ -334,7 +334,7 @@ class Defect:
             "cbm_down_max_el", "cbm_down_max_proj_orbital", "is_vbm_cbm_from_same_element"
         ])
         grouping.extend(["defect_type", "charge", "defect_name", "mag"])
-        agg_func = {"up_tran_en": ["unique"], "dn_tran_en": ["unique"], "up_from_vbm":"unique", "dn_from_vbm":
+        agg_func = {"up_tran_en": ["unique"], "dn_tran_en": ["unique"], "up_tran_bottom":"unique", "dn_tran_bottom":
             "unique", "task_id": ["count", "unique"], }
         # agg_func.update(level_info)
         df = df.groupby(grouping).agg(agg_func)
@@ -676,7 +676,7 @@ class Defect:
                 )
 def main():
     a = Defect(defect_xlsx="defect_2021-11-10")
-    a.get_defect_df_v2()
+    # a.get_defect_df_v2()
     # a.get_host_df()
     # a.get_host_gp()
     # a.get_defect_df()

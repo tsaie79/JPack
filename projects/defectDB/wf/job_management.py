@@ -282,29 +282,41 @@ class RerunJobs:
                 except Exception:
                     pass
                 if glob("*") == []:
-                    self.lpad.rerun_fw(fw_id)
+                    pass
+                    # self.lpad.rerun_fw(fw_id)
                 elif glob("CONTCAR.relax*") != []:
+                    print("rerun!")
                     shutil.copy("CONTCAR", "POSCAR")
                     self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
                 else:
-                    shutil.copy("CONTCAR", "POSCAR")
-                    self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+                    pass
+                    # shutil.copy("CONTCAR", "POSCAR")
+                    # self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
             else:
                 self.lpad.rerun_fw(fw_id)
 
         def rerun_scf(fw_id):
-            subprocess.call("gunzip -f INCAR.gz".split(" "))
-            incar = Incar.from_file("INCAR")
-            incar.update({"NELM": 200, "ALGO": "Fast"})
-            incar.write_file("INCAR")
-            lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+            def scp_task():
+                print(fw_id)
+                fw = self.lpad.get_fw_by_id(fw_id)
+                for task in fw.tasks:
+                    if "FileSCPTask" in task["_fw_name"]:
+                        self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+                        task.update({
+                            "user": "qimin",
+                            "dest": "/mnt/sdb/tsai/Research/projects/Scan2dDefect/calc_data/scf"
+                        })
+                        break
+                    else:
+                        continue
+                self.lpad.update_spec([fw_id], fw.as_dict()["spec"])
+            scp_task()
 
         def run():
-            conditions = (self.fws_df["state"].isin(["RUNNING", "FIZZLED"])) & \
-                         (self.fws_df["charge_state"] == 1) &\
-                         (self.fws_df["name"].str.contains("relax")) & \
-                         (self.fws_df["fworker"] == "efrc")
-
+            #set up conditions for reruning fws
+            conditions = (self.fws_df["state"].isin(["RUNNING", "FIZZLED"])) & (self.fws_df["name"].str.contains(
+                "SCAN_relax")) & (self.fws_df["fworker"] == "efrc")
+            # (self.fws_df["charge_state"] == 1) &\
             fw_ids_df = self.fws_df.loc[conditions, ["fw_id", "state"]]
             print(fw_ids_df)
             for idx, fw_status in fw_ids_df.iterrows():
@@ -315,9 +327,9 @@ class RerunJobs:
                 try:
                     # delet_dir(prev_path)
                     rerun_opt(fw_status["fw_id"])
-                    # rerun_scf(fw_id)
+                    # rerun_scf(fw_status["fw_id"])
                 except Exception as err:
-                    print(err)
+                    print("err:{}".format(err))
                     continue
         run()
 class ResetFworker:
@@ -425,7 +437,7 @@ class RemainingJobs:
                         print(fw_id)
                         entry = {}
                         fw = self.lpad.db["fireworks"].find_one({"fw_id": fw_id})
-
+                        updated_on = datetime.fromisoformat(fw["updated_on"]).strftime("%Y-%m-%d")
                         todb_firetask = None
                         for ft in fw["spec"]["_tasks"]:
                             if "ToDb" in ft["_fw_name"]:
@@ -434,7 +446,10 @@ class RemainingJobs:
                         additional_fields = todb_firetask["additional_fields"]
                         charge_state = additional_fields["charge_state"]
                         c2db_uid = additional_fields["host_info"]["c2db_info"]["uid"]
+                        c2db_prototype = c2db_uid.split("-")[1]
                         host_taskid = additional_fields["pc_from_id"]
+                        task_label = additional_fields["task_label"]
+
                         if "irvsp" in fw["name"]:
                             defect_name = additional_fields["defect_name"]
                             try:
@@ -450,6 +465,7 @@ class RemainingJobs:
                                 spg_number = additional_fields["host_info"]["sym_data"]["pmg_spg_number"]
 
                         entry["c2db_uid"] = c2db_uid
+                        entry["c2db_prototype"] = c2db_prototype
                         entry["host_taskid"] = host_taskid
                         entry["defect_name"] = defect_name
                         entry["charge_state"] = charge_state
@@ -458,6 +474,8 @@ class RemainingJobs:
                         entry["fworker"] = fw["spec"]["_fworker"]
                         entry["state"] = fw["state"]
                         entry["name"] = fw["name"]
+                        entry["updated_on"] = updated_on
+                        entry["task_label"] = task_label
                         data.append(entry)
 
             df = pd.DataFrame(data).drop_duplicates()
@@ -468,7 +486,10 @@ class RemainingJobs:
             return df
 
         def group_df(df, excel_name):
-            df = df.groupby(["fworker", "charge_state", "spg_number", "host_taskid", "c2db_uid", "defect_name", "name",
+            df = df.groupby(["fworker", "task_label", "c2db_prototype", "host_taskid", "updated_on", "c2db_uid",
+                             "charge_state",
+                             "defect_name",
+                             "name",
                              ]).agg(
                 dict(state=["unique"], fw_id=["unique", "count"]))
             output = df.style\
@@ -506,7 +527,7 @@ def local_main():
     RemainingJobs().existed_fw_status()
 
 def remote_main():
-    rerun_list = RerunJobs("uni_2021-11-05.json")
+    rerun_list = RerunJobs("nonuni_2021-11-11.json")
     rerun_list.rerun_fw()
 
 

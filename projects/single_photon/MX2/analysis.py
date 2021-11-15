@@ -153,14 +153,14 @@ for frac, st in sts.items():
                     "soc_cdft/WX2_Ch/S-W/{}.vasp".format("_".join(str(frac).split("."))))
 
 #%%
-from qubitPack.qc_searching.analysis.main import get_defect_state
+from qubitPack.qc_searching.analysis.main import get_defect_state_v1
 from qubitPack.tool_box import get_db
 
 db = get_db("single_photon_emitter", "soc_standard_defect")
-tot, proj, d_df = get_defect_state(
+tot, proj, d_df = get_defect_state_v1(
     db,
-    {"task_id": 395},
-    1,-2.5,
+    {"task_id": 645},
+    5,-5,
     None,
     True,
     "dist",
@@ -175,6 +175,25 @@ tot, proj, d_df = get_defect_state(
 # plotter.add_dos_dict(pdos)
 # f = plotter.get_plot(xlim=[-5,5])
 # f.show()
+
+#%%
+from qubitPack.qc_searching.analysis.main import get_defect_state_v1
+from qubitPack.tool_box import get_db
+tot, proj, d_df, levels, in_gap_levels = get_defect_state_v1(
+    get_db("single_photon_emitter", "soc_standard_defect"),
+    {"task_id": 645},
+    -10, 10,
+    None,
+    "all",
+    None,
+    None, #(host_db, pc_from_id, 0, 0, 0),
+    0.2,
+    is_vacuum_aligment_on_plot=False,
+    locpot_c2db=None, #(c2db, c2db_uid, 0)
+    ir_db=None,
+    ir_entry_filter=None,
+)
+
 
 #%%
 from qubitPack.tool_box import get_db

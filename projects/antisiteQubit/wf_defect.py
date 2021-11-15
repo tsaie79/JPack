@@ -23,7 +23,6 @@ from monty.serialization import loadfn
 from unfold import find_K_from_k
 import math
 from qubitPack.tool_box import *
-#%%
 
 class HostWF:
     @classmethod
@@ -1297,29 +1296,34 @@ class Sandwich:
 
 class Cluster:
     def __init__(self, structure):
-        hydrogen_site = [i for i in range(17, 17+13)]
+        hydrogen_site = structure.indices_from_symbol("H")
         a = []
         for i in range(len(structure.sites)):
             if i in hydrogen_site:
-                a.append([True,True,True])
+                a.append([True, True, True])
             else:
-                a.append([False,False,False])
+                a.append([False, False, False])
         structure.add_site_property("selective_dynamics", a)
         self.structure = structure
 
     def wf(self):
-        lpad = LaunchPad.auto_load()
+        LPAD = LaunchPad.from_file(
+            os.path.expanduser(os.path.join("~", "config/project/antisiteQubit/{}/"
+                                                 "my_launchpad.yaml".format("cluster"))))
+
         opt = OptimizeFW(self.structure, name="HSE_relax", job_type="normal", max_force_threshold=False)
         hse_relax_incar = MPHSERelaxSet(self.structure).incar
         hse_relax_incar.update(
             {"ISIF":2,
              "IBRION":2,
-             "EDIFF":1E-4,
+             "EDIFF":1E-5,
              "EDIFFG":-0.01,
              "ENCUT":520,
              "LCHARG":False,
              "LWAVE":False,
-             "LASPH": True
+             "LASPH": True,
+             # PBE0
+             "HFSCREEN": None
              }
         )
 
@@ -1332,9 +1336,9 @@ class Cluster:
         vis_kpt.pop('@module')
         vis_kpt.pop('@class')
         wf = add_modify_kpoints(wf, {"kpoints_update":vis_kpt})
-        wf = set_execution_options(wf, category="cluster")
+        wf = set_execution_options(wf, category="cluster", fworker_name="owls")
         wf = preserve_fworker(wf)
-        lpad.add_wf(wf)
+        LPAD.add_wf(wf)
 
 
 class FormationEnergy:
@@ -1635,7 +1639,7 @@ class MoveZ:
         plt.ylabel("level energy relative to vacuum (eV)")
         plt.legend(loc="upper center", frameon=True, ncol=6, bbox_to_anchor=(0.5, 1.1))
         plt.show()
-#%%
+
 class AnalyzeDefectStates:
     @classmethod
     def get_defect_state(cls):
@@ -1665,15 +1669,18 @@ class AnalyzeDefectStates:
             locpot_c2db=None #(c2db, c2db_uid, 0)
         )
         return tot, proj, d_df
-tot, proj, d_df = AnalyzeDefectStates.get_defect_state()
-#%%
+# tot, proj, d_df = AnalyzeDefectStates.get_defect_state()
 def main():
+
+    cluster = Cluster(Structure.from_file("input/cluster/structure/cluster_h2_2021-11-12.vasp"))
+    cluster.wf()
     # DefectWF.MX2_formation_energy()
     # FormationEnergy.formation("M_rich")
     # MoveZ().get_sheet()
-    COHP.analysis()
+    # COHP.analysis()
 
 if __name__ == '__main__':
+    print(os.getcwd())
     main()
 
 

@@ -209,3 +209,42 @@ for e in tgt:
         mmdb.collection.update_one(
             {"task_id": t_id}, {"$set": {"calcs_reversed.0.dos_fs_id": dos_gfs_id}}
         )
+
+#%% 7*
+from monty.json import jsanitize
+from qubitPack.tool_box import get_db
+from pymatgen import Structure
+
+db = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=12347)
+col = db.collection
+filter = {"task_label": "SCAN_nscf line"}
+
+for e in list(col.find(filter))[1:]:
+    print(e["task_id"], e["c2db_info"]["uid"])
+    structure = Structure.from_dict(e["output"]["structure"]).copy()
+    structure.add_oxidation_state_by_guess()
+    site_oxi_state = []
+    for site in structure.sites:
+        specie = site.specie.as_dict()
+        site_oxi_state.append((specie["element"], specie["oxidation_state"]))
+    data = {"site_oxi_state": site_oxi_state}
+    d = jsanitize(data)
+    db.collection.update_one({"task_id": e["task_id"]}, {"$set": data})
+
+#%% 8
+from monty.json import jsanitize
+from qubitPack.tool_box import get_db
+from pymatgen import Structure
+
+host = get_db("Scan2dMat", "calc_data", user="Jeng", password="qimin", port=12347)
+db = get_db("Scan2dDefect", "calc_data", user="Jeng", password="qimin", port=12347)
+
+col = db.collection
+filter = {"task_label": "SCAN_scf"}
+
+for e in list(col.find(filter))[:]:
+    print(e["task_id"], e["host_info"]["c2db_info"]["uid"])
+    host_entry = host.collection.find_one({"c2db_info.uid": e["host_info"]["c2db_info"]["uid"], "task_label":
+        "SCAN_nscf line"})
+    site_oxi_state = host_entry["site_oxi_state"]
+    db.collection.update_one({"task_id": e["task_id"]}, {"$set": {"host_info.scan_bs.site_oxi_state": site_oxi_state}})
