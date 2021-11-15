@@ -3,13 +3,8 @@
   <component name="ChangeListManager">
     <list default="true" id="0bafc422-f07f-4651-b8f0-502c636454b7" name="Default Changelist" comment="update">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/wf_defect.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf_defect.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../defectDB/.idea/defectDB.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/.idea/defectDB.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../defectDB/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../defectDB/analysis/data_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/analysis/data_analysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../defectDB/analysis/update_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/analysis/update_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../defectDB/wf/job_management.py" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/wf/job_management.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../single_photon/MX2/analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/../single_photon/MX2/analysis.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -255,8 +255,8 @@ class Defect:
     def get_defect_df_v2(self):
         data = []
         col = SCAN2dDefect.collection
-        # condition = {"task_label": "SCAN_scf", "host_info.c2db_info.uid": "BaBr2-CdI2-NM"}
-        condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 5936}}
+        condition = {"task_label": "SCAN_scf", "host_info.c2db_info.uid": "BaBr2-CdI2-NM"}
+        # condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 5936}}
         for e in list(col.find(condition)):
             print(e["task_id"])
             host_c2db_info = e["host_info"]["c2db_info"]
@@ -298,7 +298,8 @@ class Defect:
                 "is_host_pot_steep": abs(host_pot_a[0]) > 5e-4,
                 "is_defect_pot_steep": abs(defect_pot_a[0]) > 5e-4,
                 "host_pot_a": host_pot_a[0],
-                "defect_pot_a": defect_pot_a[0]
+                "defect_pot_a": defect_pot_a[0],
+                "site_oxi_state": tuple([tuple(i) for i in e["host_info"]["scan_bs"]["site_oxi_state"]])
             }
             for host_info in [host_c2db_info, host_band_edges, host_sym_data]:
                 info.update(host_info)
@@ -676,12 +677,12 @@ class Defect:
                 )
 def main():
     a = Defect(defect_xlsx="defect_2021-11-10")
-    # a.get_defect_df_v2()
+    a.get_defect_df_v2()
     # a.get_host_df()
     # a.get_host_gp()
     # a.get_defect_df()
-    screened_df = a.get_screened_defect_df()
-    a.get_defect_df_gp(screened_df, "triplet_plt_gp")
+    # screened_df = a.get_screened_defect_df()
+    # a.get_defect_df_gp(screened_df, "triplet_plt_gp")
 
     # print(a.defect_df["prototype"])
     # Defect.bar_plot_defect_levels_v2(screened_df)
