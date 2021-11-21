@@ -354,9 +354,10 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
     wfs = []
     db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
     col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
-    defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-10").read_excel()
+    defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-18").read_excel()
     triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
-    triplet_df = triplet_df.iloc[1:, :]
+    triplet_df = triplet_df.iloc[14:24, :]
+    # triplet_df = triplet_df.iloc[12:, :]
     print(triplet_df)
     for uid, charge, defect_name, defect_type, task_id in zip(triplet_df["uid"], triplet_df["charge"],
                                                      triplet_df["defect_name"], triplet_df["defect_type"],
@@ -449,39 +450,39 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
                         port=12348,
                         task_name_constraint="RunVasp"
                     )
+                    wf = set_execution_options(wf, category=category, fworker_name="gpu_nersc",
+                                               fw_name_constraint="HSE_relax")
+                    wf = set_execution_options(wf, category=category, fworker_name="gpu_nersc",
+                                               fw_name_constraint="HSE_scf")
+
                     if irvsp_fw:
+                        wf = set_execution_options(wf, category="ir_data", fworker_name="nersc",
+                                                   fw_name_constraint="irvsp")
                         wf = bash_scp_files(
                             wf,
                             dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/ir_data/",
                             port=12348,
-                            task_name_constraint="RunIRVSP"
+                            task_name_constraint="ToDb",
+                            fw_name_constraint="irvsp"
                         )
-                        wf = set_queue_options(wf, "1:00:00", fw_name_constraint="irvsp")
+                        wf = clean_up_files(wf, files=["WAVECAR*", "vasprun.xml*"], fw_name_constraint="irvsp",
+                                            task_name_constraint="ToDb")
 
-                    if pyzfs_fw:
-                        wf = bash_scp_files(
-                            wf,
-                            dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/zfs_data/",
-                            port=12348,
-                            task_name_constraint="RunPyzfs"
-                        )
-                        wf = set_queue_options(wf, "02:00:00", fw_name_constraint="pyzfs")
-
-
-                    wf = set_queue_options(wf, "06:00:00", fw_name_constraint="HSE_relax")
-                    wf = set_queue_options(wf, "06:00:00", fw_name_constraint="HSE_scf")
-
-                    wf = add_modify_incar(wf)
-                    wf = set_execution_options(wf, category=category, fworker_name="gpu_nersc")
-                    if irvsp_fw:
-                        wf = set_execution_options(wf, category="ir_data", fworker_name="nersc",
-                                                   fw_name_constraint="irvsp")
 
                     if pyzfs_fw:
                         wf = set_execution_options(wf, category="zfs_data", fworker_name="nersc",
                                                    fw_name_constraint="pyzfs")
+                        wf = bash_scp_files(
+                            wf,
+                            dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/zfs_data/",
+                            port=12348,
+                            task_name_constraint="ToDb",
+                            fw_name_constraint="pyzfs"
+                        )
+                        wf = clean_up_files(wf, files=["WAVECAR*", "vasprun.xml*"], fw_name_constraint="pyzfs",
+                                            task_name_constraint="ToDb")
 
-                    wf = preserve_fworker(wf)
+                    wf = add_modify_incar(wf)
                     wf.name = "{}:{}:{}".format(mx2["uid"], defect_name, ":".join(wf.name.split(":")[3:5]))
                     print(wf.name)
                     wfs.append(wf)
@@ -511,7 +512,7 @@ def main():
             os.path.join(
                 os.path.expanduser("~"),
                 "config/project/HSE_triplets_from_Scan2dDefect/calc_data/my_launchpad.yaml"))
-        wfs = binary_triplet_HSE_wf(irvsp_fw=False)
+        wfs = binary_triplet_HSE_wf(irvsp_fw=True)
         for idx, wf in enumerate(wfs):
             lpad.add_wf(wf)
             print(idx, wf.name)

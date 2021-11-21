@@ -256,7 +256,7 @@ class Defect:
         data = []
         col = SCAN2dDefect.collection
         # condition = {"task_label": "SCAN_scf", "host_info.c2db_info.uid": "BaBr2-CdI2-NM"}
-        condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 5936}}
+        condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 6084}}
         for e in list(col.find(condition)):
             print(e["task_id"])
             host_c2db_info = e["host_info"]["c2db_info"]
@@ -299,7 +299,8 @@ class Defect:
                 "is_defect_pot_steep": abs(defect_pot_a[0]) > 5e-4,
                 "host_pot_a": host_pot_a[0],
                 "defect_pot_a": defect_pot_a[0],
-                "site_oxi_state": tuple([tuple(i) for i in e["host_info"]["scan_bs"]["site_oxi_state"]])
+                "site_oxi_state": tuple([tuple(i) for i in e["host_info"]["scan_bs"]["site_oxi_state"]]),
+                "number_NN": len(e["NN"])
             }
             for host_info in [host_c2db_info, host_band_edges, host_sym_data]:
                 info.update(host_info)
@@ -312,6 +313,8 @@ class Defect:
 
         self.defect_df = pd.DataFrame(data)
         self.defect_df.fillna("None", inplace=True)
+        self.defect_df.replace({"up_tran_en": "None"}, 0, inplace=True)
+        self.defect_df.replace({"dn_tran_en": "None"}, 0, inplace=True)
 
         print(self.defect_df)
         print(os.getcwd())
@@ -320,10 +323,27 @@ class Defect:
 
     def get_screened_defect_df(self):
         defect_df = self.defect_df.copy()
-        triplet_df = defect_df.loc[(defect_df["mag"] == 2) & (defect_df["level_cbm"] != "None")
-                                   & (defect_df["level_vbm"] != "None"), :]
-        # triplet_df = triplet_df.loc[(triplet_df["up_tran_en"] > 0.5) | (triplet_df["dn_tran_en"] > 0.5), :]
-        return triplet_df
+        triplet_plt_df = defect_df.loc[(defect_df["mag"] == 2) & (defect_df["level_cbm"] != "None")
+                                    & (defect_df["level_vbm"] != "None"), :]
+        def triplet_plt():
+            return triplet_plt_df
+
+        def qubit_candidate():
+            # triplet_df.replace({"up_tran_en": "None"}, 0, inplace=True)
+            # triplet_df.replace({"dn_tran_en": "None"}, 0, inplace=True)
+            screened_df = triplet_plt_df.loc[(triplet_plt_df["up_tran_en"] >= 0.5) | (triplet_plt_df["dn_tran_en"]
+                                                                                       >= 0.5), :]
+            return screened_df
+
+        def vacancy():
+            screened_df = triplet_plt_df.loc[(triplet_plt_df["defect_type"] == "vacancy"), :]
+            return screened_df
+
+        def band_edges():
+            screened_df = triplet_plt_df.loc[(triplet_plt_df["is_vbm_cbm_from_same_element"] == False), :]
+
+            return screened_df
+        return band_edges()
 
     def get_defect_df_gp(self, df, output_gp_name):
         # all_triplet_df = defect_df.loc[~defect_df["reduced_site_sym"].isin([("-6m2", "-6m2"), ("3m", "3m"), ("4mm", "4mm")]), :]
@@ -335,9 +355,9 @@ class Defect:
             "vbm_down_max_proj_orbital", "cbm_up_max_el", "cbm_up_max_proj_orbital",
             "cbm_down_max_el", "cbm_down_max_proj_orbital", "is_vbm_cbm_from_same_element"
         ])
-        grouping.extend(["defect_type", "charge", "defect_name", "mag"])
-        agg_func = {"up_tran_en": ["unique"], "dn_tran_en": ["unique"], "up_tran_bottom":"unique", "dn_tran_bottom":
-            "unique", "task_id": ["count", "unique"], }
+        grouping.extend(["defect_type", "charge", "defect_name", "mag", "number_NN"])
+        agg_func = {"up_tran_en": ["unique"], "dn_tran_en": ["unique"], "up_tran_bottom": "unique",
+                    "dn_tran_bottom": "unique", "task_id": ["count", "unique"], }
         # agg_func.update(level_info)
         df = df.groupby(grouping).agg(agg_func)
         IOTools(cwd=save_xlsx_path, pandas_df=df).to_excel(output_gp_name, index=True)
@@ -542,7 +562,7 @@ class Defect:
                             "up_deg": defect["up_in_gap_deg"].iloc[0] ,
                             "dn_deg": defect["dn_in_gap_deg"].iloc[0],
                             "up_ir": defect["up_in_gap_ir"].iloc[0],
-                            "dn_ir": defect["dn_in_gap_deg"].iloc[0],
+                            "dn_ir": defect["dn_in_gap_ir"].iloc[0],
                             "up_occ": defect["up_in_gap_occ"].iloc[0],
                             "dn_occ": defect["dn_in_gap_occ"].iloc[0],
                             "up_id": defect["up_in_gap_band_id"].iloc[0],
@@ -593,6 +613,7 @@ class Defect:
 
                     dx = 0.35
                     for level, occ, deg, id in zip(up, up_occ, up_deg, up_id):
+                        print(occ)
                         # dx += 0.2
                         ax.text(x-2, level, id)
                         color = None
@@ -676,16 +697,92 @@ class Defect:
                         "host_taskid-{}.png".format(host_taskid)
                     )
                 )
+
+    def statistics(self, df):
+        df = df.loc[df["defect_type"] == "antisite", :]
+        df = df.groupby("charge")
+        print(df.agg({"task_id": ["count"]}))
+        # print(df["task_id"].count())
+
+    def back_process(self):
+        def add_number_occ_electrons():
+            """
+            Regarding electron counting
+            Q: charge state for triplets
+            Vac_e: vacancy-type number of electrons
+            Anti-e: antisite-type number of electrons (0 if no antisite)
+            Occ-e: Vac_e + Anti-e
+            Triplet-e: triplet-configuration number of electrons (from calculation)
+            Q = Occ-e - Triplet-e
+            :return:
+            """
+            def fun(x):
+                oxi = x["site_oxi_state"]
+                defect_name = x["defect_name"]
+                NN = x["number_NN"]
+                occ_e, vac_e, anti_e = None, None, None
+                if "vac" in defect_name:
+                    vac_specie = defect_name.split("_")[-1]
+                    for site_oxi in oxi:
+                        if site_oxi[0] == vac_specie:
+                            continue
+                        NN_oxi = site_oxi[1]
+                        vac_e = abs(NN_oxi)*NN
+                        anti_e = 0
+                        occ_e = vac_e + anti_e
+                        break
+
+                else:
+                    ant_specie = defect_name.split("_")[2]
+                    orig_specie = defect_name.split("_")[-1]
+                    for site_oxi in oxi:
+                        if site_oxi[0] != ant_specie:
+                            continue
+                        NN_oxi = site_oxi[1]
+                        vac_e = abs(NN_oxi)*(NN-1)
+                        ant_val, orig_val = None, None
+                        try:
+                            ant_val = Element(ant_specie).valence[-1]
+                        except ValueError:
+                            print("valence not found:{} or {}".format(ant_specie, orig_specie))
+                            group, row = Element(ant_specie).group, Element(ant_specie).row
+                            try:
+                                ant_val = Element.from_row_and_group(row+1, group).valence[-1]
+                            except:
+                                ant_val = Element.from_row_and_group(row-1, group).valence[-1]
+                        try:
+                            orig_val = Element(orig_specie).valence[-1]
+                        except ValueError:
+                            group, row = Element(orig_specie).group, Element(orig_specie).row
+                            try:
+                                orig_val = Element.from_row_and_group(row+1, group).valence[-1]
+                            except:
+                                orig_val = Element.from_row_and_group(row-1, group).valence[-1]
+                        anti_e = ant_val - orig_val
+                        occ_e = vac_e + anti_e
+                        break
+                return (vac_e, anti_e, occ_e)
+            defect_df = self.defect_df.copy()
+            defect_df["occ_e"] = defect_df.apply(lambda x: fun(x), axis=1)
+            defect_df["triplet_e"] = defect_df.apply(lambda x: x["occ_e"][-1] - x["charge"], axis=1)
+            return defect_df
+
+        def band_edges_and_defects():
+            pass
+        return add_number_occ_electrons()
+
 def main():
-    a = Defect(defect_xlsx="defect_2021-11-10")
+    a = Defect(defect_xlsx="defect_2021-11-18")
+    # print(a.defect_df["up_in_gap_occ"].iloc[1])
+    screened_df = a.get_screened_defect_df()
+    # a.statistics(screened_df)
     # a.get_defect_df_v2()
     # a.get_host_df()
     # a.get_host_gp()
     # a.get_defect_df()
-    screened_df = a.get_screened_defect_df()
-    a.get_defect_df_gp(screened_df, "triplet_plt_gp")
+    a.get_defect_df_gp(screened_df, "triplet_plt")
 
-    # print(a.defect_df["prototype"])
+    # print(a.defect_df["up_in_gap_occ"])
     # Defect.bar_plot_defect_levels_v2(screened_df)
 
 if __name__ == '__main__':

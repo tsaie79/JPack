@@ -1316,14 +1316,14 @@ class Cluster:
         hse_relax_incar.update(
             {"ISIF":2,
              "IBRION":2,
-             "EDIFF":1E-5,
-             "EDIFFG":-0.01,
+             "EDIFF":1E-4,
+             "EDIFFG":-0.02,
              "ENCUT":520,
              "LCHARG":False,
              "LWAVE":False,
              "LASPH": True,
              # PBE0
-             "HFSCREEN": None
+             # "HFSCREEN": None
              }
         )
 
@@ -1335,7 +1335,7 @@ class Cluster:
         vis_kpt = Kpoints.gamma_automatic().as_dict()
         vis_kpt.pop('@module')
         vis_kpt.pop('@class')
-        wf = add_modify_kpoints(wf, {"kpoints_update":vis_kpt})
+        wf = add_modify_kpoints(wf, {"kpoints_update": vis_kpt})
         wf = set_execution_options(wf, category="cluster", fworker_name="owls")
         wf = preserve_fworker(wf)
         LPAD.add_wf(wf)
@@ -1672,7 +1672,7 @@ class AnalyzeDefectStates:
 # tot, proj, d_df = AnalyzeDefectStates.get_defect_state()
 def main():
 
-    cluster = Cluster(Structure.from_file("input/cluster/structure/cluster_h2_2021-11-12.vasp"))
+    cluster = Cluster(Structure.from_file("input/cluster/structure/cluster_h3_2021-11-13.vasp"))
     cluster.wf()
     # DefectWF.MX2_formation_energy()
     # FormationEnergy.formation("M_rich")

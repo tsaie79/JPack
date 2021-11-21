@@ -218,7 +218,7 @@ class ExtractDefectES:
             None,
             None, #(host_db, pc_from_id, 0, 0, 0),
             0.2,
-            edge_tol=(1, 1),
+            edge_tol=(.25, .25),
             is_vacuum_aligment_on_plot=True,
             locpot_c2db=None, #(c2db, c2db_uid, 0)
             ir_db=ir_db,
@@ -285,10 +285,9 @@ class Potential:
         return host_popt, defect_popt
 
 def main():
-    for j in [566]:
+    for j in [3284]:
         tot, proj, d_df, levels, in_gap_levels = ExtractDefectES.defect_levels(j)    # dd = PureQuery.aggregate()
         return tot, proj, d_df, levels, in_gap_levels
 
 if __name__ == '__main__':
     tot, proj, d_df, levels, in_gap_levels = main()
-    IOTools(cwd="~/Desktop", pandas_df=tot).to_excel("tot")
