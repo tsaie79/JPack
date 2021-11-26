@@ -330,9 +330,17 @@ class Defect:
 
         def qubit_candidate():
             # triplet_df.replace({"up_tran_en": "None"}, 0, inplace=True)
-            # triplet_df.replace({"dn_tran_en": "None"}, 0, inplace=True)
-            screened_df = triplet_plt_df.loc[(triplet_plt_df["up_tran_en"] >= 0.5) | (triplet_plt_df["dn_tran_en"]
-                                                                                       >= 0.5), :]
+            # triplet_df.replace({"is_vbm_cbm_from_same_element": "True"}, 0, inplace=True)
+            screened_df = triplet_plt_df.loc[
+                          (triplet_plt_df["up_tran_en"] >= 0.5) |
+                          (triplet_plt_df["dn_tran_en"] >= 0.5), :]
+            screened_df = screened_df.loc[(screened_df["is_vbm_cbm_from_same_element"] == False), :]
+
+        def qubit_and_follow_level_hypth():
+            screened_df = triplet_plt_df.loc[
+                          (triplet_plt_df["up_tran_en"] >= 0.5) |
+                          (triplet_plt_df["dn_tran_en"] >= 0.5), :]
+            screened_df = screened_df.loc[screened_df["is_follow_level_hypth"]==True, :]
             return screened_df
 
         def vacancy():
@@ -343,19 +351,24 @@ class Defect:
             screened_df = triplet_plt_df.loc[(triplet_plt_df["is_vbm_cbm_from_same_element"] == False), :]
 
             return screened_df
-        return band_edges()
+        return qubit_and_follow_level_hypth()
 
     def get_defect_df_gp(self, df, output_gp_name):
         # all_triplet_df = defect_df.loc[~defect_df["reduced_site_sym"].isin([("-6m2", "-6m2"), ("3m", "3m"), ("4mm", "4mm")]), :]
 
         grouping = ["prototype", "pmg_spg", "reduced_site_sym", "reduced_site_specie", "uid", "host_taskid",
                     "site_oxi_state"]
+        # grouping.extend([
+        #     "vbm_up_max_el", "vbm_up_max_proj_orbital", "vbm_down_max_el",
+        #     "vbm_down_max_proj_orbital", "cbm_up_max_el", "cbm_up_max_proj_orbital",
+        #     "cbm_down_max_el", "cbm_down_max_proj_orbital", "is_vbm_cbm_from_same_element"
+        # ])
         grouping.extend([
-            "vbm_up_max_el", "vbm_up_max_proj_orbital", "vbm_down_max_el",
-            "vbm_down_max_proj_orbital", "cbm_up_max_el", "cbm_up_max_proj_orbital",
-            "cbm_down_max_el", "cbm_down_max_proj_orbital", "is_vbm_cbm_from_same_element"
+            "vbm_max_el", "vbm_max_proj_orbital", "cbm_max_el", "cbm_max_proj_orbital", "is_vbm_cbm_from_same_element"
         ])
-        grouping.extend(["defect_type", "charge", "defect_name", "mag", "number_NN"])
+        grouping.extend(["defect_type", "charge", "defect_name", "mag"])
+        grouping.extend(["level_source_specie", "tran_top", "level_gap", "level_from_edge",
+                         "is_tran_top_near_vbm", "is_follow_level_hypth"])
         agg_func = {"up_tran_en": ["unique"], "dn_tran_en": ["unique"], "up_tran_bottom": "unique",
                     "dn_tran_bottom": "unique", "task_id": ["count", "unique"], }
         # agg_func.update(level_info)
@@ -765,26 +778,131 @@ class Defect:
             defect_df = self.defect_df.copy()
             defect_df["occ_e"] = defect_df.apply(lambda x: fun(x), axis=1)
             defect_df["triplet_e"] = defect_df.apply(lambda x: x["occ_e"][-1] - x["charge"], axis=1)
+            defect_df.fillna("None", inplace=True)
             return defect_df
 
         def band_edges_and_defects():
-            pass
-        return add_number_occ_electrons()
+            def fun(x):
+                is_vbm_cbm = x["is_vbm_cbm_from_same_element"]
+                vbm_up_max_el = x["vbm_up_max_el"] if x["vbm_up_max_el"] != "None" else None
+                vbm_up_max_proj_orbital = x["vbm_up_max_proj_orbital"] if x["vbm_up_max_proj_orbital"] != "None" else\
+                    None
+
+                vbm_down_max_el = x["vbm_down_max_el"] if x["vbm_down_max_el"] != "None" else None
+                vbm_down_max_proj_orbital = x["vbm_down_max_proj_orbital"] if x["vbm_down_max_proj_orbital"] != \
+                                                                              "None" else None
+
+                vbm_max_el = vbm_up_max_el or vbm_down_max_el
+                vbm_max_proj_orbital= vbm_up_max_proj_orbital or vbm_down_max_proj_orbital
+
+                cbm_up_max_el = x["cbm_up_max_el"] if x["cbm_up_max_el"] != "None" else None
+                cbm_up_max_proj_orbital = x["cbm_up_max_proj_orbital"] if x["cbm_up_max_proj_orbital"] != "None" else None
+                cbm_down_max_el = x["cbm_down_max_el"] if x["cbm_down_max_el"] != "None" else None
+                cbm_down_max_proj_orbital = x["cbm_down_max_proj_orbital"] if x["cbm_down_max_proj_orbital"] !="None" else None
+                cbm_max_el = cbm_up_max_el or cbm_down_max_el
+                cbm_max_proj_orbital= cbm_up_max_proj_orbital or cbm_down_max_proj_orbital
+
+
+
+                up_tran_top = x["up_tran_top"] if x["up_tran_top"] != "None" else 0
+                dn_tran_top = x["dn_tran_top"] if x["dn_tran_top"] != "None" else 0
+                tran_top = max(up_tran_top, dn_tran_top)
+                level_gap = None
+                try:
+                    level_gap = x["level_cbm"] - x["level_vbm"]
+                except Exception:
+                    level_gap = 0
+
+                level_source_specie = None
+                if x["defect_type"] == "antisite":
+                    level_source_specie = x["defect_name"].split("_")[2]
+                elif x["defect_type"] == "vacancy":
+                    for el in x["chemsys"].split("-"):
+                        if x["defect_name"].split("_")[2] != el:
+                            level_source_specie = el
+
+                is_tran_top_near_vbm = None
+                if level_gap == 0:
+                    is_tran_top_near_vbm = "None"
+                elif tran_top >= 0.5*level_gap:
+                    is_tran_top_near_vbm = False
+                else:
+                    is_tran_top_near_vbm = True
+
+
+                level_from_edge = None
+                if vbm_max_el == cbm_max_el:
+                    if vbm_max_el == level_source_specie:
+                        level_from_edge = "both"
+                    else:
+                        level_from_edge = "None"
+                else:
+                    if vbm_max_el == level_source_specie:
+                        level_from_edge = "vbm"
+                    elif cbm_max_el == level_source_specie:
+                        level_from_edge = "cbm"
+                    else:
+                        level_from_edge = "None"
+
+                is_follow_level_hypth = None
+                if level_from_edge == "both":
+                    if is_tran_top_near_vbm is True:
+                        is_follow_level_hypth = False
+                    elif is_tran_top_near_vbm is False:
+                        is_follow_level_hypth = True
+                    else:
+                        is_follow_level_hypth = "None"
+
+                elif level_from_edge == "cbm":
+                    if is_tran_top_near_vbm is False:
+                        is_follow_level_hypth = True
+                    elif is_tran_top_near_vbm is True:
+                        is_follow_level_hypth = False
+                    else:
+                        is_follow_level_hypth = "None"
+
+                elif level_from_edge == "vbm":
+                    if is_tran_top_near_vbm is True:
+                        is_follow_level_hypth = True
+                    elif is_tran_top_near_vbm is False:
+                        is_follow_level_hypth = False
+                    else:
+                        is_follow_level_hypth = "None"
+                else:
+                    is_follow_level_hypth = "None"
+
+                return vbm_max_el, cbm_max_el, tran_top, level_gap, level_from_edge, is_tran_top_near_vbm,  \
+                       is_follow_level_hypth, level_source_specie, vbm_max_proj_orbital, cbm_max_proj_orbital
+
+            defect_df = self.defect_df.copy()
+            print(defect_df)
+            defect_df["vbm_max_el"] = defect_df.apply(lambda x: fun(x)[0], axis=1)
+            defect_df["cbm_max_el"] = defect_df.apply(lambda x: fun(x)[1], axis=1)
+            defect_df["tran_top"] = defect_df.apply(lambda x: fun(x)[2], axis=1)
+            defect_df["level_gap"] = defect_df.apply(lambda x: fun(x)[3], axis=1)
+            defect_df["level_from_edge"] = defect_df.apply(lambda x: fun(x)[4], axis=1)
+            defect_df["is_tran_top_near_vbm"] = defect_df.apply(lambda x: fun(x)[5], axis=1)
+            defect_df["is_follow_level_hypth"] = defect_df.apply(lambda x: fun(x)[6], axis=1)
+            defect_df["level_source_specie"] = defect_df.apply(lambda x: fun(x)[7], axis=1)
+            defect_df["vbm_max_proj_orbital"] = defect_df.apply(lambda x: fun(x)[8], axis=1)
+            defect_df["cbm_max_proj_orbital"] = defect_df.apply(lambda x: fun(x)[9], axis=1)
+            defect_df.fillna("None", inplace=True)
+            return defect_df
+
+        return band_edges_and_defects()
 
 def main():
     a = Defect(defect_xlsx="defect_2021-11-18")
-    # print(a.defect_df["up_in_gap_occ"].iloc[1])
     screened_df = a.get_screened_defect_df()
     # a.statistics(screened_df)
     # a.get_defect_df_v2()
     # a.get_host_df()
     # a.get_host_gp()
     # a.get_defect_df()
-    a.get_defect_df_gp(screened_df, "triplet_plt")
+    a.get_defect_df_gp(screened_df, "qubit_and_follow_level_hypoth")
 
     # print(a.defect_df["up_in_gap_occ"])
     # Defect.bar_plot_defect_levels_v2(screened_df)
 
 if __name__ == '__main__':
-    print(os.getcwd())
-    main()
+    df = main()
