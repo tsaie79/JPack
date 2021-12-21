@@ -2,14 +2,15 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c03654ef-b62d-4598-9a7b-9ab89ff536d2" name="Changes" comment="update">
+      <change afterPath="$PROJECT_DIR$/../antisiteQubit/input/cluster/structure/pristine_cluster_2021-11-23.vasp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../antisiteQubit/wf_defect.py" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/wf_defect.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/defectDB.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/defectDB.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis/data_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis/deep_defect.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/deep_defect.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis/input/defect_2021-11-10.xlsx" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis/update_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/update_data.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wf/job_management.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/job_management.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/wf/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/wf.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -58,11 +59,12 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/analysis/input" />
-    <property name="settings.editor.selected.configurable" value="web.server" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/analysis" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/analysis" />
       <recent name="$PROJECT_DIR$/analysis/input" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
@@ -111,7 +113,9 @@
       <workItem from="1637090140363" duration="2278000" />
       <workItem from="1637117886311" duration="818000" />
       <workItem from="1637119728927" duration="33938000" />
-      <workItem from="1637380564186" duration="12786000" />
+      <workItem from="1637380564186" duration="46843000" />
+      <workItem from="1638754138510" duration="36096000" />
+      <workItem from="1639763888154" duration="36289000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1636403040202</created>
@@ -169,7 +173,21 @@
       <option name="project" value="LOCAL" />
       <updated>1636956696016</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="update">
+      <created>1637464859981</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1637464859981</updated>
+    </task>
+    <task id="LOCAL-00010" summary="update">
+      <created>1637903186591</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1637903186591</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

@@ -331,16 +331,18 @@ class Defect:
         def qubit_candidate():
             # triplet_df.replace({"up_tran_en": "None"}, 0, inplace=True)
             # triplet_df.replace({"is_vbm_cbm_from_same_element": "True"}, 0, inplace=True)
-            screened_df = triplet_plt_df.loc[
+            screened_df = triplet_plt_df.loc[triplet_plt_df["level_cat"] == "4", :]
+            screened_df = screened_df.loc[
                           (triplet_plt_df["up_tran_en"] >= 0.5) |
                           (triplet_plt_df["dn_tran_en"] >= 0.5), :]
-            screened_df = screened_df.loc[(screened_df["is_vbm_cbm_from_same_element"] == False), :]
+
+            return screened_df
 
         def qubit_and_follow_level_hypth():
             screened_df = triplet_plt_df.loc[
                           (triplet_plt_df["up_tran_en"] >= 0.5) |
                           (triplet_plt_df["dn_tran_en"] >= 0.5), :]
-            screened_df = screened_df.loc[screened_df["is_follow_level_hypth"]==True, :]
+            screened_df = screened_df.loc[screened_df["is_follow_level_hypth"] != True, :]
             return screened_df
 
         def vacancy():
@@ -351,7 +353,7 @@ class Defect:
             screened_df = triplet_plt_df.loc[(triplet_plt_df["is_vbm_cbm_from_same_element"] == False), :]
 
             return screened_df
-        return qubit_and_follow_level_hypth()
+        return qubit_candidate()
 
     def get_defect_df_gp(self, df, output_gp_name):
         # all_triplet_df = defect_df.loc[~defect_df["reduced_site_sym"].isin([("-6m2", "-6m2"), ("3m", "3m"), ("4mm", "4mm")]), :]
@@ -535,9 +537,10 @@ class Defect:
     @classmethod
     def bar_plot_defect_levels_v2(cls, defect_df):
         plt.style.use(["science", "notebook", "grid"])
-        all_protos = ["AgBr3", "BN", "BiI3", "CH", "CdI2", "FeSe", "GaS", "GaSe", "GeS2", "GeSe", "MoS2", "TiCl3"]
+        all_protos = ["AgBr3", "BN", "BiI3", "CH", "CdI2", "FeSe", "GaS", "GaSe", "GeS2", "GeSe", "MoS2",
+                             "TiCl3"]
         # defect_df_copy = defect_df.loc[defect_df["charge"] == 0, :]
-        for set_prototype in all_protos:
+        for set_prototype in defect_df.prototype.unique():
             defect_df_copy = defect_df.copy()
             print(set_prototype)
             conditions = (defect_df_copy["prototype"] == set_prototype)
@@ -563,6 +566,7 @@ class Defect:
                 for taskid in plot_df["task_id"].tolist():
                     defect = plot_df.loc[(plot_df["task_id"] == taskid) , :]
                     mag = plot_df["mag"].iloc[0]
+                    print("=="*20)
                     print("defect_taskid:{}, host_taskid:{}".format(defect["task_id"].iloc[0],
                                                                     defect["host_taskid"].iloc[0]))
 
@@ -580,6 +584,11 @@ class Defect:
                             "dn_occ": defect["dn_in_gap_occ"].iloc[0],
                             "up_id": defect["up_in_gap_band_id"].iloc[0],
                             "dn_id": defect["dn_in_gap_band_id"].iloc[0],
+
+                            "vbm_max_el": defect["vbm_max_el"].iloc[0],
+                            "vbm_max_proj_orbital": defect["vbm_max_proj_orbital"].iloc[0],
+                            "cbm_max_el": defect["cbm_max_el"].iloc[0],
+                            "cbm_max_proj_orbital": defect["cbm_max_proj_orbital"].iloc[0]
                         }
                     )
 
@@ -597,15 +606,22 @@ class Defect:
                 print(np.arange(0, len(defects)*2, 2))
                 print(defects)
                 for defect, x in zip(defects, np.arange(0, len(defects)*5, 5)):
-                    vbm, cbm, up, dn, up_deg, dn_deg, up_ir, dn_ir, up_occ, dn_occ, up_id, dn_id = \
-                        defect["vbm"], defect["cbm"], defect["up"], defect["dn"], defect["up_deg"], \
-                        defect["dn_deg"], \
-                        defect["up_ir"], \
-                        defect["dn_ir"], \
-                        defect["up_occ"],\
-                        defect["dn_occ"],\
-                        defect["up_id"], \
-                        defect["dn_id"]
+                    vbm = defect["vbm"]
+                    cbm = defect["cbm"]
+                    up = defect["up"]
+                    dn = defect["dn"]
+                    up_deg = defect["up_deg"]
+                    dn_deg = defect["dn_deg"]
+                    up_ir = defect["up_ir"]
+                    dn_ir = defect["dn_ir"]
+                    up_occ = defect["up_occ"]
+                    dn_occ = defect["dn_occ"]
+                    up_id = defect["up_id"]
+                    dn_id = defect["dn_id"]
+                    vbm_max_el = defect["vbm_max_el"]
+                    vbm_max_proj_orbital = defect["vbm_max_proj_orbital"]
+                    cbm_max_el = defect["cbm_max_el"]
+                    cbm_max_proj_orbital = defect["cbm_max_proj_orbital"]
 
                     if not up_ir:
                         up_ir = ["" for i in up]
@@ -654,6 +670,8 @@ class Defect:
                         ]
                     )
                     ax.text(x-1.5, cbm+0.45, up_info, bbox=dict(facecolor='white', edgecolor='black'), size=8)
+                    ax.text(x, cbm+3, "{}-{}".format(cbm_max_el, cbm_max_proj_orbital), bbox=dict(
+                        facecolor='white', edgecolor='black'), size=12)
 
                     dx = 1
                     for level, occ, deg, id in zip(dn, dn_occ, dn_deg, dn_id):
@@ -686,11 +704,16 @@ class Defect:
                                                                                    edgecolor='black'),
                             size=8)
 
+                    ax.text(x, vbm_lim-fig_y_height[0]+4, "{}-{}".format(vbm_max_el, vbm_max_proj_orbital),
+                            bbox=dict(facecolor='white', edgecolor='black'), size=12)
+
                 ax.yaxis.set_minor_locator(AutoMinorLocator(5))
                 for tick in ax.get_yticklabels():
                     tick.set_fontsize(15)
 
                 ax.tick_params(axis="x", bottom=False, labelbottom=True)
+                ax.tick_params(axis="y", right=False, which="both")
+
                 ax.set_xticks(np.arange(0, len(defects)*5, 5))
                 print(taskid_labels, mags)
                 ax.set_xticklabels(["{}\nmag:{}".format(taskid_labels[i], mags[i]) for i in range(len(mags))],
@@ -710,6 +733,8 @@ class Defect:
                         "host_taskid-{}.png".format(host_taskid)
                     )
                 )
+                plt.close()
+
 
     def statistics(self, df):
         df = df.loc[df["defect_type"] == "antisite", :]
@@ -889,17 +914,65 @@ class Defect:
             defect_df.fillna("None", inplace=True)
             return defect_df
 
-        return band_edges_and_defects()
+        def add_level_category():
+            def fun(x):
+                level_from_edge = x["level_from_edge"]
+                is_tran_top_near_vbm = x["is_tran_top_near_vbm"]
+                vbm_max_el = x["vbm_max_el"]
+                cbm_max_el = x["cbm_max_el"]
+                level_source_specie = x["level_source_specie"]
+                cat = None
+                if level_from_edge == "both":
+                    cat = "1"
+                elif level_from_edge == "vbm":
+                    if is_tran_top_near_vbm is True:
+                        cat = "2"
+                    else:
+                        cat = "2'"
+                elif level_from_edge == "cbm":
+                    if is_tran_top_near_vbm is False:
+                        cat = "3"
+                    else:
+                        cat = "3'"
+                else:
+                    if vbm_max_el == cbm_max_el:
+                        if vbm_max_el != level_source_specie:
+                            cat = "4"
+                    else:
+                        cat = "None"
+
+                return cat
+            defect_df = self.defect_df.copy()
+            defect_df["level_cat"] = defect_df.apply(lambda x: fun(x), axis=1)
+            defect_df.fillna("None", inplace=True)
+            return defect_df
+
+        def add_transition_wavevlength():
+            def fun(x): # in nm
+                up_tran_en = x["up_tran_en"]
+                dn_tran_en = x["dn_tran_en"]
+                up_tran_wavelength = round(12400/up_tran_en/10, 0) if up_tran_en !=0 else 0
+                dn_tran_wavelength = round(12400/dn_tran_en/10, 0) if dn_tran_en !=0 else 0
+                return up_tran_wavelength, dn_tran_wavelength
+            defect_df = self.defect_df.copy()
+            defect_df["up_tran_wavelength"] = defect_df.apply(lambda x: fun(x)[0], axis=1)
+            defect_df["dn_tran_wavelength"] = defect_df.apply(lambda x: fun(x)[1], axis=1)
+            defect_df.fillna("None", inplace=True)
+            return defect_df
+
+        return add_transition_wavevlength()
 
 def main():
     a = Defect(defect_xlsx="defect_2021-11-18")
-    screened_df = a.get_screened_defect_df()
+    # screened_df = a.get_screened_defect_df()
+    b = a.back_process()
+    IOTools(cwd=save_xlsx_path, pandas_df=b).to_excel("test")
     # a.statistics(screened_df)
     # a.get_defect_df_v2()
     # a.get_host_df()
     # a.get_host_gp()
     # a.get_defect_df()
-    a.get_defect_df_gp(screened_df, "qubit_and_follow_level_hypoth")
+    # a.get_defect_df_gp(screened_df, "qubit_and_not_follow_level_hypth")
 
     # print(a.defect_df["up_in_gap_occ"])
     # Defect.bar_plot_defect_levels_v2(screened_df)

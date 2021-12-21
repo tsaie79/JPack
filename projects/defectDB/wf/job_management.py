@@ -11,8 +11,11 @@ from pymatgen.io.vasp.inputs import Structure, Incar
 from pymatgen.io.vasp.outputs import Oszicar
 from fireworks import LaunchPad
 
-db = get_db("Scan2dDefect", "calc_data", port=12347)
-wf_col = get_db("Scan2dDefect", "workflows", port=12347).collection
+# db = get_db("Scan2dDefect", "calc_data", port=12347)
+# wf_col = get_db("Scan2dDefect", "workflows", port=12347).collection
+
+db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data", port=12347, user="Jeng")
+wf_col = get_db("HSE_triplets_from_Scan2dDefect", "workflows", port=12347, user="Jeng").collection
 
 class CheckJobs:
     def __init__(self):
@@ -260,9 +263,68 @@ class CheckJobs:
         # return df
 
 class RerunJobs:
-    def __init__(self, json_file):
+    def __init__(self):
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
-        self.fws_df = pd.DataFrame(monty.serialization.loadfn("wf/unfinished_jobs/{}".format(json_file)))
+        # self.fws_df = pd.DataFrame(monty.serialization.loadfn("wf/unfinished_jobs/{}".format(json_file)))
+    def locate_jobs(self):
+        self.target_fws = self.lpad.get_fw_ids({"state": "RUNNING", "spec._fworker":"efrc", "name": {"$regex":
+                                                                                                         "HSE_relax"}})
+        real_running_fws = []
+        target_fws = []
+        for idx in self.target_fws:
+            if self.lpad.detect_lostruns(query={"fw_id": idx})[1] == []:
+                real_running_fws.append(idx)
+                print(idx, "ALREADY RUNNING")
+            else:
+                target_fws.append(idx)
+                print(idx)
+        self.target_fws = target_fws
+        print("Number of real_running_fws: {}, {}".format(len(real_running_fws), real_running_fws))
+        print("Number of target_fws: {}, {}".format(len(self.target_fws), self.target_fws))
+
+
+        fw_status_dict = {"no_prev_dir": [], "unable_unzip": [], "empty_dir": [], "contcar_relax": [], "has_error": [],
+                          "cp_contcat_poscar": []}
+        for idx in self.target_fws:
+            fw_status = self.categorize_opt_jobs(idx)
+            fw_status_dict["no_prev_dir"].extend(fw_status["no_prev_dir"])
+            fw_status_dict["unable_unzip"].extend(fw_status["unable_unzip"])
+            fw_status_dict["empty_dir"].extend(fw_status["empty_dir"])
+            fw_status_dict["contcar_relax"].extend(fw_status["contcar_relax"])
+            fw_status_dict["has_error"].extend(fw_status["has_error"])
+            fw_status_dict["cp_contcat_poscar"].extend(fw_status["cp_contcat_poscar"])
+        self.fw_status_dict = fw_status_dict
+        print(fw_status_dict)
+        monty.serialization.dumpfn(fw_status_dict, "/home/tug03990/fw_status.json", indent=4)
+
+
+    def categorize_opt_jobs(self, fw_id):
+        prev_path = self.lpad.get_launchdir(fw_id, 0)
+        fw_status_dict = {"no_prev_dir": [], "unable_unzip": [], "empty_dir": [], "contcar_relax": [], "has_error": [],
+                          "cp_contcat_poscar": []}
+        if prev_path:
+            print(fw_id, prev_path)
+            os.chdir(prev_path)
+            try:
+                for f_gz in glob("*.gz"):
+                    pass
+            except Exception:
+                fw_status_dict["unable_unzip"].append(fw_id)
+                pass
+            if glob("*") == []:
+                fw_status_dict["empty_dir"].append(fw_id)
+                pass
+                # self.lpad.rerun_fw(fw_id)
+            elif glob("CONTCAR.relax*") != []:
+                fw_status_dict["contcar_relax"].append(fw_id)
+            elif glob("error*") != []:
+                fw_status_dict["has_error"].append(fw_id)
+            else:
+                fw_status_dict["cp_contcat_poscar"].append(fw_id)
+        else:
+            fw_status_dict["no_prev_dir"].append(fw_id)
+            # self.lpad.rerun_fw(fw_id)
+        return fw_status_dict
 
     def rerun_fw(self):
         """
@@ -289,11 +351,11 @@ class RerunJobs:
                     shutil.copy("CONTCAR", "POSCAR")
                     self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
                 else:
-                    pass
-                    # shutil.copy("CONTCAR", "POSCAR")
-                    # self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+                    shutil.copy("CONTCAR", "POSCAR")
+                    self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
             else:
-                self.lpad.rerun_fw(fw_id)
+                pass
+                # self.lpad.rerun_fw(fw_id)
 
         def rerun_scf(fw_id):
             def scp_task():
@@ -313,24 +375,38 @@ class RerunJobs:
             scp_task()
 
         def run():
-            #set up conditions for reruning fws
-            conditions = (self.fws_df["state"].isin(["RUNNING", "FIZZLED"])) & (self.fws_df["name"].str.contains(
-                "SCAN_relax")) & (self.fws_df["fworker"] == "efrc")
-            # (self.fws_df["charge_state"] == 1) &\
-            fw_ids_df = self.fws_df.loc[conditions, ["fw_id", "state"]]
-            print(fw_ids_df)
-            for idx, fw_status in fw_ids_df.iterrows():
-                if self.lpad.detect_lostruns(query={"fw_id": fw_status["fw_id"]})[1] == [] \
-                        and fw_status["state"] == "RUNNING":
-                    print(fw_status["fw_id"], "ALREADY RUNNING")
-                    continue
-                try:
-                    # delet_dir(prev_path)
-                    rerun_opt(fw_status["fw_id"])
-                    # rerun_scf(fw_status["fw_id"])
-                except Exception as err:
-                    print("err:{}".format(err))
-                    continue
+            def run1():
+                #set up conditions for reruning fws
+                conditions = (self.fws_df["state"].isin(["RUNNING", "FIZZLED"])) & (self.fws_df["name"].str.contains(
+                    "SCAN_relax")) & (self.fws_df["fworker"] == "efrc")
+                # (self.fws_df["charge_state"] == 1) &\
+                fw_ids_df = self.fws_df.loc[conditions, ["fw_id", "state"]]
+                print(fw_ids_df)
+                for idx, fw_status in fw_ids_df.iterrows():
+                    if self.lpad.detect_lostruns(query={"fw_id": fw_status["fw_id"]})[1] == [] \
+                            and fw_status["state"] == "RUNNING":
+                        print(fw_status["fw_id"], "ALREADY RUNNING")
+                        continue
+                    try:
+                        # delet_dir(prev_path)
+                        rerun_opt(fw_status["fw_id"])
+                        # rerun_scf(fw_status["fw_id"])
+                    except Exception as err:
+                        print("err:{}".format(err))
+                        continue
+            def run2():
+                #set up conditions for reruning fws
+                self.locate_jobs()
+                for idx in self.fw_status_dict["cp_contcat_poscar"][:]:
+                    fw = self.lpad.get_fw_by_id(idx)
+                    try:
+                        # delet_dir(prev_path)
+                        fw_status = rerun_opt(idx)
+                        # rerun_scf(fw_status["fw_id"])
+                    except Exception as err:
+                        print("err:{}".format(err))
+                        continue
+            run2()
         run()
 class ResetFworker:
     def __init__(self):
@@ -338,9 +414,10 @@ class ResetFworker:
         self.init_fws = None
 
     def locate_jobs(self):
-        self.init_fws = self.lpad.get_fw_ids({"state": "READY", "spec._fworker":"owls",
-                                              "name": {"$regex": "SCAN_relax"}})
-        print("Number of wfs: {}".format(len(self.init_fws)))
+        self.init_fws = self.lpad.get_fw_ids({"state": "RUNNING", "spec._fworker":"gpu_nersc",
+                                              "name": {"$regex": "HSE_relax"}})
+        # self.init_fws = [348]
+        print("Number of wfs: {}, {}".format(len(self.init_fws), self.init_fws))
 
     def change_fworker(self, fraction, new_fworker):
         total_fws = len(self.init_fws)
@@ -348,7 +425,10 @@ class ResetFworker:
         for init_fw in self.init_fws[:int(total_fws*fraction)]:
             wf = self.lpad.get_wf_by_fw_id(init_fw)
             fw_ids = list(wf.id_fw.keys())
+            for fw_id in fw_ids:
+                self.lpad.rerun_fw(fw_id)
             print(fw_ids)
+            # self.lpad.update_spec(fw_ids, {"$unset": {"spec._launch_dir": ""}}, mongo=True)
             self.lpad.update_spec(fw_ids, {"_fworker": new_fworker})
 
     @classmethod
@@ -356,7 +436,7 @@ class ResetFworker:
         reset_fworker = cls()
         reset_fworker.locate_jobs()
         print(reset_fworker.init_fws)
-        reset_fworker.change_fworker(1/2, "efrc")
+        reset_fworker.change_fworker(0.5, "efrc")
 
 
 class DeleteCompleteJobs:
@@ -533,7 +613,7 @@ def remote_main():
 
 if __name__ == '__main__':
     # local_main()
-    remote_main()
+    # remote_main()
     # d = CheckJobs.run()
     # d = d.groupby(["c2db_uid", "defect_name", "charge_state"])
     # a = RerunJobs("nonuni_owls_2021-10-27.json")
@@ -543,6 +623,8 @@ if __name__ == '__main__':
     # RemainingJobs().existed_fw_status()
     # uni = RemainginJobs().uni_not_calculated()
     # nonuni = RemainginJobs().nonuni_not_calculated()
+    re = RerunJobs()
+    re.locate_jobs()
 
 
 

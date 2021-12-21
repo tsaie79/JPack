@@ -1322,6 +1322,7 @@ class Cluster:
              "LCHARG":False,
              "LWAVE":False,
              "LASPH": True,
+             "NUPDOWN": 0,
              # PBE0
              # "HFSCREEN": None
              }
@@ -1330,14 +1331,15 @@ class Cluster:
         fws = [opt]
         wf = Workflow(fws, name="{}:opt_cluster".format(self.structure.formula))
 
-        wf = add_modify_incar(wf)
         wf = add_modify_incar(wf, {"incar_update": hse_relax_incar}, "relax")
         vis_kpt = Kpoints.gamma_automatic().as_dict()
         vis_kpt.pop('@module')
         vis_kpt.pop('@class')
         wf = add_modify_kpoints(wf, {"kpoints_update": vis_kpt})
+        wf = add_additional_fields_to_taskdocs(wf, {"structure_file_name": "pristine_cluster_2021-11-23.vasp"})
         wf = set_execution_options(wf, category="cluster", fworker_name="owls")
         wf = preserve_fworker(wf)
+        wf = add_modify_incar(wf)
         LPAD.add_wf(wf)
 
 
@@ -1672,7 +1674,7 @@ class AnalyzeDefectStates:
 # tot, proj, d_df = AnalyzeDefectStates.get_defect_state()
 def main():
 
-    cluster = Cluster(Structure.from_file("input/cluster/structure/cluster_h3_2021-11-13.vasp"))
+    cluster = Cluster(Structure.from_file("input/cluster/structure/pristine_cluster_2021-11-23.vasp"))
     cluster.wf()
     # DefectWF.MX2_formation_energy()
     # FormationEnergy.formation("M_rich")

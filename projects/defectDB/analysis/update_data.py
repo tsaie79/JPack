@@ -161,7 +161,7 @@ from monty.json import MontyEncoder, MontyDecoder
 from atomate.vasp.database import VaspCalcDb
 from atomate.vasp.drones import VaspDrone
 
-local_scf_path = "/home/qimin/tsai/Research/projects/Scan2dDefect/calc_data/scf"
+local_scf_path = "/home/qimin/sdc_tsai/Research/projects/Scan2dDefect/calc_data/scf"
 
 # run this code in db1
 mmdb = VaspCalcDb.from_db_file('/mnt/sdb/tsai/scripts/update_eigen/db.json', admin=True)

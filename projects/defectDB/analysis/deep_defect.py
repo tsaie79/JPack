@@ -14,9 +14,14 @@ from scipy.optimize import curve_fit
 import os
 
 C2DB = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=12345)
+C2DB_IR = get_db("C2DB_IR", "calc_data",  user="Jeng_ro", password="qimin", port=12345)
+
 SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
-C2DB_IR = get_db("C2DB_IR", "calc_data",  user="Jeng_ro", password="qimin", port=12345)
+SCAN2dDefect_IR = get_db("Scan2dDefect", "ir_data",  user="Jeng_ro", password="qimin", port=12347)
+
+HSE_triplets_from_Scan2dDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data", port=12347)
+HSE_triplets_from_Scan2dDefect_IR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data", port=12347)
 
 class PureQuery:
     @classmethod
@@ -199,15 +204,17 @@ class ExtractStructure:
 class ExtractDefectES:
     @classmethod
     def defect_levels(cls, task_id):
-        defect_db = get_db("Scan2dDefect", "calc_data", port=12347)
-        ir_db = get_db("Scan2dDefect", "ir_data", port=12347)
-        host_db = get_db("Scan2dMat", "calc_data", port=12347)
+        # defect_db = get_db("Scan2dDefect", "calc_data", port=12347)
+        defect_db = HSE_triplets_from_Scan2dDefect
+
+        # ir_db = get_db("Scan2dDefect", "ir_data", port=12347)
+        ir_db = HSE_triplets_from_Scan2dDefect_IR
 
         tk_id = task_id
         defect = defect_db.collection.find_one({"task_id": tk_id})
-        pc_from_id = defect["pc_from_id"]
-        defect_name = defect["defect_name"]
-        charge_state = defect["charge_state"]
+        # pc_from_id = defect["pc_from_id"]
+        # defect_name = defect["defect_name"]
+        # charge_state = defect["charge_state"]
 
         tot, proj, d_df, levels, in_gap_levels = get_defect_state_v3(
             defect_db,
@@ -222,7 +229,9 @@ class ExtractDefectES:
             is_vacuum_aligment_on_plot=True,
             locpot_c2db=None, #(c2db, c2db_uid, 0)
             ir_db=ir_db,
-            ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
+            # ir_entry_filter={"prev_fw_taskid": tk_id},
+            ir_entry_filter={"prev_fw_taskid": defect["task_id"]},
+            # ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
         )
         return tot, proj, d_df, levels, in_gap_levels
 
@@ -285,7 +294,7 @@ class Potential:
         return host_popt, defect_popt
 
 def main():
-    for j in [3284]:
+    for j in [32]:
         tot, proj, d_df, levels, in_gap_levels = ExtractDefectES.defect_levels(j)    # dd = PureQuery.aggregate()
         return tot, proj, d_df, levels, in_gap_levels
 

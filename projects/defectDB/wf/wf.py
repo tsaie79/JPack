@@ -354,11 +354,13 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
     wfs = []
     db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
     col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
-    defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-18").read_excel()
-    triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
-    triplet_df = triplet_df.iloc[14:24, :]
+    # defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-18").read_excel()
+    # triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
+    # triplet_df = triplet_df.iloc[24:34, :]
     # triplet_df = triplet_df.iloc[12:, :]
-    print(triplet_df)
+    qubit_candidate_df = IOTools(cwd=INPUT_PATH, excel_file="qubit_candidate_df_2021-11-18").read_excel()
+    triplet_df = qubit_candidate_df.copy()
+    triplet_df = triplet_df.iloc[1:, :]
     for uid, charge, defect_name, defect_type, task_id in zip(triplet_df["uid"], triplet_df["charge"],
                                                      triplet_df["defect_name"], triplet_df["defect_type"],
                                                               triplet_df["task_id"]
