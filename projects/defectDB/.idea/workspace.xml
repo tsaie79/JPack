@@ -4,7 +4,7 @@
     <list default="true" id="c03654ef-b62d-4598-9a7b-9ab89ff536d2" name="Changes" comment="update">
       <change afterPath="$PROJECT_DIR$/../antisiteQubit/input/cluster/structure/pristine_cluster_2021-11-23.vasp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis/data_analysis_2021-11-18.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis_2021-11-18.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wf/job_management.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/job_management.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -109,7 +109,7 @@
       <workItem from="1637380564186" duration="46843000" />
       <workItem from="1638754138510" duration="36096000" />
       <workItem from="1639763888154" duration="36602000" />
-      <workItem from="1640119955417" duration="362000" />
+      <workItem from="1640119955417" duration="5460000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1636403040202</created>
@@ -188,7 +188,21 @@
       <option name="project" value="LOCAL" />
       <updated>1640119892048</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="update">
+      <created>1640120508230</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1640120508230</updated>
+    </task>
+    <task id="LOCAL-00013" summary="update">
+      <created>1640120553879</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1640120553879</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
