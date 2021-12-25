@@ -951,10 +951,10 @@ class ZPLWF:
                                                  self.spin_config, "{}CDFT".format(task)))
         wf = add_namefile(wf)
 
-        try:
-            vprun = Vasprun(os.path.join(self.prev_calc_dir, "vasprun.xml"))
-        except FileNotFoundError:
-            vprun = Vasprun(os.path.join(self.prev_calc_dir, "vasprun.xml.gz"))
+        # try:
+        #     vprun = Vasprun(os.path.join(self.prev_calc_dir, "vasprun.xml"))
+        # except FileNotFoundError:
+        #     vprun = Vasprun(os.path.join(self.prev_calc_dir, "vasprun.xml.gz"))
 
         wf = add_additional_fields_to_taskdocs(
             wf, {
@@ -963,7 +963,7 @@ class ZPLWF:
                         "structure": self.structure.composition.reduced_formula,
                         "spin_config": self.spin_config,
                         "prev_path": self.prev_calc_dir,
-                        "total_energy": vprun.final_energy
+                        # "total_energy": vprun.final_energy
                     }
             }
         )
