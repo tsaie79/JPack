@@ -772,17 +772,20 @@ class DefectWF:
 
 
 class ZPLWF:
-    def __init__(self, prev_calc_dir, spin_config):
+    def __init__(self, from_db_entry, prev_calc_dir, spin_config):
         self.prev_calc_dir = prev_calc_dir
-        structure = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).structure
+        try:
+            self.structure = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).structure
+            self.nelect = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).nelect
+        except Exception:
+            self.structure = Structure.from_dict(from_db_entry["output"]["strucutre"])
+            self.nelect = from_db_entry["input"]["incar"]["NELECT"]
 
-        if "magmom" in structure.site_properties.keys():
-            structure.remove_site_property("magmom")
+        if "magmom" in self.structure.site_properties.keys():
+            self.structure.remove_site_property("magmom")
 
-        self.structure = structure
-        self.nelect = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).nelect
-        self.spin_config = spin_config
         self.encut = 1.3*max([potcar.enmax for potcar in MPHSERelaxSet(self.structure).potcar])
+        self.spin_config = spin_config
 
     def set_selective_sites(self, center_n, distance):
         selective_dyn = []
@@ -868,6 +871,8 @@ class ZPLWF:
             specific_structure=specific_structure,
             vasp_input_set_params=uis,
             selective_dynamics=None,
+            filesystem="qimin@localhost",
+            port=12348,
             name="CDFT-B-HSE_scf",
             vasptodb_kwargs={
                 "additional_fields": {
@@ -890,6 +895,8 @@ class ZPLWF:
             prev_calc_dir=self.prev_calc_dir,
             specific_structure=specific_structure,
             selective_dynamics=selective_dyn,
+            filesystem="qimin@localhost",
+            port=12348,
             name="CDFT-C-HSE_relax",
             vasptodb_kwargs={
                 "additional_fields": {
