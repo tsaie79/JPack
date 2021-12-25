@@ -778,7 +778,7 @@ class ZPLWF:
             self.structure = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).structure
             self.nelect = MPHSEBSSet.from_prev_calc(self.prev_calc_dir).nelect
         except Exception:
-            self.structure = Structure.from_dict(from_db_entry["output"]["strucutre"])
+            self.structure = Structure.from_dict(from_db_entry["output"]["structre"])
             self.nelect = from_db_entry["input"]["incar"]["NELECT"]
 
         if "magmom" in self.structure.site_properties.keys():
