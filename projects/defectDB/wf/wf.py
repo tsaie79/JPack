@@ -11,7 +11,9 @@ from atomate.vasp.powerups import (
     set_execution_options,
     clean_up_files,
     add_modify_kpoints,
-    add_tags
+    add_tags,
+    add_modify_potcar,
+    remove_custodian
 )
 from atomate.vasp.workflows.base.core import get_wf
 
@@ -23,7 +25,6 @@ from my_atomate_jyt.vasp.fireworks.pyzfs import PyzfsFW
 from pymatgen.io.vasp.inputs import Kpoints
 from pymatgen.io.vasp.sets import MPRelaxSet
 
-
 from qubitPack.tool_box import *
 
 from mpinterfaces.utils import *
@@ -34,7 +35,13 @@ from monty.json import jsanitize
 import os
 import pandas as pd
 
+import sys
+sys.path.append("/home/tug03990/scripts/JPack_independent")
+
+from projects.antisiteQubit.wf_defect import ZPLWF
+
 INPUT_PATH = "analysis/input"
+OUTPUT_PATH = "analysis/output/xlsx"
 
 
 
@@ -151,6 +158,75 @@ def pc():
         wf.name = "{}:scan".format(mx2["uid"])
         lpad.add_wf(wf)
 
+def hse_relax_pc():
+    cat = "hse_pc"
+    qubit_df = IOTools(excel_file="qubit_2021-11-18", cwd="analysis/output/xlsx").read_excel()
+    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
+    mx2s = col.find({"uid":{"$in":list(qubit_df["uid"].unique())}})
+    # remember to write OPTCELL 110 in folders
+    for mx2 in mx2s:
+        if mx2["uid"] in [
+            "In2Se2-GaSe-NM",
+            "ZnCl2-GeS2-NM"
+            "CaCl2-GeS2-NM",
+            "ZnBr2-GeS2-NM",
+            "SrBr2-GeS2-NM"
+            "CdCl2-GeS2-NM",
+            "CdBr2-GeS2-NM",
+            "CdI2-GeS2-NM",
+            "CdI2-CdI2-NM",
+            "OsBr2-CdI2-NM",
+            "PbI2-CdI2-NM",
+            "SnBr2-MoS2-NM",
+            "Sc2Br6-BiI3-NM",
+            "Y2Cl6-AgBr3-NM",
+            "MoTe2-MoS2-NM",
+            "SnS2-CdI2-NM",
+            "MoS2-MoS2-NM",
+            "MoSe2-MoS2-NM",
+            "WS2-MoS2-NM",
+            "WSe2-MoS2-NM",
+        ]:
+            continue
+        print(mx2["uid"])
+        pc = Structure.from_dict(mx2["structure"])
+        pc = set_vacuum(pc, 20)
+        pc, site_info = phonopy_structure(pc)
+        wf = get_wf_full_hse(
+            structure=pc,
+            charge_states=[0],
+            gamma_only=False,
+            gamma_mesh=True,
+            nupdowns=[-1],
+            task="hse_relax",
+        )
+        print(wf)
+
+        wf = add_tags(wf,
+                      [
+                          {
+                              "category": cat,
+                              "uid": mx2["uid"],
+                          }
+                      ]
+                      )
+
+        wf = add_modify_incar(
+            wf,
+            {
+                "incar_update":
+                    {"EDIFF": 1E-6, "EDIFFG": -0.001, "ISIF": 3, "NSW": 250, "LCHARG":False,
+                     "LWAVE":False, "LREAL": False}
+            }
+        )
+        wf = add_additional_fields_to_taskdocs(wf, {"cat":cat, "uid": mx2["uid"]})
+        wf = set_execution_options(wf, category=cat)
+        wf = preserve_fworker(wf)
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/HSE_triplets_from_Scan2dDefect/hse_pc/my_launchpad.yaml"))
+        lpad.add_wf(wf)
 def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
     os.chdir("/home/tug03990/scripts/JPack/projects/defectDB")
     col = get_db("Scan2dMat", "calc_data", port=12347).collection
@@ -350,22 +426,26 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
 
     return wfs
 
-def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvsp_fw=False): #1e-4
+def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvsp_fw=True): #1e-4
     wfs = []
+    # db_name, col_name = "HSE_triplets_from_Scan2dDefect", "hse_pc"
     db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
-    col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
+    hse_pc_db = get_db(db_name, col_name,  port=12345, user="readUser", password="qiminyan")
+    pc_db = hse_pc_db
     # defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-18").read_excel()
     # triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
     # triplet_df = triplet_df.iloc[24:34, :]
     # triplet_df = triplet_df.iloc[12:, :]
-    qubit_candidate_df = IOTools(cwd=INPUT_PATH, excel_file="qubit_candidate_df_2021-11-18").read_excel()
+    qubit_candidate_df = IOTools(cwd=INPUT_PATH, excel_file="qubit_2021-11-18").read_excel()
     triplet_df = qubit_candidate_df.copy()
-    triplet_df = triplet_df.iloc[1:, :]
+    triplet_df = triplet_df.loc[triplet_df["uid"].isin(["MoTe2-MoS2-NM", "WTe2-MoS2-NM"])]
+    #"WTe2-MoS2-NM", "MoS2-MoS2-NM", "MoSe2-MoS2-NM",
+    # "MoTe2-MoS2-NM"])]
     for uid, charge, defect_name, defect_type, task_id in zip(triplet_df["uid"], triplet_df["charge"],
                                                      triplet_df["defect_name"], triplet_df["defect_type"],
                                                               triplet_df["task_id"]
                                                      ):
-        mx2 = col.find_one({"uid": uid})
+        mx2 = pc_db.collection.find_one({"uid": uid})
         pc = Structure.from_dict(mx2["structure"])
         scaling = find_scaling_for_2d_defect(pc, 15)[0]
         area = scaling[0]*scaling[1]
@@ -393,6 +473,9 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
                         vacuum_thickness=thick,
                         distort=distort,
                     )
+                    magmom = MPRelaxSet(gen_defect.defect_st).incar.get("MAGMOM")
+                    print(magmom)
+                    magmom[55] = -5
                     # special_st = Structure.from_file("/home/tug03990/wse0_456.vasp")
                     # move_site(special_st, [25], dz)
                     wf = get_wf_full_hse(
@@ -406,7 +489,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
                         vasptodb={
                             "category": category, "NN": gen_defect.NN,
                             "defect_entry": gen_defect.defect_entry,
-                            "lattice_constant": "PBE",
+                            "lattice_constant": "HSE",
                             "taskid_Scan2dDefect": task_id,
                             "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["uid"]),
                         },
@@ -438,31 +521,26 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
                     wf = add_tags(wf,
                                   [
                                       {
-                                          "defect_xlsx": "defect_2021-11-10",
-                                          "category": category, "NN": gen_defect.NN,
-                                          "lattice_constant": "PBE",
-                                          "pc_from": "{}/{}/{}".format(db_name, col_name, mx2["uid"]),
+                                          "category": category,
+                                          "uid": mx2["uid"],
                                       }
                                   ]
                                   )
 
                     wf = bash_scp_files(
                         wf,
-                        dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data/",
+                        dest="/mnt/sdc/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc/",
                         port=12348,
                         task_name_constraint="RunVasp"
                     )
-                    wf = set_execution_options(wf, category=category, fworker_name="gpu_nersc",
-                                               fw_name_constraint="HSE_relax")
-                    wf = set_execution_options(wf, category=category, fworker_name="gpu_nersc",
-                                               fw_name_constraint="HSE_scf")
+                    wf = set_execution_options(wf, category=category, fw_name_constraint="HSE_relax")
+                    wf = set_execution_options(wf, category=category, fw_name_constraint="HSE_scf")
 
                     if irvsp_fw:
-                        wf = set_execution_options(wf, category="ir_data", fworker_name="nersc",
-                                                   fw_name_constraint="irvsp")
+                        wf = set_execution_options(wf, category="ir_data", fw_name_constraint="irvsp")
                         wf = bash_scp_files(
                             wf,
-                            dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/ir_data/",
+                            dest="/mnt/sdc/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/ir_data-pbe_pc/",
                             port=12348,
                             task_name_constraint="ToDb",
                             fw_name_constraint="irvsp"
@@ -472,25 +550,125 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
 
 
                     if pyzfs_fw:
-                        wf = set_execution_options(wf, category="zfs_data", fworker_name="nersc",
-                                                   fw_name_constraint="pyzfs")
+                        wf = set_execution_options(wf, category="zfs_data", fw_name_constraint="pyzfs")
                         wf = bash_scp_files(
                             wf,
-                            dest="/mnt/sdb/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/zfs_data/",
+                            dest="/mnt/sdc/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/zfs_data-pbe_pc/",
                             port=12348,
                             task_name_constraint="ToDb",
                             fw_name_constraint="pyzfs"
                         )
                         wf = clean_up_files(wf, files=["WAVECAR*", "vasprun.xml*"], fw_name_constraint="pyzfs",
                                             task_name_constraint="ToDb")
-
+                    wf = add_modify_incar(wf, {"incar_update": {"EDIFF": 1E-5, "MAGMOM": magmom}})
                     wf = add_modify_incar(wf)
                     wf.name = "{}:{}:{}".format(mx2["uid"], defect_name, ":".join(wf.name.split(":")[3:5]))
                     print(wf.name)
                     wfs.append(wf)
     return wfs
 
+def cdft(task, std_taskid, nbands=None, occ=None, std_base_dir=None, category="cdft", specific_poscar=None,
+             prevent_JT=True):
 
+    std_db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347)
+    std_entry = std_db.collection.find_one({"task_id":std_taskid})
+
+    std_path = std_entry["calcs_reversed"][0]["dir_name"]
+    std_launchdir = std_path.split("/")[-1]
+    std_path = os.path.join("/mnt/sdc/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc/", std_launchdir)
+    if not std_base_dir:
+        std_base_dir = std_path.split("launch")[0]
+
+    cdft = ZPLWF(std_entry, std_path, None)
+
+    if not nbands:
+        nbands = std_entry["input"]["parameters"]["NBANDS"]
+
+    up_occ, dn_occ = None, None
+    up_occ_no_excite, dn_occ_no_excite = get_lowest_unocc_band_idx_v2(std_taskid, std_db, nbands)
+    wf = None
+    if occ["1"] and occ["-1"] == "None":
+        up_occ = occ["1"]
+        dn_occ = dn_occ_no_excite
+        print("up_occ: {}, dn_occ:{}".format(up_occ, dn_occ))
+        wf = cdft.wf(
+            task, 0, up_occupation=up_occ,
+            down_occupation=dn_occ, nbands=nbands, gamma_only=True, selective_dyn=None,
+            specific_structure=specific_poscar,
+            nonsoc_prev_dir=None
+        )
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up": up_occ, "dn": dn_occ}})
+
+    elif occ["-1"] and occ["1"] == "None":
+        dn_occ = occ["-1"]
+        up_occ = up_occ_no_excite
+        print("up_occ: {}, dn_occ:{}".format(up_occ, dn_occ))
+        wf = cdft.wf(
+            task, 0, up_occupation=up_occ,
+            down_occupation=dn_occ, nbands=nbands, gamma_only=True, selective_dyn=None,
+            specific_structure=specific_poscar,
+            nonsoc_prev_dir=None
+        )
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up": up_occ, "dn": dn_occ}})
+
+    elif occ["1"] and occ["-1"]:
+        up_occ = occ["1"]
+        dn_occ = dn_occ_no_excite
+        print("up_occ: {}, dn_occ:{}".format(up_occ, dn_occ))
+        wf = cdft.wf(
+            task, 0, up_occupation=up_occ,
+            down_occupation=dn_occ, nbands=nbands, gamma_only=True, selective_dyn=None,
+            specific_structure=specific_poscar,
+            nonsoc_prev_dir=None
+        )
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up": up_occ, "dn": dn_occ}})
+        fws_up = wf.fws.copy()
+
+
+        dn_occ = occ["-1"]
+        up_occ = up_occ_no_excite
+        print("up_occ: {}, dn_occ:{}".format(up_occ, dn_occ))
+        wf = cdft.wf(
+            task, 0, up_occupation=up_occ,
+            down_occupation=dn_occ, nbands=nbands, gamma_only=True, selective_dyn=None,
+            specific_structure=specific_poscar,
+            nonsoc_prev_dir=None
+        )
+        wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up": up_occ, "dn": dn_occ}})
+        fws_dn = wf.fws.copy()
+
+        fws_up.extend(fws_dn)
+        wf = Workflow(fws_up, name=wf.name)
+
+
+
+    wf = clean_up_files(wf, files=["WAVECAR*", "vasprun.xml*"], fw_name_constraint="CDFT-B-HSE_scf",
+                        task_name_constraint="ToDb")
+    wf = clean_up_files(wf, files=["WAVECAR*", "vasprun.xml*"], fw_name_constraint="CDFT-D-HSE_scf",
+                        task_name_constraint="ToDb")
+
+    wf = bash_scp_files(
+        wf,
+        dest="/mnt/sdc/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/cdft-pbe_pc/",
+        port=12348,
+        task_name_constraint="ToDb",
+    )
+
+
+    wf = add_additional_fields_to_taskdocs(
+        wf,
+        {
+            "source_entry":"{}/{}/{}".format(std_entry["db"],
+                                             std_entry["collection"],
+                                             std_entry["task_id"]),
+            "prev_fw_taskid": std_entry["task_id"],
+            "prev_fw_db": std_entry["db"],
+            "prev_fw_collection": std_entry["collection"]
+        })
+    wf = add_modify_incar(wf)
+    wf = set_execution_options(wf, category=category)
+    wf = preserve_fworker(wf)
+    return wf, category
 
 def main():
     def run_binary_scan_defect():
@@ -515,9 +693,45 @@ def main():
                 os.path.expanduser("~"),
                 "config/project/HSE_triplets_from_Scan2dDefect/calc_data/my_launchpad.yaml"))
         wfs = binary_triplet_HSE_wf(irvsp_fw=True)
-        for idx, wf in enumerate(wfs):
+        for idx, wf in enumerate(wfs[:]):
+            wf.name += "Ch"
+            wf = set_execution_options(wf, fworker_name="owls")
+            wf = preserve_fworker(wf)
             lpad.add_wf(wf)
             print(idx, wf.name)
+
+    def run_cdft():
+        # qubit_df = IOTools(excel_file="hse_screened_qubit_2021-11-18", cwd=INPUT_PATH).read_excel()
+        qubit_df = IOTools(excel_file="hse_screened_qubit_2021-11-18_nersc_modified-nbands",
+                           cwd=INPUT_PATH).read_excel()
+        fworker = "nersc"
+        taskids = qubit_df.loc[qubit_df["fworker"]==fworker, "task_id"]
+        # taskids = qubit_df.loc[qubit_df["task_id"]==868, "task_id"]
+        if fworker == "nersc":
+            # hse qubit on nersc uses gpu-vasp6, which has problem of running cdft!
+            fworker = "owls"
+        # fworker = "efrc"
+        # taskids = qubit_df.loc[qubit_df["fworker"]==fworker, "task_id"][:]
+        for taskid in taskids[1:]:
+            print("{}=".format(taskid)*20)
+            nbands = qubit_df.loc[qubit_df["task_id"] == taskid, "nbands"].iloc[0]
+            up_occ = qubit_df.loc[qubit_df["task_id"] == taskid, "up_tran_cdft_occ"].iloc[0]
+            dn_occ = qubit_df.loc[qubit_df["task_id"] == taskid, "dn_tran_cdft_occ"].iloc[0]
+            wf, cat = cdft(
+                "B-C-D",
+                taskid,
+                occ={"1": up_occ, "-1": dn_occ},
+                nbands=nbands,
+                category="cdft",
+            )
+            wf = remove_custodian(wf)
+            wf = add_additional_fields_to_taskdocs(wf, {"cat":cat, "taskid": taskid})
+            wf = set_execution_options(wf, fworker_name=fworker)
+            lpad = LaunchPad.from_file(
+                os.path.join(
+                    os.path.expanduser("~"),
+                    "config/project/HSE_triplets_from_Scan2dDefect/cdft/my_launchpad.yaml"))
+            lpad.add_wf(wf)
 
     run_triplet_HSE_wf()
 if __name__ == '__main__':

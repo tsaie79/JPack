@@ -3,8 +3,13 @@
   <component name="ChangeListManager">
     <list default="true" id="c03654ef-b62d-4598-9a7b-9ab89ff536d2" name="Changes" comment="update">
       <change afterPath="$PROJECT_DIR$/../antisiteQubit/input/cluster/structure/pristine_cluster_2021-11-23.vasp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/defectDB.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/defectDB.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/analysis/data_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/analysis/input/defect_2021-11-03.xlsx" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/wf/job_management.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/job_management.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wf/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/wf.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,6 +29,14 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+  </component>
+  <component name="GitSEFilterConfiguration">
+    <file-type-list>
+      <filtered-out-file-type name="LOCAL_BRANCH" />
+      <filtered-out-file-type name="REMOTE_BRANCH" />
+      <filtered-out-file-type name="TAG" />
+      <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
+    </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/wf/Scan2dDefect/bg_gte_1_and_inhomo_07272021" root0="SKIP_INSPECTION" />
@@ -52,13 +65,13 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/analysis" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/analysis/input" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/analysis" />
       <recent name="$PROJECT_DIR$/analysis/input" />
+      <recent name="$PROJECT_DIR$/analysis" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/analysis/input" />
@@ -109,7 +122,15 @@
       <workItem from="1637380564186" duration="46843000" />
       <workItem from="1638754138510" duration="36096000" />
       <workItem from="1639763888154" duration="36602000" />
-      <workItem from="1640119955417" duration="5460000" />
+      <workItem from="1640119955417" duration="126750000" />
+      <workItem from="1640757219376" duration="798000" />
+      <workItem from="1640758088014" duration="901000" />
+      <workItem from="1640759006136" duration="154000" />
+      <workItem from="1640759176746" duration="6168000" />
+      <workItem from="1640803057400" duration="21949000" />
+      <workItem from="1640833231287" duration="125414000" />
+      <workItem from="1641780869103" duration="21740000" />
+      <workItem from="1641860722421" duration="14507000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1636403040202</created>
@@ -202,7 +223,14 @@
       <option name="project" value="LOCAL" />
       <updated>1640120553879</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="update">
+      <created>1640225767360</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1640225767361</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

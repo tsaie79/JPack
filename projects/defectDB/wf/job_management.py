@@ -266,16 +266,19 @@ class RerunJobs:
     def __init__(self):
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
         # self.fws_df = pd.DataFrame(monty.serialization.loadfn("wf/unfinished_jobs/{}".format(json_file)))
-    def locate_jobs(self):
-        self.target_fws = self.lpad.get_fw_ids({"state": "RUNNING", "spec._fworker":"owls", "name": {"$regex":
-                                                                                                         "HSE_relax"}})
+    def locate_jobs(self, state):
+        self.target_fws = self.lpad.get_fw_ids({"state": state, "spec._category": "hse_pc"})
         real_running_fws = []
         target_fws = []
         for idx in self.target_fws:
-            if self.lpad.detect_lostruns(query={"fw_id": idx})[1] == []:
-                real_running_fws.append(idx)
-                print(idx, "ALREADY RUNNING")
-            else:
+            if state == "RUNNING":
+                if self.lpad.detect_lostruns(query={"fw_id": idx})[1] == []:
+                    real_running_fws.append(idx)
+                    print(idx, "ALREADY RUNNING")
+                else:
+                    target_fws.append(idx)
+                    print(idx)
+            elif state == "FIZZLED":
                 target_fws.append(idx)
                 print(idx)
         self.target_fws = target_fws
@@ -286,7 +289,11 @@ class RerunJobs:
         fw_status_dict = {"no_prev_dir": [], "unable_unzip": [], "empty_dir": [], "contcar_relax": [], "has_error": [],
                           "cp_contcar_poscar": []}
         for idx in self.target_fws:
-            fw_status = self.categorize_opt_jobs(idx)
+            try:
+                fw_status = self.categorize_opt_jobs(idx)
+            except Exception as er:
+                print(er)
+                continue
             fw_status_dict["no_prev_dir"].extend(fw_status["no_prev_dir"])
             fw_status_dict["unable_unzip"].extend(fw_status["unable_unzip"])
             fw_status_dict["empty_dir"].extend(fw_status["empty_dir"])
@@ -295,7 +302,7 @@ class RerunJobs:
             fw_status_dict["cp_contcar_poscar"].extend(fw_status["cp_contcar_poscar"])
         self.fw_status_dict = fw_status_dict
         print(fw_status_dict)
-        monty.serialization.dumpfn(fw_status_dict, "/home/tug03990/fw_status.json", indent=4)
+        # monty.serialization.dumpfn(fw_status_dict, "/home/tug03990/fw_status.json", indent=4)
 
 
     def categorize_opt_jobs(self, fw_id):
@@ -303,7 +310,6 @@ class RerunJobs:
         fw_status_dict = {"no_prev_dir": [], "unable_unzip": [], "empty_dir": [], "contcar_relax": [], "has_error": [],
                           "cp_contcar_poscar": []}
         if prev_path:
-            print(fw_id, prev_path)
             os.chdir(prev_path)
             try:
                 for f_gz in glob("*.gz"):
@@ -326,7 +332,7 @@ class RerunJobs:
             # self.lpad.rerun_fw(fw_id)
         return fw_status_dict
 
-    def rerun_fw(self, task):
+    def rerun_fw(self, state, task):
         """
         fworker = "nersc", "owls", "efrc"
         """
@@ -347,12 +353,19 @@ class RerunJobs:
                     pass
                     # self.lpad.rerun_fw(fw_id)
                 elif glob("CONTCAR.relax*") != []:
-                    print("rerun!")
                     shutil.copy("CONTCAR", "POSCAR")
                     self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+                    subprocess.call("/home/tug03990/anaconda3/envs/wf/bin/qlaunch -c "
+                                    "/home/tug03990/config/project/HSE_triplets_from_Scan2dDefect/hse_pc/ -r "
+                                    "singleshot -f {}".format(fw_id).split(" "))
+                    print("rerun!")
                 else:
                     shutil.copy("CONTCAR", "POSCAR")
                     self.lpad.rerun_fw(fw_id, recover_launch="last", recover_mode="prev_dir")
+                    subprocess.call("/home/tug03990/anaconda3/envs/wf/bin/qlaunch -c "
+                                    "/home/tug03990/config/project/HSE_triplets_from_Scan2dDefect/hse_pc/ -r "
+                                    "singleshot -f {}".format(fw_id).split(" "))
+                    print("rerun!")
             else:
                 pass
                 # self.lpad.rerun_fw(fw_id)
@@ -374,7 +387,7 @@ class RerunJobs:
                 self.lpad.update_spec([fw_id], fw.as_dict()["spec"])
             scp_task()
 
-        def run(task):
+        def run(state, task):
             def run1():
                 #set up conditions for reruning fws
                 conditions = (self.fws_df["state"].isin(["RUNNING", "FIZZLED"])) & (self.fws_df["name"].str.contains(
@@ -394,9 +407,9 @@ class RerunJobs:
                     except Exception as err:
                         print("err:{}".format(err))
                         continue
-            def run2(task):
+            def run2(state, task):
                 #set up conditions for reruning fws
-                self.locate_jobs()
+                self.locate_jobs(state=state)
                 for idx in self.fw_status_dict[task][:]:
                     fw = self.lpad.get_fw_by_id(idx)
                     try:
@@ -406,8 +419,8 @@ class RerunJobs:
                     except Exception as err:
                         print("err:{}".format(err))
                         continue
-            run2(task=task)
-        run(task)
+            run2(state=state, task=task)
+        run(state, task)
 class ResetFworker:
     def __init__(self):
         self.lpad = LaunchPad(host=db.host, port=db.port, name=db.db_name, username=db.user, password=db.password)
@@ -624,7 +637,9 @@ if __name__ == '__main__':
     # uni = RemainginJobs().uni_not_calculated()
     # nonuni = RemainginJobs().nonuni_not_calculated()
     re = RerunJobs()
-    re.rerun_fw("contcar_relax")
+    re.locate_jobs("RUNNING")
+    # re.rerun_fw("FIZZLED", 'has_error')
+
 
 
 

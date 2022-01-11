@@ -4,11 +4,11 @@
     <list default="true" id="0bafc422-f07f-4651-b8f0-502c636454b7" name="Default Changelist" comment="update">
       <change afterPath="$PROJECT_DIR$/input/cluster/structure/pristine_cluster_2021-11-23.vasp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/wf_defect.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf_defect.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../defectDB/.idea/defectDB.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/.idea/defectDB.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../defectDB/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../defectDB/analysis/data_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/analysis/data_analysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../defectDB/analysis/deep_defect.py" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/analysis/deep_defect.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../defectDB/analysis/input/defect_2021-11-03.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../defectDB/wf/job_management.py" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/wf/job_management.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../defectDB/wf/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/../defectDB/wf/wf.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -178,6 +178,16 @@
       <workItem from="1637117886946" duration="598000" />
       <workItem from="1637119729514" duration="1208000" />
       <workItem from="1637380560589" duration="5051000" />
+      <workItem from="1640543027483" duration="627000" />
+      <workItem from="1640735160413" duration="1302000" />
+      <workItem from="1640757217757" duration="612000" />
+      <workItem from="1640758086292" duration="638000" />
+      <workItem from="1640759004645" duration="155000" />
+      <workItem from="1640759175332" duration="598000" />
+      <workItem from="1640803055918" duration="598000" />
+      <workItem from="1640833229113" duration="1924000" />
+      <workItem from="1641780867395" duration="1276000" />
+      <workItem from="1641860718908" duration="848000" />
     </task>
     <task id="LOCAL-00001" summary="update">
       <created>1631023417264</created>
