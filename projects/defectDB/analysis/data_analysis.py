@@ -1,4 +1,4 @@
-import os, datetime
+import os, subprocess, datetime
 
 # from analysis.deep_defect import Potential
 
@@ -17,6 +17,10 @@ from monty.serialization import loadfn
 from matplotlib import pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 
+from ase.units import _hplanck, _eps0, _c
+from VaspBandUnfolding.vasp_constant import *
+DEBYETOSI = 3.335640952e-30
+
 SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dIR = get_db("Scan2dDefect", "ir_data", port=12347)
@@ -24,6 +28,8 @@ SCAN2dIR = get_db("Scan2dDefect", "ir_data", port=12347)
 HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347)
 HSEQubitIR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data-pbe_pc", port=12347)
 HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12347, user="Jeng")
+
+DB1_PATH = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
 
 input_path = "analysis/input"
 save_xlsx_path = "analysis/output/xlsx"
@@ -96,7 +102,7 @@ class Tools:
                 {"task_id": defect_taskid},
                 -10, 10,
                 None,
-                None,
+                "all",
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
                 0.2,  #0.2
@@ -108,7 +114,6 @@ class Tools:
             )
             tot, proj, d_df, levels, defect_levels = state
             level_info = d_df.to_dict("records")[0]
-
         except Exception as er:
             print(er)
             level_info = {}
@@ -136,7 +141,7 @@ class Tools:
                 {"task_id": defect_taskid},
                 -10, 10,
                 None,
-                None,
+                "all",
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
                 0.2,  #0.2
@@ -877,6 +882,7 @@ class Defect:
                         "host_taskid-{}.png".format(host_taskid)
                     )
                 )
+                # plt.show()
                 plt.close()
 
 
@@ -1161,6 +1167,48 @@ class BackProcess:
         defect_df["dn_tran_cdft_occ"] = defect_df.apply(lambda x: fun(x)[1], axis=1)
         defect_df.fillna("None", inplace=True)
 
+    def add_tdm_input(self):
+        def fun(x):
+            mode = ["1*0 1*1", "1*0.5 1*0.5 1*1", "1*0 1*0.5 1*0.5", "1*0.5 1*0.5 1*0.5 1*0.5",
+                    "1*0.5 1*0.5 1*0.333333 1*0.333333 1*0.333333"]
+            up = " ".join(x["up_cdft_occ"].split(" ")[1:-1])
+            dn = " ".join(x["dn_cdft_occ"].split(" ")[1:-1])
+            up_first = int(x["up_cdft_occ"].split("*")[0])
+            dn_first = int(x["dn_cdft_occ"].split("*")[0])
+            T = {"up": [], "dn": []}
+            for cdft_occ, first, T_name in zip((up, dn), (up_first, dn_first), ("up", "dn")):
+                if cdft_occ == mode[0]:
+                    T[T_name].append((first+1, first+2))
+                elif cdft_occ == mode[1]:
+                    T[T_name].append((first+1, first+3))
+                    T[T_name].append((first+2, first+3))
+                elif cdft_occ == mode[2]:
+                    T[T_name].append((first+1, first+2))
+                    T[T_name].append((first+1, first+3))
+                elif cdft_occ == mode[3]:
+                    T[T_name].append((first+1, first+3))
+                    T[T_name].append((first+1, first+4))
+                    T[T_name].append((first+2, first+3))
+                    T[T_name].append((first+2, first+4))
+                elif cdft_occ == mode[4]:
+                    T[T_name].append((first+1, first+3))
+                    T[T_name].append((first+1, first+4))
+                    T[T_name].append((first+1, first+5))
+                    T[T_name].append((first+2, first+3))
+                    T[T_name].append((first+2, first+4))
+                    T[T_name].append((first+2, first+5))
+                else:
+                    T[T_name] = None
+            T_up, T_dn = None, None
+            if T["up"]:
+                T_up = tuple(T["up"])
+            if T["dn"]:
+                T_dn = tuple(T["dn"])
+            return T_up, T_dn
+        self.input_df["up_TDM_input"] = self.input_df.loc[self.input_df["task_label"] == "CDFT-B-HSE_scf"].apply(
+            lambda x: fun(x)[0], axis=1)
+        self.input_df["dn_TDM_input"] = self.input_df.loc[self.input_df["task_label"] == "CDFT-B-HSE_scf"].apply(
+            lambda x: fun(x)[1], axis=1)
 
 class CDFT:
     def __init__(self):
@@ -1200,7 +1248,10 @@ class CDFT:
     def get_data_sheet(self):
         es = self.cdft_db.collection.find()
         data = {"prototype": [], "pc_from": [], "gs_taskid": [], "task_id": [], "defect_name": [],
-                "charge_state":[], "up_cdft_occ":[],"dn_cdft_occ": [], "task_label":[], "energy": []}
+                "charge_state":[], "up_cdft_occ":[],"dn_cdft_occ": [], "task_label":[], "energy": [],
+                "up_TDM_sq_X": [], "up_TDM_sq_Y": [], "up_TDM_sq_Z": [],
+                "dn_TDM_sq_X": [], "dn_TDM_sq_Y": [], "dn_TDM_sq_Z": []
+        }
         for e in es:
             print(e["task_id"])
             gs_taskid = int(e["source_entry"].split("/")[-1])
@@ -1216,6 +1267,15 @@ class CDFT:
             data["gs_taskid"].append(gs_taskid)
             data["task_label"].append(e["task_label"])
             data["energy"].append(e["output"]["energy"])
+            for idx, component in enumerate(["X", "Y", "Z"]):
+                try:
+                    data["up_TDM_sq_{}".format(component)].append(e["TDM_transition"]["up_TDM_squared"][idx])
+                except Exception:
+                    data["up_TDM_sq_{}".format(component)].append(0)
+                try:
+                    data["dn_TDM_sq_{}".format(component)].append(e["TDM_transition"]["dn_TDM_squared"][idx])
+                except Exception:
+                    data["dn_TDM_sq_{}".format(component)].append(0)
 
         for gs in self.cdft_db.collection.distinct("source_entry"):
             gs_taskid = int(gs.split("/")[-1])
@@ -1231,44 +1291,48 @@ class CDFT:
             data["task_label"].append("CDFT-A-HSE_scf")
             gs_energy = gs_e["output"]["energy"]
             data["energy"].append(gs_energy)
+            for idx, component in enumerate(["X", "Y", "Z"]):
+                data["up_TDM_sq_{}".format(component)].append(None)
+                data["dn_TDM_sq_{}".format(component)].append(None)
 
-        print(data)
         df = pd.DataFrame(data)
         self.foundation_df = df
-        IOTools(cwd=save_xlsx_path, pandas_df=df).to_excel("hse_screened_qubit_cdft_2021-11-18")
+        IOTools(cwd=os.path.join(DB1_PATH, save_xlsx_path), pandas_df=df).to_excel("hse_screened_qubit_cdft_2021-11-18")
         return df
 
     def get_zpl_data(self, excel_file=None):
         df = self.foundation_df.copy() if not excel_file else IOTools(cwd=input_path, excel_file=excel_file).read_excel()
         data = {"gs_taskid":[], "prototype": [], "host": [], "defect":[], "charge": [], "AB": [],
-        "BC": [], "CD": [], "DA": [], "ZPL": []}
+                "BC": [], "CD": [], "DA": [], "ZPL": [],
+                "up_TDM_sq_X": [], "up_TDM_sq_Y": [], "up_TDM_sq_Z": [],
+                "dn_TDM_sq_X": [], "dn_TDM_sq_Y": [], "dn_TDM_sq_Z": []
+        }
 
         for src_taskid in df["gs_taskid"].unique():
             print(src_taskid)
-            entry = df.loc[df["gs_taskid"]==src_taskid]
-            up_occ = entry["up_cdft_occ"].unique().tolist()
+            base_entry = df.loc[df["gs_taskid"]==src_taskid]
+            up_occ = base_entry["up_cdft_occ"].unique().tolist()
             up_occ.remove('ground-state')
-            dn_occ = entry["dn_cdft_occ"].unique().tolist()
+            dn_occ = base_entry["dn_cdft_occ"].unique().tolist()
             dn_occ.remove("ground-state")
 
             for up_cdft_occ, dn_cdft_occ in zip(up_occ, dn_occ):
+                entry = base_entry.loc[(base_entry["up_cdft_occ"] == up_cdft_occ) &
+                                       (base_entry["dn_cdft_occ"] == dn_cdft_occ), :].copy()
                 try:
-                    A = entry.loc[(entry["task_label"] == "CDFT-A-HSE_scf"), "energy"].iloc[0]
+                    A = base_entry.loc[(base_entry["task_label"] == "CDFT-A-HSE_scf"), "energy"].iloc[0]
                 except Exception:
                     A = None
                 try:
-                    B = entry.loc[(entry["task_label"] == "CDFT-B-HSE_scf") & (entry["up_cdft_occ"] == up_cdft_occ) &
-                        (entry["dn_cdft_occ"] == dn_cdft_occ), "energy"].iloc[0]
+                    B = entry.loc[(entry["task_label"] == "CDFT-B-HSE_scf"), "energy"].iloc[0]
                 except Exception:
                     B = None
                 try:
-                    C = entry.loc[(entry["task_label"] == "CDFT-C-HSE_relax") & (entry["up_cdft_occ"] == up_cdft_occ) &
-                                  (entry["dn_cdft_occ"] == dn_cdft_occ), "energy"].iloc[0]
+                    C = entry.loc[(entry["task_label"] == "CDFT-C-HSE_relax"), "energy"].iloc[0]
                 except Exception:
                     C = None
                 try:
-                    D = entry.loc[(entry["task_label"] == "CDFT-D-HSE_scf") & (entry["up_cdft_occ"] == up_cdft_occ) &
-                                  (entry["dn_cdft_occ"] == dn_cdft_occ), "energy"].iloc[0]
+                    D = entry.loc[(entry["task_label"] == "CDFT-D-HSE_scf"), "energy"].iloc[0]
                 except Exception:
                     D = None
 
@@ -1282,17 +1346,129 @@ class CDFT:
                 data["host"].append(entry["pc_from"].iloc[0].split("-")[0])
                 data["defect"].append(entry["defect_name"].iloc[0])
                 data["charge"].append(entry["charge_state"].iloc[0])
-                print(data)
+
+                for idx, component in enumerate(["X", "Y", "Z"]):
+                    data["up_TDM_sq_{}".format(component)].append(
+                        entry.loc[(entry["task_label"] == "CDFT-B-HSE_scf"), "up_TDM_sq_{}".format(component)].iloc[0])
+                    data["dn_TDM_sq_{}".format(component)].append(
+                        entry.loc[(entry["task_label"] == "CDFT-B-HSE_scf"), "dn_TDM_sq_{}".format(component)].iloc[0])
+
+        def calculate_TDM_rate(TDM_sq, E, refractive_index=1):
+            TDM_rate = refractive_index * E**3 * TDM_sq / 3 / PI / _eps0 / _c**3 / (_hplanck/(2*PI))**4
+            return TDM_rate*1e-6
+
         result_df = pd.DataFrame(data)
+
+        for spin in ["up", "dn"]:
+            for component in ["X", "Y", "Z"]:
+                result_df["{}_TDM_rate_{}".format(spin, component)] = \
+                    calculate_TDM_rate(result_df["{}_TDM_sq_{}".format(spin, component)], result_df["ZPL"]*EVTOJ)
+
+        result_df["total_TDM_rate"] = sum([result_df["{}_TDM_rate_{}".format(spin, component)]
+                                                     for spin in ["up", "dn"] for component in ["X", "Y", "Z"]])
+        result_df.drop(["up_TDM_sq_{}".format(component) for component in ["X", "Y", "Z"]], axis=1, inplace=True)
+        result_df.drop(["dn_TDM_sq_{}".format(component) for component in ["X", "Y", "Z"]], axis=1, inplace=True)
+
         result_df["ZPL_wavelength"] = result_df.agg(lambda x: 12400/x["ZPL"]/10 if x["ZPL"] else None, axis=1)
         result_df = result_df.round(3)
-        result_df["valid"] = result_df.agg(lambda x: True if x["AB"]>=0 and x["BC"]>=0 and x["CD"]>=0 and x["DA"]>=0
-        else False,
-                                           axis=1)
-        result_df.fillna("None", inplace=True)
+        result_df["valid"] = result_df.agg(
+            lambda x: True if (x["AB"]>=0 and x["BC"]>=0 and x["CD"]>=0 and x["DA"]>=0) else False, axis=1)
         result_df.sort_values(["valid", "ZPL"], inplace=True, ascending=False)
+        result_df.fillna("None", inplace=True)
         return result_df
+
+
+class COHP:
+    # LOBSTER_DB = get_db("HSE_triplets_from_Scan2dDefect", "lobster",  user="Jeng_ro", password="qimin", port=12347)
+    LOBSTER_DB = get_db("Scan2dDefect", "lobster",  user="Jeng_ro", password="qimin", port=12347)
+
+    @classmethod
+    def find_label_in_cohp(cls, completecohp, nn, defect_type="antisite"):
+        nn_pair = None
+        if defect_type == "antisite":
+            nn_pair = [{nn[-1], i} for i in nn] # for antisite NN[-1] only
+        elif defect_type == "vacancy":
+            nn_pair = [{i, j} for i in nn for j in nn] # for vacancy
+
+        label_list = []
+        for label, cohp_pair in completecohp.bonds.items():
+            sites_index = tuple(completecohp.structure.sites.index(site) for site in cohp_pair["sites"])
+            if set(sites_index) in nn_pair:
+                print(label, cohp_pair["length"])
+                label_list.append(label)
+        return label_list
+
+    @classmethod
+    def analysis(cls):
+        from pymatgen.electronic_structure.cohp import CompleteCohp
+        from pymatgen.electronic_structure.plotter import CohpPlotter
+        from pymatgen.electronic_structure.core import Orbital
+
+        def orbital_resolved(label, orbitals):
+            #search for the number of the COHP you would like to plot in ICOHPLIST.lobster (the numbers in COHPCAR.lobster are different!)
+            label = str(label)
+            cp = CohpPlotter()
+            #get a nicer plot label
+            plotlabel=str(completecohp.bonds[label]['sites'][0].species_string)+'-'+str(completecohp.bonds[label]['sites'][1].species_string+"{}".format(orbitals))
+
+            cp.add_cohp(plotlabel,completecohp.get_orbital_resolved_cohp(label=label, orbitals=orbitals))
+            #check which COHP you are plotting
+
+            print("This is a COHP between the following sites: "+str(completecohp.bonds[label]['sites'][0])+' and '+ str(completecohp.bonds[label]['sites'][1]))
+
+            x = cp.get_plot(integrated=False)
+            x.ylim([-5, 5])
+            x.show()
+
+        def sum_lobster_orbitals(lobster_list, orbitals, plot_label):
+            cp = CohpPlotter()
+            #"W75-W50+W55+W56 bonds"
+            cp.add_cohp(plot_label, completecohp.get_summed_cohp_by_label_and_orbital_list(lobster_list, orbitals))
+            x = cp.get_plot(integrated=False)
+            x.ylim([-5, 5])
+            x.show()
+
+        def summed(completecohp, lobster_list, plot_label, title, is_coop):
+            cp = CohpPlotter(are_coops=is_coop)
+            # get a nicer plot label
+            cp.add_cohp(plot_label, completecohp.get_summed_cohp_by_label_list(label_list=lobster_list, divisor=1))
+            x = cp.get_plot(integrated=False, ylim=[-5, 5])
+            x.legend(loc="upper right")
+            # x.ylim([-5, 5])
+            # x.xlim([-1, 1])
+            x.title(title, fontsize=20)
+            # x.savefig("{}.png".format(title))
+            x.show()
+
+        for lobster in cls.LOBSTER_DB.collection.find({"task_id": {"$in": [6194, 6195]}}):
+            is_coop = True
+            if is_coop:
+                f = "COOPCAR.lobster.gz"
+            else:
+                f = "COHPCAR.lobster.gz"
+            dir_name = lobster["dir_name"]
+            print(dir_name)
+            os.chdir(dir_name)
+            subprocess.call(["gunzip", "POSCAR.gz"])
+            completecohp = CompleteCohp.from_file(fmt="LOBSTER", filename=f,
+                                                  structure_file="POSCAR", are_coops=is_coop)
+            label_list = cls.find_label_in_cohp(completecohp, lobster["NN"])
+            summed(completecohp, label_list, "{}".format(lobster["NN"]), "{}".format(lobster["prev_fw_taskid"]),
+                   is_coop=is_coop)
+    # @classmethod
+    # def scp_COHP_diagram(cls):
+    #     for lobster in cls.LOBSTER_DB.collection.find({}):
+    #         dir_name = lobster["dir_name"]
+    #         title = lobster["prev_fw_taskid"]
+    #         print(dir_name)
+    #         subprocess.call(["scp", dir_name+"/{}.png".format(title)])
+
 def main():
+    # a = Defect(defect_xlsx="hse_screened_qubit_cdft_2021-11-18_2022-01-09")
+    # back_process = BackProcess(a.defect_df)
+    # back_process.add_tdm_input()
+    # back_process.df_to_excel(excel_name="test")
+
     # a = Defect(defect_xlsx="defect_2021-11-18_2022-01-10")
     # a = Defect()
     # a.get_defect_df_v2_hse()
@@ -1304,9 +1480,9 @@ def main():
     # back_process.add_hse_fworker()
     # back_process.df_to_excel(excel_name="hse_screened_qubit_2021-11-18")
 
-    a = Defect(defect_xlsx="defect_2021-11-18")
-    screened = a.get_screened_defect_df()
-    IOTools(cwd=save_xlsx_path, pandas_df=screened).to_excel("triplet_2021-11-18.xlsx")
+    # a = Defect(defect_xlsx="defect_2021-11-18")
+    # screened = a.get_screened_defect_df()
+    # IOTools(cwd=save_xlsx_path, pandas_df=screened).to_excel("triplet_2021-11-18.xlsx")
 
     # a.statistics(screened_df)
     # a.get_host_df()
@@ -1314,8 +1490,11 @@ def main():
     # a.get_defect_df()
     # a.get_defect_df_gp(screened, "triplet_max-tran_gp_2021-11-18")
 
-    # a = Defect(defect_xlsx="hse_screened_qubit_2021-11-18_2022-01-10")
-    # Defect.bar_plot_defect_levels_v2(a.defect_df)
+    a = Defect(defect_xlsx="hse_screened_qubit_2021-11-18")
+    defect_df = a.defect_df.copy()
+    for i in [[162, 575, 151, 182, 171, 186, 211, 229, 196]]:
+        df = defect_df.loc[defect_df["task_id"].isin(i)]
+        Defect.bar_plot_defect_levels_v2(df)
 #
 if __name__ == '__main__':
     df = main()
@@ -1334,4 +1513,8 @@ if __name__ == '__main__':
     # cdft.update_entry_with_occ()
     # cdft.get_data_sheet()
     # df1 = cdft.get_zpl_data()
-    # IOTools(cwd=save_xlsx_path, pandas_df=df1).to_excel("hse_screened_qubit_cdft_zpl_2021-11-18")
+    # IOTools(cwd=os.path.join(DB1_PATH, save_xlsx_path), pandas_df=df1).to_excel("hse_screened_qubit_cdft_zpl_2021-11-18")
+
+    # Tools.extract_defect_levels_v2_hse(1313)
+    # COHP.analysis()
+
