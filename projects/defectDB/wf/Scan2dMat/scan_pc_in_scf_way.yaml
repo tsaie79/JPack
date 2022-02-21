@@ -24,7 +24,7 @@ fireworks:
 
   - fw: my_atomate_jyt.vasp.fireworks.NonSCFFW
     params:
-      parents: 1
+      parents: 0
       name: SCAN_nscf
       mode: line
       additional_files: ["WAVECAR"]
@@ -49,7 +49,7 @@ fireworks:
   - fw: atomate.vasp.fireworks.NonSCFFW
     params:
       name: SCAN_nscf
-      parents: 1
+      parents: 0
       mode: uniform
       additional_files: ["WAVECAR"]
       input_set_overrides:
@@ -73,10 +73,10 @@ fireworks:
   - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
     params:
       name: irvsp
-      parents: 2
+      parents: 1
       kpt_mode: all
       symprec: 0.001
       irvsptodb_kwargs:
-        collection_name: ir_data
+        collection_name: scan_pc_in_scf_way
 
 
