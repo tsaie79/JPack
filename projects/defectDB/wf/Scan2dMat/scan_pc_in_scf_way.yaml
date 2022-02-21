@@ -1,0 +1,82 @@
+fireworks:
+  - fw: my_atomate_jyt.vasp.fireworks.ScanStaticFW
+    params:
+      name: SCAN_scf
+      force_gamma: True
+      vasp_input_set_params:
+        user_incar_settings:
+          ALGO: All
+          ENCUT: 800
+          ISPIN: 2
+          LAECHG: False
+          EDIFF: 1e-05
+          ISMEAR: 0
+          LCHARG: True
+          LWAVE: True
+          SIGMA: 0.05
+          METAGGA: R2Scan
+      vasptodb_kwargs:
+        additional_fields:
+          task_type: ScanStaticFW
+        parse_dos: False
+        parse_eigenvalues: False
+        parse_chgcar: False
+
+  - fw: my_atomate_jyt.vasp.fireworks.NonSCFFW
+    params:
+      parents: 1
+      name: SCAN_nscf
+      mode: line
+      additional_files: ["WAVECAR"]
+      input_set_overrides:
+        other_params:
+          user_incar_settings:
+            ISTART: 1
+            ICHARG: 1
+            ALGO: All
+            ENCUT: 800
+            EDIFF: 1e-5
+            ISPIN: 2
+            LWAVE: True
+            LCHARG: False
+            LAECHG: False
+            LVHAR: True
+            ISMEAR: 0
+            SIGMA: 0.05
+            ISYM: 2
+            METAGGA: R2Scan
+
+  - fw: atomate.vasp.fireworks.NonSCFFW
+    params:
+      name: SCAN_nscf
+      parents: 1
+      mode: uniform
+      additional_files: ["WAVECAR"]
+      input_set_overrides:
+        nedos: 0
+        other_params:
+          user_incar_settings:
+            ISTART: 1
+            ICHARG: 1
+            ALGO: All
+            ENCUT: 800
+            EDIFF: 1e-5
+            ISPIN: 2
+            LWAVE: False
+            LCHARG: False
+            LAECHG: False
+            LVHAR: True
+            ISMEAR: 0
+            SIGMA: 0.05
+            METAGGA: R2Scan
+
+  - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
+    params:
+      name: irvsp
+      parents: 2
+      kpt_mode: all
+      symprec: 0.001
+      irvsptodb_kwargs:
+        collection_name: ir_data
+
+
