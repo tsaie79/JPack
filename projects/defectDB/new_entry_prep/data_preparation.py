@@ -10,7 +10,11 @@ C2DB_IR_calc_data = get_db("C2DB_IR", "calc_data", user="Jeng", password="qimin"
 C2DB_IR_ir_data = get_db("C2DB_IR", "ir_data", user="Jeng_ro", password="qimin", port=12345)
 C2DB = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=12345)
 
+"""
+Prepare the data for the new entry in the database, and then to update the database.
+Generate tables for the new entry.
 
+"""
 class DataPrepHost:
     @classmethod
     def sym_data(cls):
@@ -347,21 +351,33 @@ class GenerateDefectTable(BackProcess):
         self.df_to_excel(excel_name="test")
 
 
+def main():
+    # define a function that updates c2db_ir_calc_data with the new data
+    def update_c2db_ir_calc_data():
+        DataPrepHost.sym_data()
+        DataPrepHost.band_edge()
+        DataPrepHost.site_oxi_state()
+        DataPrepHost.cp_c2db_info()
+
+    # define a function to generate a table of defects
+    def get_defect_table():
+        DataPrepDefect.cp_symdata_bandedges()
+        DataPrepDefect.is_site_sym_uniform()
+        DataPrepDefect.cp_site_oxi_state()
+
+        antisite_tmd = {
+            "task_label": "HSE_scf", "nupdown_set": 2,
+            "pc_from":
+                {
+                    "$in": ["owls/mx2_antisite_pc/{}".format(taskid) for taskid in [3091, 3083, 3093, 3097, 3094, 3102]]
+                }
+        }
+        test = GenerateDefectTable(antisite_tmd)
+        test.get_defect_df_v2_hse()
+        test.backprocess()
+
+
 
 if __name__ == '__main__':
 
-    # DataPrepHost.sym_data()
-    # DataPrepHost.band_edge()
-    # DataPrepHost.site_oxi_state()
-    # DataPrepHost.cp_c2db_info()
-    #
-    DataPrepDefect.cp_symdata_bandedges()
-    DataPrepDefect.is_site_sym_uniform()
-    DataPrepDefect.cp_site_oxi_state()
-
-    antisite_tmd = {"task_label": "HSE_scf", "nupdown_set": 2, "pc_from": {"$in":
-            ["owls/mx2_antisite_pc/{}".format(taskid) for taskid in [3091, 3083, 3093, 3097, 3094, 3102]]
-    }}
-    test = GenerateDefectTable(antisite_tmd)
-    test.get_defect_df_v2_hse()
-    test.backprocess()
+    main()
