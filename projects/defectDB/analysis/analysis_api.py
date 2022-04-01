@@ -9,12 +9,16 @@ from IPython.display import display
 from subprocess import check_output
 from pymatgen.io.vasp.outputs import Wavecar
 from pymatgen.io.vasp.inputs import Poscar, Element
+from pathlib import Path
 
-os.chdir("/Users/jeng-yuantsai/anaconda3/envs/workflow/lib/python3.7/site-packages/JPack_independent/projects/defectDB")
+from JPack_independent.projects.defectDB.analysis.data_analysis import Defect
 
-input_path = "analysis/input"
-save_xlsx_path = "analysis/output/xlsx"
-save_plt_path = "analysis/output/plt"
+MODULE_DIR = Path(__file__).resolve().parent
+# This is neccessary for importing this module, while when running this module in shell, comment it first.
+
+input_path = os.path.join(MODULE_DIR, "input")
+save_xlsx_path = os.path.join(MODULE_DIR, "output/xlsx")
+save_plt_path = os.path.join(MODULE_DIR, "output/plt")
 
 defect_df = IOTools(cwd=input_path, excel_file="defect_2021-11-18_2022-01-10").read_excel()
 triplet_df = IOTools(cwd=input_path, excel_file="triplet_2021-11-18").read_excel()
@@ -23,33 +27,51 @@ hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2021-11-18").read_e
 hse_screened_qubit_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_2021-11-18").read_excel()
 hse_screened_qubit_cdft_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_cdft_2021-11-18_2022-01-31").read_excel()
 hse_screened_qubit_cdft_zpl_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_cdft_zpl_2021-11-18_2022-01-31").read_excel()
+defects_36_groups_df = IOTools(cwd=input_path, excel_file="defects_36_groups_2022-03-07").read_excel()
+defects_36_groups_zpl_zfs_df = IOTools(cwd=input_path, excel_file="defects_36_groups_zpl_zfs").read_excel()
 
-os.environ["PATH"] += os.pathsep + "/Library/TeX/texbin/latex"
-plt.style.use(["science", "nature", "light"])
+# os.environ["PATH"] += os.pathsep + "/Library/TeX/texbin/latex"
+# plt.style.use(["science", "nature", "light"])
+
 
 class Toolbox:
     @classmethod
-    def get_defect_st_and_wavecar(cls):
+    def get_poscar_and_wavecar(cls, taskid):
         from qubitPack.tool_box import get_db
         col = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347).collection
-
         def scp(taskid):
             for i in col.find({"task_id": taskid}):
                 task_id = i["task_id"]
                 dir_name = i["dir_name"].split("/")[-1]
                 os.makedirs(os.path.join("structures", str(task_id)), exist_ok=True)
-                for f in ["POSCAR"]:
-                    check_output("scp -P 12348 qimin@localhost:{}/{}/{}.gz structures/{}/".format("/mnt/sdc/tsai/Research/projects/backup/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc", dir_name, f, task_id).split(" "))
+                for f in ["POSCAR", "WAVECAR"]:
+                    check_output("scp -P 12348 qimin@localhost:{}/{}/{}.gz structures/{}/".format(
+                        "/mnt/sdc/tsai/Research/projects/backup/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc",
+                        dir_name, f, task_id).split(" "))
+        scp(taskid)
+    @classmethod
+    def get_parcharg(cls, taskid, band, spin):
+        try:
+            check_output("gunzip structures/{}/WAVECAR.gz".format(taskid).split(" "), input=b"Y")
+            check_output("gunzip structures/{}/POSCAR.gz".format(taskid).split(" "), input=b"Y")
+        except Exception:
+            pass
+        wv = Wavecar("structures/{}/WAVECAR".format(taskid))
+        wv.get_parchg(Poscar.from_file("structures/{}/POSCAR".format(taskid)), 0, band-1, spin, phase=True).\
+            write_file("structures/{}/{}-{}_spin-{}.vasp".format(taskid, taskid, band, spin))
+        check_output("open structures/{}/{}-{}_spin-{}.vasp".format(taskid, taskid, band, spin).split(" "))
 
-        def get_chg(taskid, band, spin=1):
-            try:
-                check_output("gunzip structures/{}/WAVECAR.gz".format(taskid).split(" "), input=b"Y")
-                check_output("gunzip structures/{}/POSCAR.gz".format(taskid).split(" "), input=b"Y")
-            except Exception:
-                pass
-            wv = Wavecar("structures/{}/WAVECAR".format(taskid))
-            wv.get_parchg(Poscar.from_file("structures/{}/POSCAR".format(taskid)), 0, band-1, spin, phase=True).write_file("structures/{}/{}-{}_spin-{}.vasp".format(task_id, taskid, band, spin))
-            check_output("open structures/{}/{}-{}_spin-{}.vasp".format(taskid, taskid, band, spin).split(" "))
+
+    @classmethod
+    def plot_defect_levels(cls, task_ids, is_hse):
+        if is_hse == "36_group":
+            df = defects_36_groups_df.copy()
+            print(df.count())
+        elif is_hse is True:
+            df = hse_qubit_df.copy()
+        else:
+            df = defect_df.copy()
+        Defect.bar_plot_defect_levels_v2(df.loc[df["task_id"].isin(task_ids)])
 
     @classmethod
     def coop_query(cls):
@@ -81,17 +103,33 @@ class Task1:
     """
     def __init__(self, df=defect_df):
         self.df = df
-        self.grouping = ["prototype", "pmg_spg", "pmg_pg", "uid", "reduced_site_sym", "reduced_site_specie",
+        self.grouping = ["prototype", "pmg_spg", "pmg_pg", "uid", "host_taskid", "reduced_site_sym",
+                         "reduced_site_specie",
                          "charge", "defect_type", "defect_name", "mag", "level_cat"]
         # grouping.extend(["vbm_max_el", "cbm_max_el", "vbm_max_proj_orbital", "cbm_max_proj_orbital", "level_edge_ir"])
 
-    def get_cat_gp(self, charge=(0,), level_gap=4, level_cat=("2", "2'"), mag=None, defect_type=None, halogenide=None):
+    def get_cat_gp(self, prototype=None, chemsys=None, c2db_uid=None, charge=None, level_gap=0, level_cat=None,
+                   mag=None, defect_type=None, halogenide=None):
         """
         Stats for neutral defects that are composed by antisites and vacancies from cat 2 and 2'
         :return:
         """
-        df = self.df.loc[(self.df["level_cat"].isin(level_cat)) &
-                         (self.df["charge"].isin(charge))]
+        df = self.df
+        if chemsys:
+            df = df.loc[df["chemsys"].isin(chemsys)]
+
+        if prototype:
+            df = df.loc[df["prototype"].isin(prototype)]
+
+        if c2db_uid:
+            df = df.loc[df["uid"].isin(host)]
+
+        if charge:
+            df = df.loc[df["charge"].isin(charge)]
+
+        if level_cat:
+            df = df.loc[df["level_cat"].isin(level_cat)]
+
         if mag:
             df = df.loc[df["mag"].isin(mag)]
 
@@ -110,7 +148,9 @@ class Task1:
         df = df.loc[df["level_gap"] >= level_gap]
         df.fillna("None", inplace=True)
 
-        df_gp = df.groupby(self.grouping).agg({"task_id": "unique", "level_gap": "unique", "mag": "unique"})
+        df_gp = df.groupby(self.grouping).agg({"task_id": "unique", "level_gap": "unique", "gap_hse_nosoc": "unique",
+                                               "gap_hse": "unique", "mag": "unique",}) #"localisation_threshold":
+        # "unique"})
         # IOTools(cwd="output_excel", pandas_df=df_gp).to_excel("task-1_neutral_cat2-2'_defect-gp_2021-11-18", index=True)
         return df_gp
 
@@ -193,10 +233,14 @@ class Task3Qubit:
         df = self.df.copy()
 
         def add_chemsys(x):
-            gs_taskid = x["gs_taskid"]
+            try:
+                gs_taskid = x["task_id"]
+            except:
+                gs_taskid = x["gs_taskid"]
+
             chemsys = hse_screened_qubit_df.loc[hse_screened_qubit_df["task_id"] == gs_taskid, "chemsys"].iloc[0]
             return chemsys
-        df["chemsys"] = df.apply(lambda x: add_chemsys(x), axis=1)
+        # df["chemsys"] = df.apply(lambda x: add_chemsys(x), axis=1)
 
         def add_host_d_f_nature(x):
             chemsys = x["chemsys"]
@@ -210,11 +254,14 @@ class Task3Qubit:
                     break
             return is_host_d_f_element
         # df = df.loc[~df["defect"].str.contains("vac")]
-        df["host_has_d_f_element"] = df.apply(lambda x: add_host_d_f_nature(x), axis=1)
+        # df["host_has_d_f_element"] = df.apply(lambda x: add_host_d_f_nature(x), axis=1)
 
         def add_zfs_data(x):
             zfs_collection = get_db("HSE_triplets_from_Scan2dDefect", "zfs_data-pbe_pc", port=12347).collection
-            gs_taskid = x["gs_taskid"]
+            try:
+                gs_taskid = x["task_id"]
+            except:
+                gs_taskid = x["gs_taskid"]
             zfs_e = zfs_collection.find_one({"prev_fw_taskid": gs_taskid})
             D, E = "None", "None"
             try:
@@ -254,7 +301,7 @@ class Task3Qubit:
 
         :return:
         """
-        df = self.data_preparation()
+        df = self.data_preparation
         df = df.loc[(df["zfs_D"] != "None") & (df["zfs_E"] != "None")]
 
         df["zfs_D"] = df.apply(lambda x: round(x["zfs_D"]/1000, 2), axis=1)
@@ -334,7 +381,7 @@ class Task3Emitter(Task3Qubit):
             4. host_has_d_f_element is FALSE
         :return:
         """
-        df = self.data_preparation()
+        df = self.data_preparation
         df = df.loc[(df["zfs_D"] != "None") & (df["zfs_E"] != "None")]
         df["zfs_D"] = df.apply(lambda x: round(x["zfs_D"]/1000, 2), axis=1)
         df["ZPL_wavelength"] = df.apply(lambda x: round(x["ZPL_wavelength"]), axis=1)
@@ -379,9 +426,7 @@ class Task5(Task3Qubit):
     def __init__(self):
         super(Task5, self).__init__()
 
-    @property
-    def data_preparation(self):
-        df = self.df.copy()
+    def extra_data_preparation(self, df):
         df["source-specie"] = df.apply(
             lambda x: hse_screened_qubit_df.loc[
                 hse_screened_qubit_df["task_id"] == x["gs_taskid"], "level_source_specie"].iloc[0], axis=1)
@@ -396,6 +441,7 @@ class Task5(Task3Qubit):
 
     def get_zpl_plots(self, non_source_group):
         df = self.data_preparation
+        df = self.extra_data_preparation(df)
         zpl_df = df.loc[(df["ZPL"] <= 15)]
 
         zpl_df = zpl_df.loc[zpl_df["non-source-group"] == non_source_group]
@@ -469,7 +515,8 @@ class Task5(Task3Qubit):
         zfs_df = zfs_df.loc[zfs_df["non-source-group"] == non_source_group]
         zfs_df["zfs_D"] = zfs_df.apply(lambda x: round(abs(x["zfs_D"]/1000), 2), axis=1)
 
-        display(zfs_df.groupby(["source-group", "Z", "prototype", "host","defect", "source-specie", "non-source-specie"]).agg({"gs_taskid": ["unique", "count"], "zfs_D": "unique"}))
+        display(zfs_df.groupby(["source-group", "Z", "prototype", "host","defect",
+                                "source-specie", "non-source-specie"]).agg({"gs_taskid": ["unique", "count"], "zfs_D": "unique"}))
 
         groups = zfs_df["source-group"].unique().tolist()
 
@@ -689,7 +736,8 @@ class Task6(Task3Qubit):
             y_f = lambda x, a, b: a*x+b
             popt, pcov = curve_fit(y_f, x_data, y_data, p0=(0, 0))
             print(popt, pcov)
-            ax.plot(np.linspace(min(x_data), max(x_data), 100), [y_f(x, popt[0], popt[1]) for x in np.linspace(min(x_data), max(x_data), 100)], color="r")
+            ax.plot(np.linspace(min(x_data), max(x_data), 100),
+                    [y_f(x, popt[0], popt[1]) for x in np.linspace(min(x_data), max(x_data), 100)], color="r")
 
             ax = axes[idx][1]
             im = ax.imshow(np.abs(pcov))
@@ -789,3 +837,48 @@ class Task6(Task3Qubit):
             im = ax.imshow(np.abs(pcov))
             fig.colorbar(im, ax=ax, orientation='vertical')
         plt.show()
+
+class Defect36Group:
+    def __init__(self, df=defects_36_groups_df):
+        self.df = df
+
+    @property
+    def data_preparation(self):
+        df = self.df.copy()
+        def add_zfs_data(x):
+            zfs_collection = get_db("HSE_triplets_from_Scan2dDefect", "zfs_data-pbe_pc", port=12347).collection
+            try:
+                gs_taskid = x["task_id"]
+            except:
+                gs_taskid = x["gs_taskid"]
+            zfs_e = zfs_collection.find_one({"prev_fw_taskid": gs_taskid})
+            D, E = "None", "None"
+            try:
+                D, E = zfs_e["pyzfs_out"]["D"], zfs_e["pyzfs_out"]["E"]
+            except Exception:
+                print(gs_taskid)
+            return D, E
+
+
+        def add_gap_diff():
+            db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan")
+            for uid in df["uid"].unique():
+                print(uid)
+                gap_hse = db.collection.find_one({"uid": uid})["gap_hse"]
+                gap_hse_nosoc = db.collection.find_one({"uid": uid})["gap_hse_nosoc"]
+                df.loc[df["uid"] == uid, "gap_hse"] = gap_hse
+                df.loc[df["uid"] == uid, "gap_hse_nosoc"] = gap_hse_nosoc
+                df.loc[df["uid"] == uid, "gap_diff"] = df.loc[df["uid"] == uid, "level_gap"] - gap_hse_nosoc
+            df["gap_diff"] = df["gap_diff"].round(3)
+            return df
+
+        df = add_gap_diff()
+        df["zfs_D"] = df.apply(lambda x: add_zfs_data(x)[0], axis=1)
+        df["zfs_E"] = df.apply(lambda x: add_zfs_data(x)[1], axis=1)
+        return df
+
+if __name__ == '__main__':
+    task3 = Task6()
+
+
+

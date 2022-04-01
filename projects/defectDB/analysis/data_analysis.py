@@ -1,7 +1,7 @@
 import os, subprocess, datetime
 
 # from analysis.deep_defect import Potential
-
+from qubitPack.defect_formation_energy_correction.defect_formation_2d_corr import FormationEnergy2D
 from qubitPack.tool_box import get_db, get_band_edges_characters, get_unique_sites_from_wy, get_good_ir_sites
 from qubitPack.tool_box import IOTools
 
@@ -25,7 +25,7 @@ SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", 
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dIR = get_db("Scan2dDefect", "ir_data", port=12347)
 
-HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347)
+HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347, user="Jeng")
 HSEQubitIR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data-pbe_pc", port=12347)
 HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12347, user="Jeng")
 
@@ -105,7 +105,7 @@ class Tools:
                 "all",
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
-                0.2,  #0.2
+                0.05,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
                 edge_tol=(0.25, 0.25),
@@ -122,7 +122,7 @@ class Tools:
         return level_info, levels, defect_levels
 
     @classmethod
-    def extract_defect_levels_v2_hse(cls, defect_taskid):
+    def extract_defect_levels_v2_hse(cls, defect_taskid, localisation=0.2):
         from qubitPack.qc_searching.analysis.main import get_defect_state_v3
         from qubitPack.tool_box import get_db
 
@@ -141,13 +141,15 @@ class Tools:
                 {"task_id": defect_taskid},
                 -10, 10,
                 None,
-                "all",
+                None, #all
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
-                0.2,  #0.2
+                localisation,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
-                edge_tol=(-0.025, -0.025), # defect state will be picked only if it's above vbm by 0.025 eV and below
+                edge_tol= (1, 1), # defect state will be picked only if it's above vbm by
+                # 0.025 eV
+            # and below
                 # cbm by 0.025 eV
                 ir_db=ir_db,
                 ir_entry_filter={"prev_fw_taskid": defect_taskid},
@@ -372,10 +374,10 @@ class Defect:
         print(os.getcwd())
         IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("defect")
 
-    def get_defect_df_v2_hse(self):
+    def get_defect_df_v2_hse(self, condition=None):
         data = []
         col = HSEQubitDefect.collection
-        condition = {"task_label": "HSE_scf", "nupdown_set": 2}
+        condition = {"task_label": "HSE_scf", "nupdown_set": 2} if condition is None else condition
         for e in list(col.find(condition))[:]:
             print(e["task_id"])
             e_from_scan = SCAN2dDefect.collection.find_one({"task_id": e["taskid_Scan2dDefect"]})
@@ -421,7 +423,16 @@ class Defect:
             for host_info in [host_c2db_info, host_band_edges, host_sym_data]:
                 info.update(host_info)
 
-            d_df, levels, in_gpa_levels = Tools.extract_defect_levels_v2_hse(e["task_id"])
+            localisation = None
+            if e["task_id"] in [575]:
+                localisation = 0.35
+            elif e["task_id"] in [1088, 2590, 585, 545, 571, 2563, 603, 644, ]:
+                localisation = 0.1
+            elif e["task_id"] in [605, 2569]:
+                localisation = 0.05
+            else:
+                localisation = 0.2
+            d_df, levels, in_gpa_levels = Tools.extract_defect_levels_v2_hse(e["task_id"], localisation=localisation)
 
             info.update(d_df)
             info.update(levels)
@@ -434,8 +445,7 @@ class Defect:
         self.defect_df.replace({"dn_tran_en": "None"}, 0, inplace=True)
 
         print(self.defect_df)
-        print(os.getcwd())
-        IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("hse_qubit")
+        # IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("defects_36_groups")
 
     def get_screened_defect_df(self):
         defect_df = self.defect_df.copy()
@@ -874,6 +884,7 @@ class Defect:
                 ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
                 ax.text(-0.1, 1.05, "{}-{}".format(uid, host_taskid), size=30, transform=ax.transAxes)
 
+                save_plt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/defect_qubit_in_36_group/code/plt"
                 os.makedirs(os.path.join(save_plt_path, set_prototype), exist_ok=True)
                 fig.savefig(
                     os.path.join(
@@ -1245,8 +1256,8 @@ class CDFT:
             )
 
 
-    def get_data_sheet(self):
-        es = self.cdft_db.collection.find()
+    def get_data_sheet(self, filter):
+        es = self.cdft_db.collection.find(filter)
         data = {"prototype": [], "pc_from": [], "gs_taskid": [], "task_id": [], "defect_name": [],
                 "charge_state":[], "up_cdft_occ":[],"dn_cdft_occ": [], "task_label":[], "energy": [],
                 "up_TDM_sq_X": [], "up_TDM_sq_Y": [], "up_TDM_sq_Z": [],
@@ -1271,14 +1282,15 @@ class CDFT:
                 try:
                     data["up_TDM_sq_{}".format(component)].append(e["TDM_transition"]["up_TDM_squared"][idx])
                 except Exception:
-                    data["up_TDM_sq_{}".format(component)].append(0)
+                    data["up_TDM_sq_{}".format(component)].append(None)
                 try:
                     data["dn_TDM_sq_{}".format(component)].append(e["TDM_transition"]["dn_TDM_squared"][idx])
                 except Exception:
-                    data["dn_TDM_sq_{}".format(component)].append(0)
+                    data["dn_TDM_sq_{}".format(component)].append(None)
 
-        for gs in self.cdft_db.collection.distinct("source_entry"):
-            gs_taskid = int(gs.split("/")[-1])
+        # get unique gs_taskid from es
+        gs_taskids = list(set(data["gs_taskid"]))
+        for gs_taskid in gs_taskids:
             gs_e = self.calc_db.collection.find_one({"task_id": gs_taskid})
             data["task_id"].append(gs_taskid)
             data["defect_name"].append(gs_e["defect_entry"]["name"])
@@ -1296,8 +1308,9 @@ class CDFT:
                 data["dn_TDM_sq_{}".format(component)].append(None)
 
         df = pd.DataFrame(data)
+        BackProcess(df).add_tdm_input()
         self.foundation_df = df
-        IOTools(cwd=os.path.join(DB1_PATH, save_xlsx_path), pandas_df=df).to_excel("hse_screened_qubit_cdft_2021-11-18")
+        # IOTools(cwd=os.path.join(DB1_PATH, save_xlsx_path), pandas_df=df).to_excel("hse_screened_qubit_cdft_2021-11-18")
         return df
 
     def get_zpl_data(self, excel_file=None):
@@ -1354,18 +1367,148 @@ class CDFT:
                         entry.loc[(entry["task_label"] == "CDFT-B-HSE_scf"), "dn_TDM_sq_{}".format(component)].iloc[0])
 
         def calculate_TDM_rate(TDM_sq, E, refractive_index=1):
-            TDM_rate = refractive_index * E**3 * TDM_sq / 3 / PI / _eps0 / _c**3 / (_hplanck/(2*PI))**4
-            return TDM_rate*1e-6
+            if TDM_sq is None or E is None:
+                return None
+            else:
+                TDM_rate = refractive_index * E**3 * TDM_sq / 3 / PI / _eps0 / _c**3 / (_hplanck/(2*PI))**4
+                return round(TDM_rate*1e-6, 3)
 
         result_df = pd.DataFrame(data)
 
         for spin in ["up", "dn"]:
             for component in ["X", "Y", "Z"]:
-                result_df["{}_TDM_rate_{}".format(spin, component)] = \
-                    calculate_TDM_rate(result_df["{}_TDM_sq_{}".format(spin, component)], result_df["ZPL"]*EVTOJ)
+                result_df["{}_TDM_rate_{}".format(spin, component)] = result_df.apply(
+                    lambda x: calculate_TDM_rate(x["{}_TDM_sq_{}".format(spin, component)], x["ZPL"]*EVTOJ)
+                    if x["{}_TDM_sq_{}".format(spin, component)] is not None and x["ZPL"] is not None else None, axis=1)
 
-        result_df["total_TDM_rate"] = sum([result_df["{}_TDM_rate_{}".format(spin, component)]
-                                                     for spin in ["up", "dn"] for component in ["X", "Y", "Z"]])
+                # result_df["{}_TDM_rate_{}".format(spin, component)] = \
+                #     calculate_TDM_rate(result_df["{}_TDM_sq_{}".format(spin, component)], result_df["ZPL"]*EVTOJ)
+
+        result_df["total_TDM_rate_up"] = sum([result_df["{}_TDM_rate_{}".format(spin, component)]
+                                              for spin in ["up"] for component in ["X", "Y", "Z"]])
+        result_df["total_TDM_rate_dn"] = sum([result_df["{}_TDM_rate_{}".format(spin, component)]
+                                              for spin in ["dn"] for component in ["X", "Y", "Z"]])
+
+        # iterate over all the rows
+        for idx, row in result_df.iterrows():
+            # get the up TDM rate
+            up_TDM_rate_X = row["up_TDM_rate_X"]
+            up_TDM_rate_Y = row["up_TDM_rate_Y"]
+            up_TDM_rate_Z = row["up_TDM_rate_Z"]
+            print("up_TDM_rate_X: {}".format(up_TDM_rate_X), "up_TDM_rate_Y: {}".format(up_TDM_rate_Y),
+                  "up_TDM_rate_Z: {}".format(up_TDM_rate_Z))
+            if up_TDM_rate_X != 0 and up_TDM_rate_Y == 0 and up_TDM_rate_Z == 0:
+                result_df.loc[idx, "up_polarization"] = "X"
+                result_df.loc[idx, "up_allowed"] = True
+                result_df.loc[idx, "up_transition"] =  True
+            elif up_TDM_rate_X == 0 and up_TDM_rate_Y != 0 and up_TDM_rate_Z == 0:
+                result_df.loc[idx, "up_polarization"] = "Y"
+                result_df.loc[idx, "up_allowed"] = True
+                result_df.loc[idx, "up_transition"] =  True
+            elif up_TDM_rate_X == 0 and up_TDM_rate_Y == 0 and up_TDM_rate_Z != 0:
+                result_df.loc[idx, "up_polarization"] = "Z"
+                result_df.loc[idx, "up_allowed"] = True
+                result_df.loc[idx, "up_transition"] =  True
+            elif up_TDM_rate_X != 0 and up_TDM_rate_Y != 0 and up_TDM_rate_Z == 0:
+                result_df.loc[idx, "up_polarization"] = "XY"
+                result_df.loc[idx, "up_allowed"] = True
+                result_df.loc[idx, "up_transition"] =  True
+            elif up_TDM_rate_X != 0 and up_TDM_rate_Y == 0 and up_TDM_rate_Z != 0:
+                result_df.loc[idx, "up_polarization"] = "XZ"
+                result_df.loc[idx, "up_allowed"] = True
+                result_df.loc[idx, "up_transition"] =  True
+            elif up_TDM_rate_X == 0 and up_TDM_rate_Y != 0 and up_TDM_rate_Z != 0:
+                result_df.loc[idx, "up_polarization"] = "YZ"
+                result_df.loc[idx, "up_allowed"] = True
+                result_df.loc[idx, "up_transition"] =  True
+            elif up_TDM_rate_X != 0 and up_TDM_rate_Y != 0 and up_TDM_rate_Z != 0:
+                if pd.isna(up_TDM_rate_X) and pd.isna(up_TDM_rate_Y) and pd.isna(up_TDM_rate_Z):
+                    result_df.loc[idx, "up_polarization"] = np.nan
+                    result_df.loc[idx, "up_allowed"] = False
+                    result_df.loc[idx, "up_transition"] =  False
+                elif abs(up_TDM_rate_X - up_TDM_rate_Y) < 1:
+                    if up_TDM_rate_X - up_TDM_rate_Z > 0:
+                        result_df.loc[idx, "up_polarization"] = "XY"
+                        result_df.loc[idx, "up_allowed"] = True
+                        result_df.loc[idx, "up_transition"] =  True
+                    else:
+                        result_df.loc[idx, "up_polarization"] = "Z"
+                        result_df.loc[idx, "up_allowed"] = True
+                        result_df.loc[idx, "up_transition"] =  True
+                else:
+                    result_df.loc[idx, "up_polarization"] = "XYZ"
+                    result_df.loc[idx, "up_allowed"] = True
+                    result_df.loc[idx, "up_transition"] =  True
+            else:
+                result_df.loc[idx, "up_polarization"] = np.nan
+                result_df.loc[idx, "up_allowed"] = False
+                result_df.loc[idx, "up_transition"] =  True
+            print("up_polarization: {}, {}".format(result_df.loc[idx, "up_polarization"], type(result_df.loc[idx, "up_polarization"])))
+            # get the dn TDM rate
+            dn_TDM_rate_X = row["dn_TDM_rate_X"]
+            dn_TDM_rate_Y = row["dn_TDM_rate_Y"]
+            dn_TDM_rate_Z = row["dn_TDM_rate_Z"]
+            print("dn_TDM_rate_X: {}".format(dn_TDM_rate_X), "dn_TDM_rate_Y: {}".format(dn_TDM_rate_Y),
+                  "dn_TDM_rate_Z: {}".format(dn_TDM_rate_Z))
+            if dn_TDM_rate_X != 0 and dn_TDM_rate_Y == 0 and dn_TDM_rate_Z == 0:
+                result_df.loc[idx, "dn_polarization"] = "X"
+                result_df.loc[idx, "dn_allowed"] = True
+                result_df.loc[idx, "dn_transition"] =  True
+            elif dn_TDM_rate_X == 0 and dn_TDM_rate_Y != 0 and dn_TDM_rate_Z == 0:
+                result_df.loc[idx, "dn_polarization"] = "Y"
+                result_df.loc[idx, "dn_allowed"] = True
+                result_df.loc[idx, "dn_transition"] =  True
+            elif dn_TDM_rate_X == 0 and dn_TDM_rate_Y == 0 and dn_TDM_rate_Z != 0:
+                result_df.loc[idx, "dn_polarization"] = "Z"
+                result_df.loc[idx, "dn_allowed"] = True
+                result_df.loc[idx, "dn_transition"] =  True
+            elif dn_TDM_rate_X != 0 and dn_TDM_rate_Y != 0 and dn_TDM_rate_Z == 0:
+                result_df.loc[idx, "dn_polarization"] = "XY"
+                result_df.loc[idx, "dn_allowed"] = True
+                result_df.loc[idx, "dn_transition"] =  True
+            elif dn_TDM_rate_X != 0 and dn_TDM_rate_Y == 0 and dn_TDM_rate_Z != 0:
+                result_df.loc[idx, "dn_polarization"] = "XZ"
+                result_df.loc[idx, "dn_allowed"] = True
+                result_df.loc[idx, "dn_transition"] =  True
+            elif dn_TDM_rate_X == 0 and dn_TDM_rate_Y != 0 and dn_TDM_rate_Z != 0:
+                result_df.loc[idx, "dn_polarization"] = "YZ"
+                result_df.loc[idx, "dn_allowed"] = True
+                result_df.loc[idx, "dn_transition"] =  True
+            elif dn_TDM_rate_X != 0 and dn_TDM_rate_Y != 0 and dn_TDM_rate_Z != 0:
+                if pd.isna(dn_TDM_rate_X) and pd.isna(dn_TDM_rate_Y) and pd.isna(dn_TDM_rate_Z):
+                    result_df.loc[idx, "dn_polarization"] = np.nan
+                    result_df.loc[idx, "dn_allowed"] = False
+                    result_df.loc[idx, "dn_transition"] =  False
+                elif abs(dn_TDM_rate_X - dn_TDM_rate_Y) < 1:
+                    if dn_TDM_rate_X - dn_TDM_rate_Z > 0:
+                        result_df.loc[idx, "dn_polarization"] = "XY"
+                        result_df.loc[idx, "dn_allowed"] = True
+                        result_df.loc[idx, "dn_transition"] =  True
+                    else:
+                        result_df.loc[idx, "dn_polarization"] = "Z"
+                        result_df.loc[idx, "dn_allowed"] = True
+                        result_df.loc[idx, "dn_transition"] =  True
+                else:
+                    result_df.loc[idx, "dn_polarization"] = "XYZ"
+                    result_df.loc[idx, "dn_allowed"] = True
+                    result_df.loc[idx, "dn_transition"] =  True
+            else:
+                result_df.loc[idx, "dn_polarization"] = np.nan
+                result_df.loc[idx, "dn_allowed"] = False
+                result_df.loc[idx, "dn_transition"] =  True
+            print("dn_polarization: {}, {}".format(result_df.loc[idx, "dn_polarization"], type(result_df.loc[idx, "dn_polarization"])))
+            result_df.loc[idx, "allowed"] = result_df.loc[idx, "up_allowed"] or result_df.loc[idx, "dn_allowed"]
+            if result_df.loc[idx, "up_transition"] and not result_df.loc[idx, "dn_transition"]:
+                result_df.loc[idx, "transition_from"] = "up"
+            elif result_df.loc[idx, "dn_transition"] and not result_df.loc[idx, "up_transition"]:
+                result_df.loc[idx, "transition_from"] = "dn"
+            elif result_df.loc[idx, "up_transition"] and result_df.loc[idx, "dn_transition"]:
+                result_df.loc[idx, "transition_from"] = "both"
+            else:
+                result_df.loc[idx, "transition_from"] = np.nan
+
+        result_df.drop(columns=["up_allowed", "dn_allowed"], inplace=True)
+
         result_df.drop(["up_TDM_sq_{}".format(component) for component in ["X", "Y", "Z"]], axis=1, inplace=True)
         result_df.drop(["dn_TDM_sq_{}".format(component) for component in ["X", "Y", "Z"]], axis=1, inplace=True)
 
@@ -1383,7 +1526,7 @@ class COHP:
     LOBSTER_DB = get_db("Scan2dDefect", "lobster",  user="Jeng_ro", password="qimin", port=12347)
 
     @classmethod
-    def find_label_in_cohp(cls, completecohp, nn, defect_type="antisite"):
+    def find_label_in_cohp(cls, completecohp, nn, defect_type="vacancy"):
         nn_pair = None
         if defect_type == "antisite":
             nn_pair = [{nn[-1], i} for i in nn] # for antisite NN[-1] only
@@ -1392,6 +1535,7 @@ class COHP:
 
         label_list = []
         for label, cohp_pair in completecohp.bonds.items():
+            print()
             sites_index = tuple(completecohp.structure.sites.index(site) for site in cohp_pair["sites"])
             if set(sites_index) in nn_pair:
                 print(label, cohp_pair["length"])
@@ -1440,7 +1584,7 @@ class COHP:
             # x.savefig("{}.png".format(title))
             x.show()
 
-        for lobster in cls.LOBSTER_DB.collection.find({"task_id": {"$in": [6194, 6195]}}):
+        for lobster in cls.LOBSTER_DB.collection.find({"task_id": {"$in": [6162]}}):
             is_coop = True
             if is_coop:
                 f = "COOPCAR.lobster.gz"
@@ -1463,22 +1607,90 @@ class COHP:
     #         print(dir_name)
     #         subprocess.call(["scp", dir_name+"/{}.png".format(title)])
 
+class TransitionLevels:
+    @classmethod
+    def regular_antisite(cls, project, collection_name, compounds, aexx=0.25):
+        path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/"
+        c = [20, 25]
+        # bulk_k = [[0.25, 0.25, 0], [-0.5, -0.5, 0]]
+        bulk_k = [[0,0,0]]
+        vbm_k = [[0, 0, 0], [-0.33333333, -0.33333333, 0], [0.33333333, 0.33333333,0]]
+        results = []
+        for compound in compounds:
+            se_antisite = FormationEnergy2D(
+                bulk_db_files=[os.path.join(path, project, collection_name, "db.json")],
+                bulk_entry_filter={
+                    # "nsites": {"$ne":48},
+                    "chemsys": compound,
+                    "formula_anonymous": "AB2",
+                    "calcs_reversed.run_type": "HSE06",
+                    "input.structure.lattice.c": {"$in": c},
+                    "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
+                    "input.parameters.AEXX": aexx,
+                    "charge_state": 0,
+                    "defect_type": "host",
+                    "task_label": "HSE_scf"
+                },
+                bk_vbm_bg_db_files=[os.path.join(path, project, collection_name, "db.json")],
+                bk_vbm_bg_filter={
+                    # "nsites": {"$ne":48},
+                    "chemsys": compound,
+                    "formula_anonymous": "AB2",
+                    "calcs_reversed.run_type": "HSE06",
+                    "calcs_reversed.input.kpoints.kpoints.0": {"$in": vbm_k},
+                    "input.structure.lattice.c": {"$in": c},
+                    "charge_state": 0,
+                    "input.parameters.AEXX": aexx,
+                    "defect_type": "vbm",
+                    "task_label": "HSE_scf"
+                },
+                defect_db_files=[os.path.join(path, project, collection_name, "db.json")],
+                defect_entry_filter={
+                    # "nsites": {"$ne":48},
+                    "charge_state": {"$in": [1, 0, -1]},
+                    "chemsys": compound,
+                    "formula_anonymous": {"$in": ["A26B49", "A37B71", "A17B31"]}, #"A17B31"
+                    "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
+                    "input.incar.NSW": 0,
+                    "input.incar.LASPH": True,
+                    "calcs_reversed.run_type": "HSE06",
+                    "input.structure.lattice.c": {"$in": c},
+                    "input.parameters.AEXX": aexx,
+                    "defect_type": {"$in":["defect_new", "defect"]},
+                    "task_label": "HSE_scf"
+                    # "calcs_reversed.output.outcar.total_magnetization": {"$lte": 3.1, "$gte": 0},
+                    # "task_id": {"$nin": [327]}
+                    #for ws2
+                    #[3510, 3537] for mos2
+                }
+            )
+            se_antisite.transition_levels()
+            for a in se_antisite.ionized_energy(collection_name, compound):
+                a.update({"name": compound})
+                results.append(a)
+        # print("$$"*50, "all")
+        # print(pd.DataFrame(results))
+
+    # # regular_antisite("antisiteQubit", "W_Se_Ef_gamma", ["Se-W"])
+    # regular_antisite("antisiteQubit", "W_Te_Ef_gamma", ["Te-W"])
+
+
+
 def main():
     # a = Defect(defect_xlsx="hse_screened_qubit_cdft_2021-11-18_2022-01-09")
     # back_process = BackProcess(a.defect_df)
     # back_process.add_tdm_input()
     # back_process.df_to_excel(excel_name="test")
 
-    # a = Defect(defect_xlsx="defect_2021-11-18_2022-01-10")
-    # a = Defect()
-    # a.get_defect_df_v2_hse()
-    # back_process = BackProcess(a.defect_df)
-    # back_process.add_band_edges_and_defects()
-    # back_process.add_level_category()
-    # back_process.add_transition_wavevlength()
-    # back_process.add_cdft_occupations()
-    # back_process.add_hse_fworker()
-    # back_process.df_to_excel(excel_name="hse_screened_qubit_2021-11-18")
+    a = Defect()
+    a.get_defect_df_v2_hse()
+    back_process = BackProcess(a.defect_df)
+    back_process.add_band_edges_and_defects()
+    back_process.add_level_category()
+    back_process.add_transition_wavevlength()
+    back_process.add_cdft_occupations()
+    back_process.add_hse_fworker()
+    back_process.df_to_excel(excel_name="test")
 
     # a = Defect(defect_xlsx="defect_2021-11-18")
     # screened = a.get_screened_defect_df()
@@ -1490,14 +1702,21 @@ def main():
     # a.get_defect_df()
     # a.get_defect_df_gp(screened, "triplet_max-tran_gp_2021-11-18")
 
-    a = Defect(defect_xlsx="hse_screened_qubit_2021-11-18")
-    defect_df = a.defect_df.copy()
-    for i in [[162, 575, 151, 182, 171, 186, 211, 229, 196]]:
-        df = defect_df.loc[defect_df["task_id"].isin(i)]
-        Defect.bar_plot_defect_levels_v2(df)
-#
+    # a = Defect(defect_xlsx="hse_qubit_2021-11-18")
+    # defect_df = a.defect_df.copy()
+    # for i in [[]]:
+    #     df = defect_df.loc[defect_df["task_id"].isin(i)]
+    #     Defect.bar_plot_defect_levels_v2(df)
+
+    # cdft = CDFT()
+    # cdft.update_entry_with_occ()
+    # cdft.get_data_sheet()
+    # df1 = cdft.get_zpl_data()
+    # IOTools(cwd=os.path.join(DB1_PATH, save_xlsx_path), pandas_df=df1).to_excel("hse_screened_qubit_cdft_zpl_2021-11-18")
+
+
 if __name__ == '__main__':
-    df = main()
+    main()
     # a = Defect(defect_xlsx="hse_screened_qubit_2021-11-18")
     # show = a.defect_df.loc[(a.defect_df["up_tran_en"]==0) & (a.defect_df["dn_tran_en"]!=0)]
     # # print(a.defect_df.dn_tran_lumo_homo_deg.unique())
