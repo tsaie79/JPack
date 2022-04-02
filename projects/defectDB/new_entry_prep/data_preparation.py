@@ -132,7 +132,7 @@ class DataPrepHost:
 class DataPrepDefect:
 
     @classmethod
-    def cp_symdata_bandedges(cls):
+    def cp_symdata_bandedges(cls, filter, c2db_uids=None):
         # 4
         from qubitPack.tool_box import get_db, get_band_edges_characters
         from monty.json import jsanitize
@@ -141,15 +141,11 @@ class DataPrepDefect:
         tgt = HSEQubitDefect
 
         col = tgt.collection
-        # filter = {"task_label": "SCAN_scf",}
-        # filter = {"task_id": {"$in":[1309, 1311, 1315, 1349, 1351]}}
-        filter = {"task_label": "HSE_scf"}
-        # "host_info.scan_bs.band_edges.vbm_is_up_dn_band_idx_equal": {
-        #"$exists": 0}}
-        for e in list(col.find(filter)):
+        entries = list(col.find(filter))
+        for idx, e in enumerate(entries):
+            c2db_uid = e["pc_from"].split("/")[-1] if c2db_uids is None else c2db_uids[idx]
             try:
                 print(e["task_id"], e["pc_from"])
-                c2db_uid = e["pc_from"].split("/")[-1]
                 src_entry = src.collection.find_one({"c2db_uid":c2db_uid, "task_label": "hse line"})
                 # vacuum = self.c2db.collection.find_one({"uid": c2db_uid})["evacmean"]
                 sym_data = src_entry["sym_data"]
@@ -166,7 +162,7 @@ class DataPrepDefect:
                 print(er)
 
     @classmethod
-    def is_site_sym_uniform(cls):
+    def is_site_sym_uniform(cls, filter):
         # 5
         from qubitPack.tool_box import get_db, get_band_edges_characters
         from monty.json import jsanitize
@@ -174,9 +170,8 @@ class DataPrepDefect:
         tgt = HSEQubitDefect
 
         col = tgt.collection
-        filter = {"task_label": "HSE_scf"}
-
-        for e in list(col.find(filter)):
+        entries = list(col.find(filter))
+        for e in entries:
             print(e["task_id"], e["pc_from"])
             try:
                 site_syms = e["host_info"]["sym_data"]["unique_wyckoff"]["site_sym"]
@@ -191,7 +186,7 @@ class DataPrepDefect:
                 print(er)
 
     @classmethod
-    def cp_site_oxi_state(cls):
+    def cp_site_oxi_state(cls, filter, c2db_uids=None):
         # 8
         from monty.json import jsanitize
         from qubitPack.tool_box import get_db
@@ -201,10 +196,9 @@ class DataPrepDefect:
         db = HSEQubitDefect
 
         col = db.collection
-        filter = {"pc_from": {"$regex": "BN-BN-NM"}, "task_label": "HSE_scf"}
-
-        for e in list(col.find(filter))[:]:
-            c2db_uid = e["pc_from"].split("/")[-1]
+        entries = list(col.find(filter))
+        for idx, e in enumerate(entries):
+            c2db_uid = e["pc_from"].split("/")[-1] if c2db_uids is None else c2db_uids[idx]
             print(e["task_id"], e["pc_from"])
             host_entry = host.collection.find_one({"c2db_uid": c2db_uid, "task_label": "hse line"})
             site_oxi_state = host_entry["site_oxi_state"]
@@ -261,12 +255,13 @@ class GenerateDefectTable(BackProcess):
         return level_info, levels, defect_levels
 
 
-    def get_defect_df_v2_hse(self):
+    def get_defect_df_v2_hse(self, c2db_uids=None):
         data = []
         col = HSEQubitDefect.collection
-        for e in list(col.find(self.df_filter))[:]:
+        entries = list(col.find(self.df_filter))
+        for idx, e in enumerate(entries):
             print(e["task_id"])
-            c2db_uid = e["pc_from"].split("/")[-1]
+            c2db_uid = e["pc_from"].split("/")[-1] if c2db_uids is None else c2db_uids[idx]
             e_from_host = C2DB_IR_calc_data.collection.find_one({"c2db_uid": c2db_uid, "task_label": "hse line"})
             host_c2db_info = e_from_host["c2db_info"]
             for field in ["spacegroup", "pmg_point_gp", "irreps", "formula"]:
@@ -361,21 +356,21 @@ def main():
 
     # define a function to generate a table of defects
     def get_defect_table():
-        DataPrepDefect.cp_symdata_bandedges()
-        DataPrepDefect.is_site_sym_uniform()
-        DataPrepDefect.cp_site_oxi_state()
-
         antisite_tmd = {
             "task_label": "HSE_scf", "nupdown_set": 2,
             "pc_from":
                 {
-                    "$in": ["owls/mx2_antisite_pc/{}".format(taskid) for taskid in [3091, 3083, 3093, 3097, 3094, 3102]]
+                    "$in": ["owls/mx2_antisite_pc/{}".format(taskid) for taskid in [3102]]
                 }
         }
-        test = GenerateDefectTable(antisite_tmd)
-        test.get_defect_df_v2_hse()
-        test.backprocess()
+        # DataPrepDefect.cp_symdata_bandedges(antisite_tmd, c2db_uids=["MoTe2-MoS2-NM"])
+        # DataPrepDefect.is_site_sym_uniform(antisite_tmd)
+        # DataPrepDefect.cp_site_oxi_state(antisite_tmd, c2db_uids=["MoTe2-MoS2-NM"])
 
+        test = GenerateDefectTable(antisite_tmd)
+        test.get_defect_df_v2_hse(c2db_uids=["MoTe2-MoS2-NM"])
+        test.backprocess()
+    get_defect_table()
 
 
 if __name__ == '__main__':
