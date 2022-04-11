@@ -141,17 +141,17 @@ class Tools:
                 {"task_id": defect_taskid},
                 -10, 10,
                 None,
-                None, #all
+                "all",
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
                 localisation,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
-                edge_tol= (1, 1), # defect state will be picked only if it's above vbm by
+                edge_tol= (-0.025, -0.025), # defect state will be picked only if it's above vbm by
                 # 0.025 eV
             # and below
                 # cbm by 0.025 eV
-                ir_db=ir_db,
+                ir_db=ir_db, #ir_db,
                 ir_entry_filter={"prev_fw_taskid": defect_taskid},
             )
             tot, proj, d_df, levels, defect_levels = state
@@ -820,7 +820,7 @@ class Defect:
                         ]
                     )
                     ax.text(x-1.5, cbm+0.45, up_info, bbox=dict(facecolor='white', edgecolor='black'), size=8)
-                    ax.text(x, cbm+3, "{}-{}-{}".format(cbm_max_el, cbm_max_proj_orbital, level_edge_ir[0][1]),
+                    ax.text(x, cbm+3, "{}-{}-{}|{}".format(cbm_max_el, cbm_max_proj_orbital, level_edge_ir[0][1], cbm),
                             bbox=dict(
                         facecolor='white', edgecolor='black'), size=12)
                     if up_tran_en and up_tran_bottom:
@@ -859,8 +859,8 @@ class Defect:
                                                                                    edgecolor='black'),
                             size=8)
 
-                    ax.text(x, vbm_lim-fig_y_height[0]+4, "{}-{}-{}".format(vbm_max_el, vbm_max_proj_orbital,
-                                                                            level_edge_ir[0][0]),
+                    ax.text(x, vbm_lim-fig_y_height[0]+4, "{}-{}-{}|{}".format(vbm_max_el, vbm_max_proj_orbital,
+                                                                            level_edge_ir[0][0], vbm),
                             bbox=dict(facecolor='white', edgecolor='black'), size=12)
                     if dn_tran_en and dn_tran_bottom:
                         ax.arrow(x=x+1.25, y=dn_tran_bottom, dx=0, dy=dn_tran_en, width=0.02,
@@ -884,7 +884,7 @@ class Defect:
                 ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
                 ax.text(-0.1, 1.05, "{}-{}".format(uid, host_taskid), size=30, transform=ax.transAxes)
 
-                save_plt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/defect_qubit_in_36_group/code/plt"
+                save_plt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/latest_results/plt/2021-11-18/defect/table_6"
                 os.makedirs(os.path.join(save_plt_path, set_prototype), exist_ok=True)
                 fig.savefig(
                     os.path.join(
@@ -1169,7 +1169,7 @@ class BackProcess:
                     cdft_occ = "{}*1 1*0.5 1*0.5 1*0.333333 1*0.333333 1*0.333333 {}*0".format(
                         lumo_band_index[0]-3, nbands-(lumo_band_index[0]+2))
                 else:
-                    cdft_occ = None
+                    cdft_occ = np.nan
                 cdft_occs[spin] = cdft_occ
             return cdft_occs["1"], cdft_occs["-1"]
 
@@ -1256,7 +1256,7 @@ class CDFT:
             )
 
 
-    def get_data_sheet(self, filter):
+    def get_data_sheet(self, filter, read_c2db_uid_key=False):
         es = self.cdft_db.collection.find(filter)
         data = {"prototype": [], "pc_from": [], "gs_taskid": [], "task_id": [], "defect_name": [],
                 "charge_state":[], "up_cdft_occ":[],"dn_cdft_occ": [], "task_label":[], "energy": [],
@@ -1264,15 +1264,23 @@ class CDFT:
                 "dn_TDM_sq_X": [], "dn_TDM_sq_Y": [], "dn_TDM_sq_Z": []
         }
         for e in es:
-            print(e["task_id"])
+            print("cdft_task_id:", e["task_id"])
             gs_taskid = int(e["source_entry"].split("/")[-1])
             gs_e = self.calc_db.collection.find_one({"task_id": gs_taskid})
             data["task_id"].append(e["task_id"])
             data["defect_name"].append(gs_e["defect_entry"]["name"])
             data["charge_state"].append(gs_e["charge_state"])
-            data["pc_from"].append(gs_e["pc_from"].split("/")[-1])
-            print(gs_e["pc_from"].split("/")[-1].split("-")[-2])
-            data["prototype"].append(gs_e["pc_from"].split("/")[-1].split("-")[-2])
+            if read_c2db_uid_key:
+                try:
+                    data["prototype"].append(gs_e["pc_from"].split("/")[-1].split("-")[-2])
+                    data["pc_from"].append(gs_e["pc_from"].split("/")[-1])
+                except Exception as err:
+                    print(err, gs_taskid)
+                    data["prototype"].append(gs_e["c2db_uid"].split("-")[-2])
+                    data["pc_from"].append(gs_e["c2db_uid"])
+            else:
+                data["pc_from"].append(gs_e["pc_from"].split("/")[-1])
+                data["prototype"].append(gs_e["pc_from"].split("/")[-1].split("-")[-2])
             data["up_cdft_occ"].append(e["cdft_occ"]["up"])
             data["dn_cdft_occ"].append(e["cdft_occ"]["dn"])
             data["gs_taskid"].append(gs_taskid)
@@ -1291,12 +1299,22 @@ class CDFT:
         # get unique gs_taskid from es
         gs_taskids = list(set(data["gs_taskid"]))
         for gs_taskid in gs_taskids:
+            print("gs_taskid: {}".format(gs_taskid))
             gs_e = self.calc_db.collection.find_one({"task_id": gs_taskid})
             data["task_id"].append(gs_taskid)
             data["defect_name"].append(gs_e["defect_entry"]["name"])
             data["charge_state"].append(gs_e["charge_state"])
-            data["pc_from"].append(gs_e["pc_from"].split("/")[-1])
-            data["prototype"].append(gs_e["pc_from"].split("/")[-1].split("-")[-2])
+            if read_c2db_uid_key:
+                try:
+                    data["prototype"].append(gs_e["pc_from"].split("/")[-1].split("-")[-2])
+                    data["pc_from"].append(gs_e["pc_from"].split("/")[-1])
+                except Exception as err:
+                    print(err, gs_taskid)
+                    data["prototype"].append(gs_e["c2db_uid"].split("-")[-2])
+                    data["pc_from"].append(gs_e["c2db_uid"])
+            else:
+                data["pc_from"].append(gs_e["pc_from"].split("/")[-1])
+                data["prototype"].append(gs_e["pc_from"].split("/")[-1].split("-")[-2])
             data["up_cdft_occ"].append("ground-state")
             data["dn_cdft_occ"].append("ground-state")
             data["gs_taskid"].append(gs_taskid)
@@ -1306,6 +1324,9 @@ class CDFT:
             for idx, component in enumerate(["X", "Y", "Z"]):
                 data["up_TDM_sq_{}".format(component)].append(None)
                 data["dn_TDM_sq_{}".format(component)].append(None)
+        # print all the entry length of data
+        for k, v in data.items():
+            print(k, len(v))
 
         df = pd.DataFrame(data)
         BackProcess(df).add_tdm_input()
@@ -1682,15 +1703,15 @@ def main():
     # back_process.add_tdm_input()
     # back_process.df_to_excel(excel_name="test")
 
-    a = Defect()
-    a.get_defect_df_v2_hse()
-    back_process = BackProcess(a.defect_df)
-    back_process.add_band_edges_and_defects()
-    back_process.add_level_category()
-    back_process.add_transition_wavevlength()
-    back_process.add_cdft_occupations()
-    back_process.add_hse_fworker()
-    back_process.df_to_excel(excel_name="test")
+    # a = Defect()
+    # a.get_defect_df_v2_hse()
+    # back_process = BackProcess(a.defect_df)
+    # back_process.add_band_edges_and_defects()
+    # back_process.add_level_category()
+    # back_process.add_transition_wavevlength()
+    # back_process.add_cdft_occupations()
+    # back_process.add_hse_fworker()
+    # back_process.df_to_excel(excel_name="test")
 
     # a = Defect(defect_xlsx="defect_2021-11-18")
     # screened = a.get_screened_defect_df()
@@ -1702,11 +1723,9 @@ def main():
     # a.get_defect_df()
     # a.get_defect_df_gp(screened, "triplet_max-tran_gp_2021-11-18")
 
-    # a = Defect(defect_xlsx="hse_qubit_2021-11-18")
-    # defect_df = a.defect_df.copy()
-    # for i in [[]]:
-    #     df = defect_df.loc[defect_df["task_id"].isin(i)]
-    #     Defect.bar_plot_defect_levels_v2(df)
+    # read excel file by IOTools
+    df = IOTools(cwd=input_path, excel_file="Table_6_df_2022-04-07").read_excel()
+    Defect.bar_plot_defect_levels_v2(df)
 
     # cdft = CDFT()
     # cdft.update_entry_with_occ()
@@ -1716,7 +1735,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
     # a = Defect(defect_xlsx="hse_screened_qubit_2021-11-18")
     # show = a.defect_df.loc[(a.defect_df["up_tran_en"]==0) & (a.defect_df["dn_tran_en"]!=0)]
     # # print(a.defect_df.dn_tran_lumo_homo_deg.unique())
@@ -1726,7 +1745,7 @@ if __name__ == '__main__':
     # # show = show.loc[(show["dn_tran_lumo_homo_deg"] == (1, 2)) | (show["dn_tran_lumo_homo_deg"] == (3, 2))]
 
     # IOTools(cwd=save_xlsx_path, pandas_df=df).to_excel("test")
-    # a, b, c = Tools.extract_defect_levels_v2_hse(1911)
+    a, b, c = Tools.extract_defect_levels_v2_hse(109, localisation=0.2)
 
     # cdft = CDFT()
     # cdft.update_entry_with_occ()
