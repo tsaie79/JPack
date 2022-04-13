@@ -1,10 +1,13 @@
-from analysis.data_analysis import BackProcess, HSEQubitDefect, HSEQubitIR
-from qubitPack.tool_box import get_db, get_good_ir_sites, get_unique_sites_from_wy, get_band_edges_characters
+from JPack_independent.projects.defectDB.analysis.data_analysis import BackProcess, CDFT, HSEQubitDefect, HSEQubitIR
+from JPack_independent.projects.defectDB.wf.wf import INPUT_PATH
+
+from qubitPack.tool_box import get_db, get_good_ir_sites, get_unique_sites_from_wy, get_band_edges_characters, IOTools
 
 from pymatgen.io.vasp.inputs import Structure
-
 from monty.json import jsanitize
 import pandas as pd
+
+import os
 
 C2DB_IR_calc_data = get_db("C2DB_IR", "calc_data", user="Jeng", password="qimin", port=12345)
 C2DB_IR_ir_data = get_db("C2DB_IR", "ir_data", user="Jeng_ro", password="qimin", port=12345)
@@ -132,7 +135,7 @@ class DataPrepHost:
 class DataPrepDefect:
 
     @classmethod
-    def cp_symdata_bandedges(cls, filter, c2db_uids=None):
+    def cp_symdata_bandedges(cls, filter, read_c2db_uid_key=False):
         # 4
         from qubitPack.tool_box import get_db, get_band_edges_characters
         from monty.json import jsanitize
@@ -143,7 +146,7 @@ class DataPrepDefect:
         col = tgt.collection
         entries = list(col.find(filter))
         for idx, e in enumerate(entries):
-            c2db_uid = e["pc_from"].split("/")[-1] if c2db_uids is None else c2db_uids[idx]
+            c2db_uid = e["pc_from"].split("/")[-1] if not read_c2db_uid_key else e["c2db_uid"]
             try:
                 print(e["task_id"], e["pc_from"])
                 src_entry = src.collection.find_one({"c2db_uid":c2db_uid, "task_label": "hse line"})
@@ -186,7 +189,7 @@ class DataPrepDefect:
                 print(er)
 
     @classmethod
-    def cp_site_oxi_state(cls, filter, c2db_uids=None):
+    def cp_site_oxi_state(cls, filter, read_c2db_uid_key=False):
         # 8
         from monty.json import jsanitize
         from qubitPack.tool_box import get_db
@@ -198,10 +201,13 @@ class DataPrepDefect:
         col = db.collection
         entries = list(col.find(filter))
         for idx, e in enumerate(entries):
-            c2db_uid = e["pc_from"].split("/")[-1] if c2db_uids is None else c2db_uids[idx]
+            c2db_uid = e["pc_from"].split("/")[-1] if not read_c2db_uid_key else e["c2db_uid"]
             print(e["task_id"], e["pc_from"])
             host_entry = host.collection.find_one({"c2db_uid": c2db_uid, "task_label": "hse line"})
-            site_oxi_state = host_entry["site_oxi_state"]
+            try:
+                site_oxi_state = host_entry["site_oxi_state"]
+            except Exception:
+                site_oxi_state = {}
             db.collection.update_one({"task_id": e["task_id"]}, {"$set": {"host_info.c2db_ir_hse_line.site_oxi_state":
                                                                               site_oxi_state}})
 
@@ -232,13 +238,13 @@ class GenerateDefectTable(BackProcess):
                 {"task_id": defect_taskid},
                 -10, 10,
                 None,
-                None, #"all",
+                None,
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
                 localisation,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
-                edge_tol= (0, 0), # defect state will be picked only if it's above vbm by
+                edge_tol= (0.25, 0.25), # defect state will be picked only if it's above vbm by
                 # 0.025 eV
                 # and below
                 # cbm by 0.025 eV
@@ -255,13 +261,13 @@ class GenerateDefectTable(BackProcess):
         return level_info, levels, defect_levels
 
 
-    def get_defect_df_v2_hse(self, c2db_uids=None):
+    def get_defect_df_v2_hse(self, read_c2db_uid_key=False):
         data = []
         col = HSEQubitDefect.collection
         entries = list(col.find(self.df_filter))
         for idx, e in enumerate(entries):
             print(e["task_id"])
-            c2db_uid = e["pc_from"].split("/")[-1] if c2db_uids is None else c2db_uids[idx]
+            c2db_uid = e["pc_from"].split("/")[-1] if not read_c2db_uid_key else e["c2db_uid"]
             e_from_host = C2DB_IR_calc_data.collection.find_one({"c2db_uid": c2db_uid, "task_label": "hse line"})
             host_c2db_info = e_from_host["c2db_info"]
             for field in ["spacegroup", "pmg_point_gp", "irreps", "formula"]:
@@ -337,14 +343,43 @@ class GenerateDefectTable(BackProcess):
         self.input_df = self.defect_df
         # IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("defects_36_groups")
 
-    def backprocess(self):
+    def backprocess(self, excel_name=None):
         self.add_band_edges_and_defects()
         self.add_level_category()
         self.add_transition_wavevlength()
         self.add_cdft_occupations()
         self.add_hse_fworker()
-        self.df_to_excel(excel_name="test")
+        if excel_name:
+            self.df_to_excel(excel_name=excel_name)
 
+class DataPrepCDFT(CDFT):
+    def __init__(self, defect_entry_df):
+        super(DataPrepCDFT, self).__init__()
+        self.defect_entry_df = defect_entry_df # hse_screened_qubits_df
+        self.zpl_df = None
+
+    def get_tgt_df(self):
+        self.get_data_sheet({"taskid": {"$in": list(self.defect_entry_df["task_id"])}}, read_c2db_uid_key=True)
+        # You need to update the entry in databased for TDM information first!
+
+    def run_TDM(self):
+        from wf.wf import transition_dipole_moment
+        transition_dipole_moment(self.foundation_df)
+
+    def get_zpl_df(self):
+        self.get_data_sheet({"taskid": {"$in": list(self.defect_entry_df["task_id"])}}, read_c2db_uid_key=True)
+        zpl_df = self.get_zpl_data()
+        zpl_df["task_id"] = zpl_df["gs_taskid"]
+        zpl_df.drop(columns=["charge", "prototype"], inplace=True)
+        self.zpl_df = zpl_df
+
+    def one_shot_calc_TDM(self):
+        self.get_tgt_df()
+        self.run_TDM()
+
+    def one_shot_zpl_df(self):
+        self.get_tgt_df()
+        self.get_zpl_df()
 
 def main():
     # define a function that updates c2db_ir_calc_data with the new data
@@ -356,23 +391,37 @@ def main():
 
     # define a function to generate a table of defects
     def get_defect_table():
-        antisite_tmd = {
-            "task_label": "HSE_scf", "nupdown_set": 2,
-            "pc_from":
-                {
-                    "$in": ["owls/mx2_antisite_pc/{}".format(taskid) for taskid in [3102]]
-                }
-        }
-        # DataPrepDefect.cp_symdata_bandedges(antisite_tmd, c2db_uids=["MoTe2-MoS2-NM"])
-        # DataPrepDefect.is_site_sym_uniform(antisite_tmd)
-        # DataPrepDefect.cp_site_oxi_state(antisite_tmd, c2db_uids=["MoTe2-MoS2-NM"])
+        from analysis.analysis_api import hse_qubit_df
+        antisite_tmd = {"pc_from": {"$regex": "owls"}, "task_label": "HSE_scf",
+                        "chemsys": {"$in": ["S-W", "Se-W", "Te-W", "Mo-S", "Mo-Se", "Mo-Te"]}}
 
-        test = GenerateDefectTable(antisite_tmd)
-        test.get_defect_df_v2_hse(c2db_uids=["MoTe2-MoS2-NM"])
-        test.backprocess()
+        # hse_qubit = hse_qubit_df.copy()
+        # taskid_list = hse_qubit["task_id"].to_list()
+        # for i in [173, 275,934]:
+        #     taskid_list.remove(i)
+        # print(taskid_list)
+
+        filter = antisite_tmd
+        DataPrepDefect.cp_symdata_bandedges(filter, read_c2db_uid_key=True)
+        DataPrepDefect.is_site_sym_uniform(filter)
+        DataPrepDefect.cp_site_oxi_state(filter, read_c2db_uid_key=True)
+
+        test = GenerateDefectTable(filter)
+        test.get_defect_df_v2_hse(read_c2db_uid_key=True)
+        test.backprocess("tmd_antisites")
+
+
+    def get_zpl_df():
+        # run TDM in db1
+        p_path = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
+        tgt_df = IOTools(excel_file="wte2_mote2",
+                         cwd=os.path.join(p_path, INPUT_PATH)).read_excel()
+        zpl = DataPrepCDFT(defect_entry_df=tgt_df)
+        zpl.one_shot_calc_TDM()
+        zpl.one_shot_zpl_df()
+        IOTools(pandas_df=zpl.zpl_df, cwd=os.path.join(p_path, "analysis/output/xlsx")).to_excel(
+            "test_zpl_df")
+
     get_defect_table()
-
-
 if __name__ == '__main__':
-
     main()
