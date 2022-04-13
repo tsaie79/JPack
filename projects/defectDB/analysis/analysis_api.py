@@ -12,6 +12,8 @@ from pymatgen.io.vasp.inputs import Poscar, Element
 from pathlib import Path
 
 from JPack_independent.projects.defectDB.analysis.data_analysis import Defect
+from JPack_independent.projects.defectDB.new_entry_prep.data_preparation import *
+
 
 MODULE_DIR = Path(__file__).resolve().parent
 # This is neccessary for importing this module, while when running this module in shell, comment it first.
@@ -23,12 +25,14 @@ save_plt_path = os.path.join(MODULE_DIR, "output/plt")
 defect_df = IOTools(cwd=input_path, excel_file="defect_2021-11-18_2022-01-10").read_excel()
 triplet_df = IOTools(cwd=input_path, excel_file="triplet_2021-11-18").read_excel()
 qubit_candidate_df = IOTools(cwd=input_path, excel_file="qubit_2021-11-18_2022-01-10").read_excel()
-hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2021-11-18").read_excel()
+hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-04-13").read_excel()
 hse_screened_qubit_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_2021-11-18").read_excel()
 hse_screened_qubit_cdft_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_cdft_2021-11-18_2022-01-31").read_excel()
 hse_screened_qubit_cdft_zpl_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_cdft_zpl_2021-11-18_2022-01-31").read_excel()
 defects_36_groups_df = IOTools(cwd=input_path, excel_file="defects_36_groups_2022-03-07").read_excel()
 defects_36_groups_zpl_zfs_df = IOTools(cwd=input_path, excel_file="defects_36_groups_zpl_zfs").read_excel()
+tmd_antisites_df = IOTools(cwd=input_path, excel_file="tmd_antisites_2022-04-13").read_excel()
+hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_6_df_2022-04-07").read_excel()
 
 # os.environ["PATH"] += os.pathsep + "/Library/TeX/texbin/latex"
 # plt.style.use(["science", "nature", "light"])
@@ -877,8 +881,362 @@ class Defect36Group:
         df["zfs_E"] = df.apply(lambda x: add_zfs_data(x)[1], axis=1)
         return df
 
+class SheetCollection:
+    def __init__(self):
+        self.scan_defect_df = None
+        self.scan_defect_df_gp = None
+
+        self.scan_triplet_df = None
+        self.scan_triplet_df_gp = None
+
+        self.scan_pre_candidate_df = None
+        self.scan_pre_candidate_df_gp = None
+
+        self.hse_triplet_df = None
+        self.hse_triplet_df_gp = None
+
+        self.hse_candidate_df = None
+        self.hse_candidate_df_gp = None
+
+        self.grouping = [
+            "prototype", "spacegroup", "C2DB_uid", "good_site_sym", "good_site_specie",
+            "defect_type", "defect_name", "charge", "perturbed_vbm", "perturbed_cbm",
+            "perturbed_bandgap", "level_edge_category",
+            "vertical_transition_up",  "vertical_transition_down"
+        ]
+
+        self.grouping_hse_candidate = [
+            "prototype", "spacegroup", "C2DB_uid", "defect_type", "defect_name", "charge",
+            "perturbed_bandgap","zfs_D", "zfs_E",  "vertical_transition_up",
+            "vertical_transition_down", "transition_from", "gap_tran_bottom_to_vbm", "gap_tran_top_to_cbm",
+            "ZPL", "AB", "BC", "CD", 'DA',
+            "up_TDM_rate_X", "up_TDM_rate_Y", "up_TDM_rate_Z", "dn_TDM_rate_X", "dn_TDM_rate_Y", "dn_TDM_rate_Z",
+            "up_polarization", "dn_polarization", "allowed"
+        ]
+
+
+    def get_diff_btw_two_dfs(self, df1, df2):
+        a = df1.copy()
+        b = df2.copy()
+        df_diff = pd.concat([a.loc[:, ["uid", "defect_name", "charge"]],
+                             b.loc[:, ["uid", "defect_name", "charge"]]],
+                            axis=0).drop_duplicates(keep=False)
+        return df_diff
+
+    def cat_revision(self, x):
+        level_cat = x["level_cat"]
+        if level_cat == "2'":
+            level_cat = 2
+        elif level_cat == "3'":
+            level_cat = 3
+        return level_cat
+
+    def check_ingap_level(self, df, vbm_distance=-0.25, cbm_distance=0.25):
+        df["in_gap_up"] = df.apply(lambda x: np.all(np.array(x["up_in_gap_level"]) - x["level_vbm"] >= vbm_distance)
+                                             and np.all(np.array(x["up_in_gap_level"]) - x["level_cbm"] <= cbm_distance),
+                                   axis=1)
+        df["in_gap_dn"] = df.apply(lambda x: np.all(np.array(x["dn_in_gap_level"]) - x["level_vbm"] >= vbm_distance)
+                                         and np.all(np.array(x["dn_in_gap_level"]) - x["level_cbm"] <= cbm_distance),
+                                   axis=1)
+
+        df["in_gap"] = df.apply(lambda x: x["in_gap_up"] or x["in_gap_dn"], axis=1)
+        return df
+
+    def check_vertical_transition(self, df, vertical_transition=0.5):
+        df["exist_vertical_transition"] = df.apply(
+            lambda x: x["vertical_transition_up"] >= vertical_transition or x["vertical_transition_down"] >=
+                      vertical_transition, axis=1)
+        return df
+
+    def get_scan_defect_df(self):
+        df = defect_df.copy()
+        df["level_cat"] = df.apply(lambda x: self.cat_revision(x), axis=1)
+
+        df["spacegroup"] = df["pmg_spg"]
+        df["good_site_sym"] = df["reduced_site_sym"]
+        df["good_site_specie"] = df["reduced_site_specie"]
+        df["C2DB_uid"] = df["uid"]
+
+        df["perturbed_vbm"] = df["level_vbm"]
+        df["perturbed_cbm"] = df["level_cbm"]
+        df["perturbed_bandgap"] = df["level_gap"]
+        df["level_edge_category"] = df["level_cat"]
+        df["vertical_transition_up"] = df["up_tran_en"]
+        df["vertical_transition_down"] = df["dn_tran_en"]
+
+        df = df.fillna("None")
+
+        # Remove bad bandedges
+        df = df.loc[(df["perturbed_vbm"] != "None") & (df["perturbed_cbm"] != "None") ]
+
+        # remove duplicated defects (same defect name, same prototype, same spacegroup, same charge, same host_taskid)
+        # and keep the one with the highest task_id (the one with the most recent scan) and remove the other one (the
+        # one with the older scan)  (this is to avoid duplicated defects in the df)
+        df = df.groupby(["defect_name", "prototype", "spacegroup", "C2DB_uid", "host_taskid",  "charge", ]).apply(
+            lambda x: x.loc[x["task_id"].idxmax()])
+        df = df.reset_index(drop=True)
+
+        self.scan_defect_df = df
+        self.scan_defect_df_gp = self.scan_defect_df.groupby(self.grouping).agg({"task_id": "unique"})
+
+        return self.scan_defect_df
+    def get_scan_triplet_df(self, df=None):
+        df = self.get_scan_defect_df().copy() if df is None else df
+        self.scan_triplet_df = df.loc[df["mag"] == 2]
+        self.scan_triplet_df_gp = self.scan_triplet_df.groupby(self.grouping).agg({"task_id": "unique"})
+
+        return self.scan_triplet_df
+
+    def get_scan_pre_candidate_df(self, df=None):
+        df = self.get_scan_triplet_df().copy() if df is None else df
+        # get df that the vertical transition up is larger than or equal to 0.5 eV or the vertical transition down is
+        # larger than or equal to 0.5 eV
+        df = self.check_vertical_transition(df, 0.5)
+        self.scan_pre_candidate_df = df.loc[df["exist_vertical_transition"]]
+        self.scan_pre_candidate_df_gp = self.scan_pre_candidate_df.groupby(self.grouping).agg({"task_id": "unique"})
+
+        return self.scan_pre_candidate_df
+
+    def get_hse_triplet_df(self):
+        df = hse_qubit_df.copy()
+        # print number of defects of df
+        print("Number of defects in hse_qubit_df: {}".format(len(df)))
+        no_36group_df = df.loc[
+            ~(
+                    (df["uid"].isin(defects_36_groups_df["uid"])) &
+                    (df["defect_name"].isin(defects_36_groups_df["defect_name"])) &
+                    (df["charge"].isin(defects_36_groups_df["charge"]))
+            )]
+        print(f"{len(no_36group_df)} defects in 36 groups")
+        no_36group_and_no_6group_tmd_df = no_36group_df.loc[
+            ~(
+                    (no_36group_df["uid"].isin(tmd_antisites_df["uid"])) &
+                    (no_36group_df["defect_name"].isin(tmd_antisites_df["defect_name"])) &
+                    (no_36group_df["charge"].isin(tmd_antisites_df["charge"]))
+            )]
+
+        print(f"{len(no_36group_and_no_6group_tmd_df)} defects in 36 groups and no 6 group tmd")
+        clean_36_group_df = defects_36_groups_df.loc[defects_36_groups_df["task_id"] != 246]
+        df = pd.concat([no_36group_and_no_6group_tmd_df, clean_36_group_df, tmd_antisites_df])
+        df["level_cat"] = df.apply(lambda x: self.cat_revision(x), axis=1)
+
+        df["spacegroup"] = df["pmg_spg"]
+        df["good_site_sym"] = df["reduced_site_sym"]
+        df["good_site_specie"] = df["reduced_site_specie"]
+        df["C2DB_uid"] = df["uid"]
+
+        df["perturbed_vbm"] = df["level_vbm"]
+        df["perturbed_cbm"] = df["level_cbm"]
+        df["perturbed_bandgap"] = df["level_gap"]
+        df["level_edge_category"] = df["level_cat"]
+        df["vertical_transition_up"] = df["up_tran_en"]
+        df["vertical_transition_down"] = df["dn_tran_en"]
+        df = df.fillna("None")
+
+        # Remove bad bandedges
+        df = df.loc[(df["perturbed_vbm"] != "None") & (df["perturbed_cbm"] != "None")]
+
+        # Make sure that the definition of in-gap levels are followed (it is no a filter, but a definition)
+        df = self.check_ingap_level(df, -0.25, 0.25)
+        df = df.loc[df["in_gap"]]
+
+        self.hse_triplet_df = df
+        self.hse_triplet_df_gp = df.groupby(self.grouping).agg({"task_id": ["unique", "count"]})
+
+        return self.hse_triplet_df
+
+    def get_hse_pre_candidate_df(self, df=None):
+        #note that this sheet can have duplicates
+        df = self.get_hse_triplet_df().copy() if df is None else df
+        df = self.check_vertical_transition(df, 0.5)
+        self.hse_pre_candidate_df = df.loc[df["exist_vertical_transition"]]
+
+        self.hse_pre_candidate_df_gp = self.hse_pre_candidate_df.groupby(self.grouping).agg({"task_id": ["unique",
+                                                                                                         "count"]})
+
+        return self.hse_pre_candidate_df
+
+
+    def get_hse_candidate_df(self, df=None):
+        df = self.get_hse_pre_candidate_df().copy() if df is None else df
+        def get_zpl_zfs_df(df):
+            task3 = Task3Qubit(df)
+            zfs_df = task3.data_preparation
+            zfs_df = zfs_df.set_index("task_id")
+
+            zpl = DataPrepCDFT(defect_entry_df=df)
+            zpl.one_shot_zpl_df()
+            zpl_df = zpl.zpl_df
+            zpl_df = zpl_df.set_index("task_id")
+
+            zfs_zpl_df = zfs_df.join(zpl_df)
+            zfs_zpl_df = zfs_zpl_df.reset_index()
+            def fun(x):
+                zfs_D = x["zfs_D"]
+                zfs_E = x["zfs_E"]
+
+                if type(zfs_D) == float:
+                    zfs_D = round(zfs_D/1000, 2)
+                if type(zfs_E) == float:
+                    zfs_E = round(abs(zfs_E), 0)
+
+                return zfs_D, zfs_E
+
+
+            zfs_zpl_df["zfs_D"] = zfs_zpl_df.apply(lambda x: fun(x)[0], axis=1)
+            zfs_zpl_df["zfs_E"] = zfs_zpl_df.apply(lambda x: fun(x)[1], axis=1)
+            return zfs_zpl_df
+
+        df = get_zpl_zfs_df(df)
+        def get_filtered_df(df, D_zfs=1, wavelength_zpl=2500, homo_to_vmb=0.1, lumo_to_cbm=0.1):
+            def func(x):
+                tran_from = x["transition_from"]
+                print(x["task_id"])
+                if tran_from == "dn":
+                    gap_tran_top_to_cbm = x["level_gap"] - x["dn_tran_top"]
+                    print(x["task_id"], x["transition_from"], x["level_gap"], x["dn_tran_top"])
+                else:
+                    gap_tran_top_to_cbm = x["level_gap"] - x["up_tran_top"]
+                    print(x["task_id"], x["transition_from"], x["level_gap"], x["up_tran_top"])
+                return gap_tran_top_to_cbm
+
+            df = df.loc[df["zfs_D"] != "None"]
+            df = df.loc[df["zfs_D"] >= D_zfs]
+
+            df = df.loc[df["allowed"] == True]
+            df = df.loc[df["ZPL"] != "None"]
+            df = df.loc[df["ZPL_wavelength"] <= wavelength_zpl]
+
+            df["gap_tran_bottom_to_vbm"] = df.apply(
+                lambda x: x["dn_tran_bottom"] if x["transition_from"] == "dn" else x["up_tran_bottom"], axis=1)
+            df["gap_tran_top_to_cbm"] = df.apply(
+                lambda x: x["level_gap"] - x["dn_tran_top"] if x["transition_from"] == "dn" else x["level_gap"] - x["up_tran_top"], axis=1)
+
+            df = df.loc[df["gap_tran_bottom_to_vbm"] >= homo_to_vmb]
+            df = df.loc[df["gap_tran_top_to_cbm"] >= lumo_to_cbm]
+            return df
+
+        df = get_filtered_df(df)
+        # Exclude some double countings
+        def exclude_double_counting(df):
+            double_counting_taskids_list = [186, 283, 211, 229, 242]
+            df = df.loc[~(df["task_id"].isin(double_counting_taskids_list))]
+
+            df = df.groupby(["defect_name", "prototype", "spacegroup", "C2DB_uid", "host_taskid", "charge",
+                             "transition_from"]).apply(
+                lambda x: x.loc[x["zfs_D"].astype(float).idxmax()])
+            df = df.reset_index(drop=True)
+            return df
+
+        self.hse_candidate_df = exclude_double_counting(df)
+        self.hse_candidate_df_gp = self.hse_candidate_df.groupby(self.grouping_hse_candidate).agg(
+            {"task_id": ["unique", "count"]})
+        return df
+
+
+class FigureAndStats(SheetCollection):
+    def __init__(self):
+        super().__init__()
+        self.figures = []
+
+    def get_zpl_fig(self, df=None):
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        # get a histogram plot of ZPL_wave values for df
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        #rename the columns ZPL_wavelength to ZPL-wavelength
+        df.rename(columns={"ZPL_wavelength": "ZPL-wavelength"}, inplace=True)
+        ax.hist(df["ZPL-wavelength"], bins=25, edgecolor="black")
+        ax.set_xlabel("ZPL-wavelength")
+        ax.set_ylabel("Counts")
+        ax.set_title("ZPL-wavelength histogram")
+        self.figures.append(fig)
+        return fig
+
+    def get_zpl_stat(self, df=None):
+        df1 = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        df1 = df1.loc[:, "ZPL_wavelength"]
+        # ref Appl. Phys. Rev. 7, 031308 (2020); doi: 10.1063/5.0006075
+        visible = df1.loc[(df1 >= 380) & (df1 < 700)]
+        nir = df1.loc[(df1 >= 700) & (df1 <= 2500)]
+
+        bio1 = df1.loc[(df1 >= 650) & (df1 <= 950)] #650
+        bio2 = df1.loc[(df1 >= 1000) & (df1 <= 1350)]
+
+        O_band = df1.loc[(df1 >= 1260) & (df1 < 1360)]
+        E_band = df1.loc[(df1 >= 1360) & (df1 < 1460)]
+        S_band = df1.loc[(df1 >= 1460) & (df1 < 1530)]
+        C_band = df1.loc[(df1 >= 1530) & (df1 < 1565)]
+        other_band = df1.loc[(df1 >= 1565) & (df1 <= 2500)]
+
+        set_visible_df = pd.DataFrame(
+            {
+                "name": ["visible", "nir"],
+                "frequency": [i.count() for i in [visible, nir]],
+            }
+        )
+        set_visible_df.set_index("name", inplace=True)
+        set_visible_df["fraction"] = round(set_visible_df.frequency / set_visible_df.frequency.sum()*100, 2)
+        display(set_visible_df)
+
+
+        set_bio_df = pd.DataFrame(
+            {
+                "name": ["bio1", "bio2"],
+                "frequency": [i.count() for i in [bio1, bio2]],
+            }
+        )
+        set_bio_df.set_index("name", inplace=True)
+        set_bio_df["fraction"] = round(set_bio_df.frequency / set_visible_df.loc["nir", "frequency"]*100, 2)
+        # set_bio_df["fraction"] = round(set_bio_df.frequency / set_visible_df.frequency.sum()*100, 2)
+        set_bio_df.loc["sum", :] = set_bio_df.sum()
+
+
+        display(set_bio_df)
+
+        set_tele_df = pd.DataFrame(
+            {
+                "name": ["O_band", "E_band", "S_band", "C_band", "other_band"],
+                "frequency": [i.count() for i in [O_band, E_band, S_band, C_band, other_band]],
+            }
+        )
+        set_tele_df.set_index("name", inplace=True)
+        set_tele_df["fraction"] = round(set_tele_df.frequency / set_visible_df.loc["nir", "frequency"]*100, 2)
+        # set_tele_df["fraction"] = round(set_tele_df.frequency /  set_visible_df.frequency.sum()*100, 2)
+        set_tele_df.loc["sum", :] = set_tele_df.iloc[0:3].sum()
+        display(set_tele_df)
+
+
+
+
+    def get_zfs_fig(self, df=None):
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        # get a histogram plot of ZFS_D values for df
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111)
+        ax.hist(df["zfs_D"], bins=20)
+        ax.set_xlabel("ZFS_D")
+        ax.set_ylabel("Count")
+        ax.set_title("ZFS_D")
+        self.figures.append(fig)
+        return fig
+
+    def test_valid_zpl(self, df=None):
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        df["valid_zpl"] = df.apply(lambda x: x["ZPL"] <= x["vertical_transition_up"] if x["transition_from"] == "up"
+        else x["ZPL"] <= x["vertical_transition_down"], axis=1)
+        df["diff_zpl_vertical_transition"] = df.loc[df["valid_zpl"] == False].apply(lambda x: x["ZPL"] - x[
+            "vertical_transition_up"] if x["transition_from"] == "up" else x["ZPL"] - x["vertical_transition_down"], axis=1)
+
+        return df.loc[df["valid_zpl"] == False,
+                      ["task_id",  "C2DB_uid", "ZPL", "vertical_transition_up", "vertical_transition_down",
+                       "diff_zpl_vertical_transition", "AB", "BC", "CD", "DA", "transition_from", "up_tran_cdft_occ",
+                       "dn_tran_cdft_occ", "dn_in_gap_deg", "up_in_gap_deg"]]
+
+
+
 if __name__ == '__main__':
-    task3 = Task6()
+    pass
 
 
 
