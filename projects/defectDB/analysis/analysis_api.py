@@ -25,14 +25,28 @@ save_plt_path = os.path.join(MODULE_DIR, "output/plt")
 defect_df = IOTools(cwd=input_path, excel_file="defect_2021-11-18_2022-01-10").read_excel()
 triplet_df = IOTools(cwd=input_path, excel_file="triplet_2021-11-18").read_excel()
 qubit_candidate_df = IOTools(cwd=input_path, excel_file="qubit_2021-11-18_2022-01-10").read_excel()
-hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-04-13").read_excel()
+
+# hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-04-13").read_excel()
+hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-04-21").read_excel()
+
+tmd_antisites_df = IOTools(cwd=input_path, excel_file="tmd_antisites_2022-04-13").read_excel()
+
 hse_screened_qubit_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_2021-11-18").read_excel()
 hse_screened_qubit_cdft_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_cdft_2021-11-18_2022-01-31").read_excel()
 hse_screened_qubit_cdft_zpl_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_cdft_zpl_2021-11-18_2022-01-31").read_excel()
-defects_36_groups_df = IOTools(cwd=input_path, excel_file="defects_36_groups_2022-03-07").read_excel()
+
+# defects_36_groups_df = IOTools(cwd=input_path, excel_file="defects_36_groups_2022-03-07").read_excel()
+defects_36_groups_df = IOTools(cwd=input_path, excel_file="defects_36_groups_2022-04-27").read_excel()
+
+
 defects_36_groups_zpl_zfs_df = IOTools(cwd=input_path, excel_file="defects_36_groups_zpl_zfs").read_excel()
-tmd_antisites_df = IOTools(cwd=input_path, excel_file="tmd_antisites_2022-04-13").read_excel()
-hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_6_df_2022-04-07").read_excel()
+
+# hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-04-15").read_excel()
+hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-04-27").read_excel()
+
+table1_df = IOTools(cwd=input_path, excel_file="Table_1_df_2022-04-15").read_excel()
+
+
 
 # os.environ["PATH"] += os.pathsep + "/Library/TeX/texbin/latex"
 # plt.style.use(["science", "nature", "light"])
@@ -270,11 +284,14 @@ class Task3Qubit:
             D, E = "None", "None"
             try:
                 D, E = zfs_e["pyzfs_out"]["D"], zfs_e["pyzfs_out"]["E"]
+                # print(f"\n=={gs_taskid} has ZFS data==")
+                # print(f"\nD: {D}, E: {E}")
             except Exception:
-                print(gs_taskid)
+                print(f"\n=={gs_taskid} has no ZFS data==")
             return D, E
         df["zfs_D"] = df.apply(lambda x: add_zfs_data(x)[0], axis=1)
         df["zfs_E"] = df.apply(lambda x: add_zfs_data(x)[1], axis=1)
+        print(f"\nZFS data added to dataframe:\n{df.loc[:, ['task_id', 'zfs_D', 'zfs_E']]}")
         return df
 
     def get_non_halogenides(self, df):
@@ -842,44 +859,6 @@ class Task6(Task3Qubit):
             fig.colorbar(im, ax=ax, orientation='vertical')
         plt.show()
 
-class Defect36Group:
-    def __init__(self, df=defects_36_groups_df):
-        self.df = df
-
-    @property
-    def data_preparation(self):
-        df = self.df.copy()
-        def add_zfs_data(x):
-            zfs_collection = get_db("HSE_triplets_from_Scan2dDefect", "zfs_data-pbe_pc", port=12347).collection
-            try:
-                gs_taskid = x["task_id"]
-            except:
-                gs_taskid = x["gs_taskid"]
-            zfs_e = zfs_collection.find_one({"prev_fw_taskid": gs_taskid})
-            D, E = "None", "None"
-            try:
-                D, E = zfs_e["pyzfs_out"]["D"], zfs_e["pyzfs_out"]["E"]
-            except Exception:
-                print(gs_taskid)
-            return D, E
-
-
-        def add_gap_diff():
-            db = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan")
-            for uid in df["uid"].unique():
-                print(uid)
-                gap_hse = db.collection.find_one({"uid": uid})["gap_hse"]
-                gap_hse_nosoc = db.collection.find_one({"uid": uid})["gap_hse_nosoc"]
-                df.loc[df["uid"] == uid, "gap_hse"] = gap_hse
-                df.loc[df["uid"] == uid, "gap_hse_nosoc"] = gap_hse_nosoc
-                df.loc[df["uid"] == uid, "gap_diff"] = df.loc[df["uid"] == uid, "level_gap"] - gap_hse_nosoc
-            df["gap_diff"] = df["gap_diff"].round(3)
-            return df
-
-        df = add_gap_diff()
-        df["zfs_D"] = df.apply(lambda x: add_zfs_data(x)[0], axis=1)
-        df["zfs_E"] = df.apply(lambda x: add_zfs_data(x)[1], axis=1)
-        return df
 
 class SheetCollection:
     def __init__(self):
@@ -902,26 +881,18 @@ class SheetCollection:
             "prototype", "spacegroup", "C2DB_uid", "good_site_sym", "good_site_specie",
             "defect_type", "defect_name", "charge", "perturbed_vbm", "perturbed_cbm",
             "perturbed_bandgap", "level_edge_category",
-            "vertical_transition_up",  "vertical_transition_down"
+            "LUMO-HOMO_up",  "LUMO-HOMO_down"
         ]
 
         self.grouping_hse_candidate = [
             "prototype", "spacegroup", "C2DB_uid", "defect_type", "defect_name", "charge",
-            "perturbed_bandgap","zfs_D", "zfs_E",  "vertical_transition_up",
-            "vertical_transition_down", "transition_from", "gap_tran_bottom_to_vbm", "gap_tran_top_to_cbm",
+            "perturbed_bandgap","zfs_D", "zfs_E",  "LUMO-HOMO_up", "LUMO-HOMO_down", "LUMO_HOMO_deg", "transition_from",
+            "gap_tran_bottom_to_vbm", "gap_tran_top_to_cbm",
             "ZPL", "AB", "BC", "CD", 'DA',
             "up_TDM_rate_X", "up_TDM_rate_Y", "up_TDM_rate_Z", "dn_TDM_rate_X", "dn_TDM_rate_Y", "dn_TDM_rate_Z",
-            "up_polarization", "dn_polarization", "allowed"
+            "TDM_rate", "up_polarization", "dn_polarization", "allowed", "class"
         ]
 
-
-    def get_diff_btw_two_dfs(self, df1, df2):
-        a = df1.copy()
-        b = df2.copy()
-        df_diff = pd.concat([a.loc[:, ["uid", "defect_name", "charge"]],
-                             b.loc[:, ["uid", "defect_name", "charge"]]],
-                            axis=0).drop_duplicates(keep=False)
-        return df_diff
 
     def cat_revision(self, x):
         level_cat = x["level_cat"]
@@ -948,6 +919,33 @@ class SheetCollection:
                       vertical_transition, axis=1)
         return df
 
+    def get_zpl_zfs_df(self, df):
+        task3 = Task3Qubit(df)
+        zfs_df = task3.data_preparation
+        zfs_df = zfs_df.set_index("task_id")
+        zpl = DataPrepCDFT(defect_entry_df=df)
+        zpl.one_shot_zpl_df()
+        zpl_df = zpl.zpl_df
+        zpl_df = zpl_df.set_index("task_id")
+        zfs_zpl_df = zfs_df.join(zpl_df)
+        zfs_zpl_df = zfs_zpl_df.reset_index()
+        def fun(x):
+            zfs_D = x["zfs_D"]
+            zfs_E = x["zfs_E"]
+
+            if type(zfs_D) == float:
+                zfs_D = round(zfs_D/1000, 2)
+            if type(zfs_E) == float:
+                zfs_E = round(abs(zfs_E), 0)
+
+            return zfs_D, zfs_E
+
+
+        zfs_zpl_df["zfs_D"] = zfs_zpl_df.apply(lambda x: fun(x)[0], axis=1)
+        zfs_zpl_df["zfs_E"] = zfs_zpl_df.apply(lambda x: fun(x)[1], axis=1)
+        self.zfs_zpl_df = zfs_zpl_df
+        return zfs_zpl_df
+
     def get_scan_defect_df(self):
         df = defect_df.copy()
         df["level_cat"] = df.apply(lambda x: self.cat_revision(x), axis=1)
@@ -963,6 +961,8 @@ class SheetCollection:
         df["level_edge_category"] = df["level_cat"]
         df["vertical_transition_up"] = df["up_tran_en"]
         df["vertical_transition_down"] = df["dn_tran_en"]
+        df["LUMO-HOMO_up"] = df["up_tran_en"]
+        df["LUMO-HOMO_down"] = df["dn_tran_en"]
 
         df = df.fillna("None")
 
@@ -997,8 +997,10 @@ class SheetCollection:
 
         return self.scan_pre_candidate_df
 
-    def get_hse_triplet_df(self):
-        df = hse_qubit_df.copy()
+    def get_hse_triplet_df(self, df=None, remove_duplicates_based_on=["uid", "defect_name", "charge"],
+                           remove_taskid_in_36group=[186, 1020, 1000, 283, 211, 644, 229, 548, 242, 603]):
+
+        df = df if df is not None else hse_qubit_df.copy()
         # print number of defects of df
         print("Number of defects in hse_qubit_df: {}".format(len(df)))
         no_36group_df = df.loc[
@@ -1007,7 +1009,7 @@ class SheetCollection:
                     (df["defect_name"].isin(defects_36_groups_df["defect_name"])) &
                     (df["charge"].isin(defects_36_groups_df["charge"]))
             )]
-        print(f"{len(no_36group_df)} defects in 36 groups")
+        print(f"{len(no_36group_df)} defects not in 36-groups")
         no_36group_and_no_6group_tmd_df = no_36group_df.loc[
             ~(
                     (no_36group_df["uid"].isin(tmd_antisites_df["uid"])) &
@@ -1015,7 +1017,7 @@ class SheetCollection:
                     (no_36group_df["charge"].isin(tmd_antisites_df["charge"]))
             )]
 
-        print(f"{len(no_36group_and_no_6group_tmd_df)} defects in 36 groups and no 6 group tmd")
+        print(f"{len(no_36group_and_no_6group_tmd_df)} defects not in 36-groups and not in 6-group tmd")
         clean_36_group_df = defects_36_groups_df.loc[defects_36_groups_df["task_id"] != 246]
         df = pd.concat([no_36group_and_no_6group_tmd_df, clean_36_group_df, tmd_antisites_df])
         df["level_cat"] = df.apply(lambda x: self.cat_revision(x), axis=1)
@@ -1031,15 +1033,24 @@ class SheetCollection:
         df["level_edge_category"] = df["level_cat"]
         df["vertical_transition_up"] = df["up_tran_en"]
         df["vertical_transition_down"] = df["dn_tran_en"]
+        df["LUMO-HOMO_up"] = df["up_tran_en"]
+        df["LUMO-HOMO_down"] = df["dn_tran_en"]
+
         df = df.fillna("None")
 
         # Remove bad bandedges
         df = df.loc[(df["perturbed_vbm"] != "None") & (df["perturbed_cbm"] != "None")]
 
         # Make sure that the definition of in-gap levels are followed (it is no a filter, but a definition)
-        df = self.check_ingap_level(df, -0.25, 0.25)
-        df = df.loc[df["in_gap"]]
+        df = self.check_ingap_level(df, -0.50, 0.50)
+        # df = df.loc[df["in_gap"]]
 
+        if remove_taskid_in_36group:
+            df = df.loc[~df["task_id"].isin(remove_taskid_in_36group)]
+
+        if remove_duplicates_based_on:
+            df = df.drop_duplicates(
+                subset=remove_duplicates_based_on, keep="first").sort_values("task_id", ascending=True)
         self.hse_triplet_df = df
         self.hse_triplet_df_gp = df.groupby(self.grouping).agg({"task_id": ["unique", "count"]})
 
@@ -1047,7 +1058,7 @@ class SheetCollection:
 
     def get_hse_pre_candidate_df(self, df=None):
         #note that this sheet can have duplicates
-        df = self.get_hse_triplet_df().copy() if df is None else df
+        df = self.get_hse_triplet_df(remove_duplicates_based_on=None).copy() if df is None else df
         df = self.check_vertical_transition(df, 0.5)
         self.hse_pre_candidate_df = df.loc[df["exist_vertical_transition"]]
 
@@ -1059,47 +1070,38 @@ class SheetCollection:
 
     def get_hse_candidate_df(self, df=None):
         df = self.get_hse_pre_candidate_df().copy() if df is None else df
-        def get_zpl_zfs_df(df):
-            task3 = Task3Qubit(df)
-            zfs_df = task3.data_preparation
-            zfs_df = zfs_df.set_index("task_id")
 
-            zpl = DataPrepCDFT(defect_entry_df=df)
-            zpl.one_shot_zpl_df()
-            zpl_df = zpl.zpl_df
-            zpl_df = zpl_df.set_index("task_id")
+        df = self.get_zpl_zfs_df(df)
+        df["LUMO_HOMO_deg"] = df.apply(lambda x: x["dn_tran_lumo_homo_deg"] if x["transition_from"] == "dn" else x[
+            "up_tran_lumo_homo_deg"], axis=1)
+        df["TDM_rate"] = df.apply(lambda x: x["total_TDM_rate_up"] if x["transition_from"] == "up" else x[
+            "total_TDM_rate_dn"], axis=1)
 
-            zfs_zpl_df = zfs_df.join(zpl_df)
-            zfs_zpl_df = zfs_zpl_df.reset_index()
-            def fun(x):
-                zfs_D = x["zfs_D"]
-                zfs_E = x["zfs_E"]
-
-                if type(zfs_D) == float:
-                    zfs_D = round(zfs_D/1000, 2)
-                if type(zfs_E) == float:
-                    zfs_E = round(abs(zfs_E), 0)
-
-                return zfs_D, zfs_E
-
-
-            zfs_zpl_df["zfs_D"] = zfs_zpl_df.apply(lambda x: fun(x)[0], axis=1)
-            zfs_zpl_df["zfs_E"] = zfs_zpl_df.apply(lambda x: fun(x)[1], axis=1)
-            return zfs_zpl_df
-
-        df = get_zpl_zfs_df(df)
-        def get_filtered_df(df, D_zfs=1, wavelength_zpl=2500, homo_to_vmb=0.1, lumo_to_cbm=0.1):
-            def func(x):
-                tran_from = x["transition_from"]
-                print(x["task_id"])
-                if tran_from == "dn":
-                    gap_tran_top_to_cbm = x["level_gap"] - x["dn_tran_top"]
-                    print(x["task_id"], x["transition_from"], x["level_gap"], x["dn_tran_top"])
-                else:
+        def fun(x):
+            if x["transition_from"] == "dn":
+                gap_tran_bottom_to_vbm = x["dn_tran_bottom"]
+                gap_tran_top_to_cbm = x["level_gap"] - x["dn_tran_top"]
+            elif x["transition_from"] == "up":
+                gap_tran_bottom_to_vbm = x["up_tran_bottom"]
+                gap_tran_top_to_cbm = x["level_gap"] - x["up_tran_top"]
+            else:
+                if x["dn_tran_bottom"] == "None":
+                    gap_tran_bottom_to_vbm = x["up_tran_bottom"]
                     gap_tran_top_to_cbm = x["level_gap"] - x["up_tran_top"]
-                    print(x["task_id"], x["transition_from"], x["level_gap"], x["up_tran_top"])
-                return gap_tran_top_to_cbm
+                else:
+                    gap_tran_bottom_to_vbm = x["dn_tran_bottom"]
+                    gap_tran_top_to_cbm = x["level_gap"] - x["dn_tran_top"]
+            return gap_tran_bottom_to_vbm, gap_tran_top_to_cbm
 
+        df["gap_tran_bottom_to_vbm"] = df.apply(lambda x: fun(x)[0], axis=1)
+        df["gap_tran_top_to_cbm"] = df.apply(lambda x: fun(x)[1], axis=1)
+
+        # df["gap_tran_bottom_to_vbm"] = df.apply(
+        #     lambda x: x["dn_tran_bottom"] if x["transition_from"] == "dn" else x["up_tran_bottom"], axis=1)
+        # df["gap_tran_top_to_cbm"] = df.apply(
+        #     lambda x: x["level_gap"] - x["dn_tran_top"] if x["transition_from"] == "dn" else x["level_gap"] - x["up_tran_top"], axis=1)
+
+        def get_filtered_df(df, D_zfs=0.95, wavelength_zpl=2500, homo_to_vmb=0.095, lumo_to_cbm=0.095):
             df = df.loc[df["zfs_D"] != "None"]
             df = df.loc[df["zfs_D"] >= D_zfs]
 
@@ -1107,37 +1109,241 @@ class SheetCollection:
             df = df.loc[df["ZPL"] != "None"]
             df = df.loc[df["ZPL_wavelength"] <= wavelength_zpl]
 
-            df["gap_tran_bottom_to_vbm"] = df.apply(
-                lambda x: x["dn_tran_bottom"] if x["transition_from"] == "dn" else x["up_tran_bottom"], axis=1)
-            df["gap_tran_top_to_cbm"] = df.apply(
-                lambda x: x["level_gap"] - x["dn_tran_top"] if x["transition_from"] == "dn" else x["level_gap"] - x["up_tran_top"], axis=1)
-
             df = df.loc[df["gap_tran_bottom_to_vbm"] >= homo_to_vmb]
             df = df.loc[df["gap_tran_top_to_cbm"] >= lumo_to_cbm]
+
+            problematic_taskids = FigureAndStats().test_valid_opt_tran(df).loc[:, "task_id"]
+            df = df.loc[~(df["task_id"].isin(problematic_taskids))]
             return df
 
-        df = get_filtered_df(df)
+        passed_df = get_filtered_df(df)
+        not_passed_df = df.loc[~(df["task_id"].isin(passed_df["task_id"]))]
+
         # Exclude some double countings
         def exclude_double_counting(df):
             double_counting_taskids_list = [186, 283, 211, 229, 242]
             df = df.loc[~(df["task_id"].isin(double_counting_taskids_list))]
-
             df = df.groupby(["defect_name", "prototype", "spacegroup", "C2DB_uid", "host_taskid", "charge",
-                             "transition_from"]).apply(
-                lambda x: x.loc[x["zfs_D"].astype(float).idxmax()])
+                             "transition_from"]).apply(lambda x: x.loc[x["zfs_D"].astype(float).idxmax()])
             df = df.reset_index(drop=True)
             return df
 
-        self.hse_candidate_df = exclude_double_counting(df)
-        self.hse_candidate_df_gp = self.hse_candidate_df.groupby(self.grouping_hse_candidate).agg(
-            {"task_id": ["unique", "count"]})
-        return df
+
+        passed_df = exclude_double_counting(passed_df)
+        def exclude_weird_zfs(df):
+            #exclude task_id = 990 from df
+            df = df.loc[df["task_id"] != 990]
+            return df
+
+        passed_df = exclude_weird_zfs(passed_df)
+        self.hse_candidate_df = passed_df.replace(np.nan, "None").copy()
+        self.hse_candidate_df_gp = self.hse_candidate_df.copy().replace(np.nan, "None").groupby(
+            self.grouping_hse_candidate).agg({"task_id": "unique"})
+        self.hse_candidate_not_passed_df = not_passed_df.replace(np.nan, "None").copy()
+        self.hse_candidate_not_passed_df_gp = self.hse_candidate_not_passed_df.copy().replace(np.nan, "None").groupby(
+            self.grouping_hse_candidate).agg(
+            {"task_id": "unique"})
 
 
 class FigureAndStats(SheetCollection):
     def __init__(self):
         super().__init__()
         self.figures = []
+
+    def get_grand_defect_level_plot(self, df, sym_name, ylim):
+        # plot a bar chart containing the defect levels for a mutiple defects
+        plot_df = df if df.shape[0] > 0 else self.hse_candidate_df
+
+        defects = []
+        taskid_labels = []
+        mags =[]
+        defect_name_labels = []
+        charge_labels = []
+        host_labels = []
+        print(f"task_id :{plot_df['task_id'].tolist()}")
+        for idx, taskid in enumerate(plot_df["task_id"].tolist()):
+            print("=="*20, "\n", f"taskid: {taskid}, idx: {idx}")
+            defect = plot_df.loc[(plot_df["task_id"] == taskid), :]
+            if len(defect) == 1:
+                idx = 0
+            defect = defect.iloc[idx, :]
+            mag = defect["mag"]
+
+            # append all entries as dict in defect to defects list
+            defects.append(defect.to_dict())
+            taskid_labels.append(defect["task_id"])
+            mags.append(defect["mag"])
+            defect_name_labels.append(defect["defect_name"])
+            if int(defect["charge"]) == -1:
+                charge_labels.append("1-")
+            elif int(defect["charge"]) == 1:
+                charge_labels.append("1+")
+            else:
+                charge_labels.append(defect["charge"])
+
+            host_labels.append(defect["C2DB_uid"])
+
+        vbm_lim, cbm_lim = plot_df["level_vbm"].median(), plot_df["level_cbm"].median()
+
+        fig, ax = plt.subplots(figsize=(12,11), dpi=300)
+        fig_y_height = 5, 5
+        font_size = 7.25
+        ax.set_ylim(vbm_lim-fig_y_height[0], cbm_lim+fig_y_height[1])
+
+        print("len of defects: {}".format(len(defects)))
+        # plot mutilple bars
+        for defect, x in zip(defects, np.arange(0, len(defects)*5, 5)):
+            # readout all the data from defect dict
+            vbm = defect["level_vbm"]
+            cbm = defect["level_cbm"]
+            level_edge_ir = defect["level_edge_ir"],
+            up = defect["up_in_gap_level"]
+            dn = defect["dn_in_gap_level"]
+            up_deg = defect["up_in_gap_deg"]
+            dn_deg = defect["dn_in_gap_deg"]
+            up_ir = defect["up_in_gap_ir"]
+            dn_ir = defect["dn_in_gap_ir"]
+            up_occ = defect["up_in_gap_occ"]
+            dn_occ = defect["dn_in_gap_occ"]
+            up_id = defect["up_in_gap_band_id"]
+            dn_id = defect["dn_in_gap_band_id"]
+            up_band = defect["up_in_gap_band_index"]
+            dn_band = defect["dn_in_gap_band_index"]
+            vbm_max_el = defect["vbm_max_el"]
+            vbm_max_proj_orbital = defect["vbm_max_proj_orbital"]
+            cbm_max_el = defect["cbm_max_el"]
+            cbm_max_proj_orbital = defect["cbm_max_proj_orbital"]
+            up_tran_bottom = defect["up_tran_bottom"] + defect["level_vbm"] if defect["up_tran_bottom"] != "None" else \
+                None
+            up_tran_en = defect["up_tran_en"]
+            dn_tran_bottom = defect["dn_tran_bottom"] + defect["level_vbm"] if defect["dn_tran_bottom"] != 'None' else None
+            dn_tran_en = defect["dn_tran_en"]
+            transition_from = defect["transition_from"]
+            #print transition_from
+            print(f"transition_from: {transition_from}")
+
+            if not up_ir:
+                up_ir = ["" for i in up]
+            if not up_deg:
+                up_deg = ["" for i in up]
+            if not up_occ:
+                up_occ = ["" for i in up]
+
+            if not dn_ir:
+                dn_ir = ["" for i in dn]
+            if not dn_deg:
+                dn_deg = ["" for i in dn]
+            if not dn_occ:
+                dn_occ = ["" for i in dn]
+
+            ax.bar(x, vbm-(vbm_lim-fig_y_height[0]), 4, (vbm_lim-fig_y_height[0]), color="deepskyblue")
+            ax.bar(x, (cbm_lim+fig_y_height[1])-cbm, 4, cbm, color="orange")
+
+            dx = 0.35
+            for level, occ, deg, id in zip(up, up_occ, up_deg, up_band):
+                print(f"level: {level}, occ: {occ}, deg: {deg}, id: {id}")
+                # dx += 0.2
+                ax.text(x-2, level, id)
+                color = None
+                if deg == 1:
+                    color = "red"
+                elif deg == 2:
+                    color = "blue"
+                elif deg == 3:
+                    color = "green"
+                elif deg == 4:
+                    color = "yellow"
+                else:
+                    color = "black"
+
+                ax.hlines(level, x-2, x-0.5, colors=color)
+                if occ == 0:
+                    ax.text(x-0.5, level, "*")
+                elif round(occ, 1) == 0.5:
+                    ax.text(x-0.5, level, "%")
+
+            up_info = '\n'.join(
+                [
+                    "{}/{}/{}/{}/{}".format(level, occ, deg, ir, band_id) for
+                    level, occ, deg, ir, band_id in zip(up, up_occ, up_deg, up_ir, up_band)
+                ]
+            )
+            ax.text(x-1.5, cbm+0.75, up_info, bbox=dict(facecolor='white', edgecolor='black'), size=font_size)
+            ax.text(x-1.5, cbm+0.4, "{}/{}/{}/{}".format(cbm_max_el, cbm_max_proj_orbital, level_edge_ir[0][1], cbm),
+                    bbox=dict(
+                        facecolor='white', edgecolor='black'), size=font_size)
+            if up_tran_en and (up_tran_bottom or up_tran_bottom != "None") and transition_from == "up":
+                ax.arrow(x=x-1.25, y=up_tran_bottom, dx=0, dy=up_tran_en, width=0.02,
+                         length_includes_head=True, facecolor="gray")
+
+            dx = 1
+            for level, occ, deg, id in zip(dn, dn_occ, dn_deg, dn_band):
+                ax.text(x+2, level, id)
+                color = None
+                if deg == 1:
+                    color = "red"
+                elif deg == 2:
+                    color = "blue"
+                elif deg == 3:
+                    color = "green"
+                elif deg == 4:
+                    color = "yellow"
+                else:
+                    color = "black"
+
+                ax.hlines(level, x+0.5, x+2, colors=color)
+                if occ == 0:
+                    ax.text(x+0.5, level, "*")
+                elif round(occ, 1) == 0.5:
+                    ax.text(x+0.5, level, "%")
+
+            dn_info = '\n'.join(
+                [
+                    "{}/{}/{}/{}/{}".format(level, occupied, deg, ir, band_id) for
+                    level, occupied, deg, ir, band_id in zip(dn, dn_occ, dn_deg, dn_ir, dn_band)
+                ]
+            )
+            ax.text(x-1.5, vbm-1.05, dn_info, bbox=dict(facecolor='white', edgecolor='black'),
+                    size=font_size)
+            ax.text(x-1.5, vbm-0.55, "{}/{}/{}/{}".format(vbm_max_el, vbm_max_proj_orbital,
+                                                          level_edge_ir[0][0], vbm),
+                    bbox=dict(facecolor='white', edgecolor='black'), size=font_size)
+            # ax.text(x-1.5, vbm_lim-fig_y_height[0]+3, dn_info, bbox=dict(facecolor='white', edgecolor='black'),
+            #         size=font_size)
+            # ax.text(x-1.5, vbm_lim-fig_y_height[0]+2.5, "{}/{}/{}/{}".format(vbm_max_el, vbm_max_proj_orbital,
+            #                                                            level_edge_ir[0][0], vbm),
+            #         bbox=dict(facecolor='white', edgecolor='black'), size=font_size)
+            if dn_tran_en and dn_tran_bottom and transition_from == "dn":
+                ax.arrow(x=x+1.25, y=dn_tran_bottom, dx=0, dy=dn_tran_en, width=0.02,
+                         length_includes_head=True, facecolor="gray")
+
+        ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        for tick in ax.get_yticklabels():
+            tick.set_fontsize(15)
+
+        ax.tick_params(axis="x", bottom=False, labelbottom=True)
+        ax.tick_params(axis="y", right=False, which="both")
+
+
+        ax.set_xticks(np.arange(0, len(defects)*5, 5))
+        # ax.set_xticklabels(["{}".format(taskid_labels[i]) for i in range(len(mags))],
+        #                    fontdict={"fontsize": 10}, rotation=0)
+
+        ax.set_xticklabels([rf"$\mathrm{{{defect_name_labels[i].split('_')[2]}_{{"
+                            rf"{defect_name_labels[i].split('_')[4]}}}^{{{charge_labels[i]}}}}}$"+
+                            rf" @ {''.join(host_labels[i].split('-')[0].split('2'))}"+ "\n"+rf"{taskid_labels[i]}" for
+                            i in range(len(mags))], fontdict={"fontsize": 10}, rotation=0)
+
+        # remove minor and major xticks
+        ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=True)
+        print(f"taskid_label: {taskid_labels}, mags: {mags}")
+
+        ax.set_title(f"Antisite defects in PTMC with {sym_name}", fontsize=15)
+        ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
+        ax.set_ylim(ylim[0], ylim[1])
+
+        fig.savefig("/Users/jeng-yuantsai/Research/project/Scan2dDefect/manuscript/fig/test.pdf", format="pdf")
+        return fig
 
     def get_zpl_fig(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
@@ -1146,10 +1352,67 @@ class FigureAndStats(SheetCollection):
         ax = fig.add_subplot(111)
         #rename the columns ZPL_wavelength to ZPL-wavelength
         df.rename(columns={"ZPL_wavelength": "ZPL-wavelength"}, inplace=True)
-        ax.hist(df["ZPL-wavelength"], bins=25, edgecolor="black")
-        ax.set_xlabel("ZPL-wavelength")
-        ax.set_ylabel("Counts")
-        ax.set_title("ZPL-wavelength histogram")
+
+        import matplotlib.cm as cm
+        c = "darkorange"
+        ax.axvspan(650, 950, facecolor=c, alpha=0.5)
+        # ax.axvline(650, color="wheat", linestyle="-")
+        ax.text(650, 9.3, "650", rotation=90, verticalalignment="center", horizontalalignment="center")
+        # ax.axvline(950, color="wheat", linestyle="-")
+        ax.text(950, 9.3, "950", rotation=90, verticalalignment="center", horizontalalignment="center")
+
+        c = "darkgreen"
+        ax.axvspan(1000, 1350, facecolor=c, alpha=0.5)
+        # ax.axvline(1000, color="limegreen", linestyle="-")
+        ax.text(1000, 9.3, "1000", rotation=90, verticalalignment="center", horizontalalignment="center")
+        # ax.axvline(1350, color="limegreen", linestyle="-")
+        ax.text(1350, 9.3, "1350", rotation=90, verticalalignment="center", horizontalalignment="center")
+
+        for wv in range(380, 780, 20):
+            cmap = cm.get_cmap('jet')
+            c = cmap(float(wv - 380) / (780 - 380))
+            ax.axvspan(wv, wv + 20, facecolor=c, alpha=0.5)
+        # ax.axvline(380, color="yellow", linestyle="-")
+        ax.text(380, 9.3, "380", rotation=90, verticalalignment="center", horizontalalignment="center")
+        # ax.axvline(780, color="yellow", linestyle="-")
+        ax.text(780, 9.3, "780", rotation=90, verticalalignment="center", horizontalalignment="center")
+
+        c = "grey"
+        ax.axvspan(1260, 1565, facecolor=c, alpha=0.5)
+        # ax.axvline(1260, color=c, linestyle="-")
+        ax.text(1260, 9.3, "1260", rotation=90, verticalalignment="center", horizontalalignment="center")
+        # ax.axvline(1630, color=c, linestyle="-")
+        ax.text(1565, 9.3, "1565", rotation=90, verticalalignment="center", horizontalalignment="center")
+
+        # ax.hist(df["ZPL-wavelength"], bins=25, edgecolor="black")
+        df1 = df.loc[:, "ZPL-wavelength"]
+        # plot bar chart of ZPL-wavelength with range of 250 to 2000 with 25
+        ax.bar(
+            [i+25 for i in range(250, 2000, 50)],
+            [df1.loc[(df1 >= i) & (df1 < i + 50)].count() for i in range(250, 2000, 50)],
+            width=50,
+            edgecolor="black",
+        )
+        # set count of ZPL-wavelength at the top of each bar except the zero-height bar
+        for i in range(250, 2000, 50):
+            if df1.loc[(df1 >= i) & (df1 < i + 50)].count() != 0:
+                ax.text(i + 25, df1.loc[(df1 >= i) & (df1 < i + 50)].count(),
+                        str(df1.loc[(df1 >= i) & (df1 < i + 50)].count()),
+                        horizontalalignment="center",
+                        verticalalignment="bottom")
+
+
+        ax.set_xlim(250, 2000)
+        ax.set_ylim(0, 10)
+        ax.set_xlabel("ZPL wavelength (nm)")
+        ax.set_ylabel("Frequency")
+        ax.set_title("ZPL wavelength distribution")
+        # remove subticks
+        ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
+        ax.tick_params(axis="x", which="major", bottom=True, top=False, direction="out")
+        ax.tick_params(axis="y", which="minor", left=False, right=False, labelbottom=True)
+        ax.tick_params(axis="y", which="major", left=True, right=False, labelbottom=True, direction="out")
+
         self.figures.append(fig)
         return fig
 
@@ -1157,7 +1420,7 @@ class FigureAndStats(SheetCollection):
         df1 = self.get_hse_candidate_df().copy() if df is None else df.copy()
         df1 = df1.loc[:, "ZPL_wavelength"]
         # ref Appl. Phys. Rev. 7, 031308 (2020); doi: 10.1063/5.0006075
-        visible = df1.loc[(df1 >= 380) & (df1 < 700)]
+        visible = df1.loc[(df1 >= 380) & (df1 < 780)]
         nir = df1.loc[(df1 >= 700) & (df1 <= 2500)]
 
         bio1 = df1.loc[(df1 >= 650) & (df1 <= 950)] #650
@@ -1173,10 +1436,11 @@ class FigureAndStats(SheetCollection):
             {
                 "name": ["visible", "nir"],
                 "frequency": [i.count() for i in [visible, nir]],
+                "wavelength": ["380-780", "700-2500"],
             }
         )
         set_visible_df.set_index("name", inplace=True)
-        set_visible_df["fraction"] = round(set_visible_df.frequency / set_visible_df.frequency.sum()*100, 2)
+        set_visible_df["fraction"] = round(set_visible_df.frequency / df1.count()*100)
         display(set_visible_df)
 
 
@@ -1184,11 +1448,11 @@ class FigureAndStats(SheetCollection):
             {
                 "name": ["bio1", "bio2"],
                 "frequency": [i.count() for i in [bio1, bio2]],
+                "wavelength": ["650-950", "1000-1350"],
             }
         )
         set_bio_df.set_index("name", inplace=True)
-        set_bio_df["fraction"] = round(set_bio_df.frequency / set_visible_df.loc["nir", "frequency"]*100, 2)
-        # set_bio_df["fraction"] = round(set_bio_df.frequency / set_visible_df.frequency.sum()*100, 2)
+        set_bio_df["fraction"] = round(set_bio_df.frequency / df1.count()*100)
         set_bio_df.loc["sum", :] = set_bio_df.sum()
 
 
@@ -1196,47 +1460,597 @@ class FigureAndStats(SheetCollection):
 
         set_tele_df = pd.DataFrame(
             {
-                "name": ["O_band", "E_band", "S_band", "C_band", "other_band"],
-                "frequency": [i.count() for i in [O_band, E_band, S_band, C_band, other_band]],
+                "name": ["O_band", "E_band", "S_band", "C_band"],
+                "frequency": [i.count() for i in [O_band, E_band, S_band, C_band]],
+                "wavelength": ["1260-1360", "1360-1460", "1460-1530", "1530-1565"],
             }
         )
         set_tele_df.set_index("name", inplace=True)
-        set_tele_df["fraction"] = round(set_tele_df.frequency / set_visible_df.loc["nir", "frequency"]*100, 2)
-        # set_tele_df["fraction"] = round(set_tele_df.frequency /  set_visible_df.frequency.sum()*100, 2)
-        set_tele_df.loc["sum", :] = set_tele_df.iloc[0:3].sum()
+        set_tele_df["fraction"] = round(set_tele_df.frequency / df1.count()*100)
+        set_tele_df.loc["sum", :] = set_tele_df.iloc[:].sum()
         display(set_tele_df)
 
+    def get_cdft_relax_energy_fig(self, df=None):
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        # plot histogram of CDFT relaxation energy BC and DA
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        df1 = df.loc[:, "BC"]
+        # plot bar chart range from 0 to 0.5 with interval 0.01 of BC and DA
+
+        ax.bar(
+            np.arange(0, 0.4-0.01, 0.01)+0.01/2,
+            df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index(),
+            width=0.01,
+            label="BC",
+            edgecolor="black",
+        )
+
+        # set text of count for each bin at the top of the bar if the count != 0, else remove the text
+        for i in range(len(df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index())):
+            if df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i] != 0:
+                ax.text(
+                    np.arange(0, 0.4-0.01, 0.01)[i]+0.01/2,
+                    df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i],
+                    df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i],
+                    horizontalalignment="center",
+                    verticalalignment="bottom",
+                    )
+
+        # remove subticks
+        ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
+        ax.tick_params(axis="x", which="major", bottom=True, top=False, direction="out")
+        ax.tick_params(axis="y", which="major", left=True, right=False, labelbottom=True, direction="out")
+        ax.tick_params(axis="y", which="minor", left=False, right=False, labelbottom=True, direction="out")
+        ax.set_xlim(0, 0.4)
+        ax.set_ylim(0, 18)
+
+
+        #plot inset bar chart of DA
+        from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+        axins = inset_axes(ax, width="50%", height="50%", loc="upper center")
+        df1 = df.loc[:, "DA"]
+        axins.bar(
+            np.arange(0, 0.2-0.01, 0.01)+0.01/2,
+            df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index(),
+            width=0.01,
+            label="DA",
+            edgecolor="black",
+            color="orange"
+        )
+
+        # set text of count for each bin at the top of the bar if the count != 0, else remove the text
+        for i in range(len(df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index())):
+            if df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i] != 0:
+                axins.text(
+                    np.arange(0, 0.2-0.01, 0.01)[i]+0.01 if i < 2 else np.arange(0, 0.2-0.01, 0.01)[i]+0.01/2,
+                    df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i],
+                    df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i],
+                    horizontalalignment="center",
+                    verticalalignment="bottom",
+                    )
+
+        axins.legend(loc="upper right")
+        axins.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
+        axins.tick_params(axis="x", which="major", bottom=True, top=False, direction="out")
+        axins.tick_params(axis="y", which="major", left=True, right=False, labelbottom=True, direction="out")
+        axins.tick_params(axis="y", which="minor", left=False, right=False, labelbottom=True, direction="out")
+        axins.set_xlim(0, 0.2)
+        axins.set_ylim(0, 30)
+
+        ax.set_ylim(0, 18)
+        ax.set_xlabel("Relaxation energy (eV)")
+        ax.set_ylabel("Frequency")
+        ax.set_title("CDFT relaxation energy distribution")
+        ax.legend(loc="upper right")
+
+        self.figures.append(fig)
+        return fig
+
+    def get_cdft_relax_energy_stat(self, df=None):
+        """
+        Get statistics of CDFT relaxation energy distribution
+        """
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        # plot histogram of CDFT relaxation energy BC and DA
+        bc, da = 0.05, 0.05
+        print("BC<={}, N={}-{}%, DA<={}, N={}-{}%".format(bc, df.loc[df["BC"] <= bc].count().iloc[0],
+                                                          df.loc[df["BC"]<= bc].count().iloc[0]/df.count().iloc[0]*100,
+                                                          da, df.loc[df["DA"] <= da].count().iloc[0],
+                                                          df.loc[df["DA"] <= da].count().iloc[0]/df.count().iloc[
+                                                              0]*100))
 
 
 
     def get_zfs_fig(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
-        # get a histogram plot of ZFS_D values for df
-        fig = plt.figure(figsize=(10, 10))
+        df.rename(columns={"zfs_D": "D"}, inplace=True)
+
+        fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.hist(df["zfs_D"], bins=20)
-        ax.set_xlabel("ZFS_D")
-        ax.set_ylabel("Count")
-        ax.set_title("ZFS_D")
+        c = "red"
+        ax.axvspan(1, 2, facecolor=c, alpha=0.4)
+        ax.text(1.5, 13, "L", verticalalignment="center", horizontalalignment="center")
+
+        c="blue"
+        ax.axvspan(2, 4, facecolor=c, alpha=0.4)
+        ax.text(3, 13, "S", verticalalignment="center", horizontalalignment="center")
+
+        c="green"
+        ax.axvspan(4, 8, facecolor=c, alpha=0.4)
+        ax.text(6, 13, "C", verticalalignment="center", horizontalalignment="center")
+
+        c="orange"
+        ax.axvspan(8, 12, facecolor=c, alpha=0.4)
+        ax.text(10, 13, "X", verticalalignment="center", horizontalalignment="center")
+
+        # ax.hist(df["D"], bins=25, edgecolor="black")
+        df1 = df.loc[:, "D"]
+        ax.bar(
+            [i+0.5 for i in range(1, 12, 1)],
+            [df1.loc[(df1 >= i) & (df1 < i + 1)].count() for i in range(1, 12, 1)],
+            width=1,
+            edgecolor="black",
+        )
+
+        # set text of count for each bin at the top of the bar and if the count is 0, then remove the text
+        for i in range(1, 12, 1):
+            count = df1.loc[(df1 >= i) & (df1 < i + 1)].count()
+            if count == 0:
+                ax.text(i+0.5, 0, "", verticalalignment="center", horizontalalignment="center")
+            else:
+                ax.text(i+0.5, count+1, str(count), verticalalignment="center", horizontalalignment="center")
+
+        ax.set_xlim(1, 12)
+        ax.set_ylim(0, 25)
+        ax.set_xlabel("ZFS D (GHz)")
+        ax.set_ylabel("Frequency")
+        ax.set_title("ZFS parameter D distribution")
+        # remove subticks
+        ax.tick_params(axis="x", which="minor", bottom=False, top=False, labelbottom=False, direction="out")
+        ax.tick_params(axis="x", which="major", bottom=True, top=False, direction="out")
+        ax.tick_params(axis="y", which="major", left=True, right=False, labelbottom=True, direction="out")
+        ax.tick_params(axis="y", which="minor", left=False, right=False, labelbottom=True, direction="out")
+
         self.figures.append(fig)
         return fig
 
-    def test_valid_zpl(self, df=None):
+
+
+    def get_zfs_stat(self, df=None):
+        import numpy as np
+        ## ref: http://www.sb.fsu.edu/~fajer/Fajerlab/LinkedDocuments/Ralph%20Weber.pdf
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        df1 = df.loc[:, "zfs_D"]
+        minor_f = df1.loc[(df1 >= 0) & (df1 < 1)]
+        L = df1.loc[(df1 >= 1) & (df1 < 2)]
+        S = df1.loc[(df1 >= 2) & (df1 < 4)]
+        C = df1.loc[(df1 >= 4) & (df1 < 8)]
+        X = df1.loc[(df1 >= 8) & (df1 < 12)]
+        Ku = df1.loc[(df1 >= 12) & (df1 < 18)]
+        K = df1.loc[(df1 >= 18) & (df1 < 26)]
+        Q = df1.loc[(df1 >= 26) & (df1 < 40)]
+        V = df1.loc[(df1 >= 40) & (df1 < 75)]
+        W = df1.loc[(df1 >= 75) & (df1 < 110)]
+        D = df1.loc[(df1 >= 110) & (df1 < 170)]
+
+        zfs_band_df = pd.DataFrame(
+            {
+                "name": ["minor_f", "L", "S", "C", "X", "Ku", "K", "Q", "V", "W", "D"],
+                "frequency": [i.count() for i in [minor_f, L, S, C, X, Ku, K, Q, V, W, D]],
+                "wavelength": ["0-1", "1-2", "2-4", "4-8", "8-12", "12-18", "18-26", "26-40", "40-75", "75-110", "110-170"],
+            }
+        )
+        zfs_band_df.set_index("name", inplace=True)
+        zfs_band_df["fraction"] = round(zfs_band_df.frequency / zfs_band_df.frequency.sum()*100, 0)
+        display(zfs_band_df)
+        zfs_band_df.loc[["L", "S", "C", "X"], "fraction"].sum()
+
+        df1 = df.loc[:, "zfs_E"]
+        #plot histogram of zfs_E
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.hist(df1[df1<=1], bins=25, edgecolor="black")
+        # ax.set_xlim(0, 1)
+        # ax.set_ylim(0, 25)
+        ax.set_xlabel("ZFS E")
+        ax.set_ylabel("Frequency")
+        ax.set_title("ZFS parameter E distribution")
+        display(fig)
+
+
+
+
+    def get_tdm_fig(self, df=None):
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        # add inset plot for the distribution of the data in the main plot
+        from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+        axins = inset_axes(ax, width="30%", height="50%", loc="upper center")
+        bin1 = df["TDM_rate"].loc[(df["TDM_rate"] >= 0) & (df["TDM_rate"] < 6)]
+        bin2 = df["TDM_rate"].loc[(df["TDM_rate"] >= 6) & (df["TDM_rate"] <= 175)]
+        axins.bar(
+            [0,1],
+            [bin1.count(), bin2.count()],
+            width=0.5,
+            edgecolor="black",
+        )
+        # set ticks as 0-6, 6-175
+        axins.set_xticks([0, 1])
+        axins.set_xticklabels(["[0-6)", "[6-175]"])
+        axins.set_ylim(0, 30)
+        # remove subticks
+        axins.tick_params(axis="x", which="minor", bottom=False, top=False, labelbottom=False, direction="out")
+        axins.tick_params(axis="x", which="major", bottom=False, top=False, direction="out")
+        axins.tick_params(axis="y", which="both", left=True, right=False, labelbottom=True, direction="out")
+        # set text of count for each bin at the top of the bar and if the count is 0, then remove the text
+        for i in [0, 1]:
+            count = bin1.count() if i == 0 else bin2.count()
+            axins.text(i, count-1.8, str(count), verticalalignment="center", horizontalalignment="center")
+
+        df1 = df.loc[:, "TDM_rate"]
+        # plot bar chart for the distribution of the data in the main plot, with the range from 0 to 175 with increment of 5
+        ax.bar(
+            [i+2.5 for i in range(0, 175, 5)],
+            [df1.loc[(df1 >= i) & (df1 < i + 5)].count() for i in range(0, 175, 5)],
+            width=5,
+            edgecolor="black",
+        )
+        ax.set_xlim(0, 175)
+
+        # set text of count for each bin at the top of the bar and if the count is 0, then remove the text
+        for i in range(len(ax.patches)):
+            if ax.patches[i].get_height() == 0:
+                ax.patches[i].set_visible(False)
+            else:
+                ax.text(
+                    ax.patches[i].get_x() + ax.patches[i].get_width() / 2 + 2 if i < 2 else ax.patches[i].get_x() +
+                                                                                             ax.patches[i].get_width() / 2,
+                    ax.patches[i].get_height(),
+                    str(int(ax.patches[i].get_height())),
+                    ha="center",
+                    va="bottom",
+                )
+
+        # ax.set_xlim(0, 175)
+        # ax.set_ylim(0, 30)
+        ax.set_xlabel("TDM rate (MHz)")
+        ax.set_ylabel("Frequency")
+        ax.set_title("TDM rate distribution")
+        ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
+        ax.tick_params(axis="x", which="major", bottom=True, top=False, direction="out")
+        ax.tick_params(axis="y", which="minor", left=False, right=False, labelbottom=True, direction="out")
+        ax.tick_params(axis="y", which="major", left=True, right=False, labelbottom=True, direction="out")
+
+        self.figures.append(fig)
+        return fig
+
+    def get_tdm_stat(self, df=None):
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+        df1 = df.loc[:, "TDM_rate"]
+        bin1 = df1.loc[(df1 >= 0) & (df1 < 25)]
+        bin2 = df1.loc[(df1 >= 25) & (df1 < 50)]
+        bin3 = df1.loc[(df1 >= 50) & (df1 < 75)]
+        bin4 = df1.loc[(df1 >= 75) & (df1 < 100)]
+        bin5 = df1.loc[(df1 >= 100) & (df1 < 125)]
+        bin6 = df1.loc[(df1 >= 125) & (df1 < 150)]
+        bin7 = df1.loc[(df1 >= 150) & (df1 <= 175)]
+
+        tdm_band_df = pd.DataFrame(
+            {
+                "bin": ["0-25", "25-50", "50-75", "75-100", "100-125", "125-150", "150-175"],
+                "frequency": [bin1.count(), bin2.count(), bin3.count(),
+                              bin4.count(), bin5.count(), bin6.count(), bin7.count()]
+            }
+        )
+        tdm_band_df.set_index("bin", inplace=True)
+        tdm_band_df["fraction"] = round(tdm_band_df.frequency / tdm_band_df.frequency.sum()*100, 0)
+        display(tdm_band_df)
+
+        sub_bin1 = df1.loc[(df1 >= 0) & (df1 < 6)]
+        sub_bin2 = df1.loc[(df1 >= 6) & (df1 <= 175)]
+        tdm_band_df = pd.DataFrame(
+            {
+                "bin": ["0-6", "6-175"],
+                "frequency": [sub_bin1.count(), sub_bin2.count()],
+            }
+        )
+        tdm_band_df.set_index("bin", inplace=True)
+        tdm_band_df["fraction"] = round(tdm_band_df.frequency / tdm_band_df.frequency.sum()*100, 0)
+        display(tdm_band_df)
+
+        print(f"TDM rate >= 6: {df1.loc[df1 >= 6].count()}, fraction:"
+              f" {round(df1.loc[df1 >= 6].count() / df1.count()*100, 2)}%")
+
+
+
+
+
+
+
+
+
+
+
+
+    def test_valid_opt_tran(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
         df["valid_zpl"] = df.apply(lambda x: x["ZPL"] <= x["vertical_transition_up"] if x["transition_from"] == "up"
         else x["ZPL"] <= x["vertical_transition_down"], axis=1)
-        df["diff_zpl_vertical_transition"] = df.loc[df["valid_zpl"] == False].apply(lambda x: x["ZPL"] - x[
+
+        df["diff_zpl_vertical_transition"] = df.apply(lambda x: x["ZPL"] - x[
             "vertical_transition_up"] if x["transition_from"] == "up" else x["ZPL"] - x["vertical_transition_down"], axis=1)
 
-        return df.loc[df["valid_zpl"] == False,
-                      ["task_id",  "C2DB_uid", "ZPL", "vertical_transition_up", "vertical_transition_down",
+        # validiation of AB>=0, BC>=0, CD>=0, DA>=0
+        df["valid_cdft"] = df.apply(lambda x: x["valid_zpl"] and x["AB"] >= 0 and x["BC"] >= 0 and x["CD"] >= 0
+                                              and x["DA"] >= 0, axis=1)
+
+        return df.loc[df["valid_cdft"] == False, ["task_id",  "C2DB_uid", "ZPL", "LUMO-HOMO_up", "LUMO-HOMO_down",
                        "diff_zpl_vertical_transition", "AB", "BC", "CD", "DA", "transition_from", "up_tran_cdft_occ",
                        "dn_tran_cdft_occ", "dn_in_gap_deg", "up_in_gap_deg"]]
 
 
+    @staticmethod
+    def get_diff_btw_two_dfs(df1, df2):
+        a = df1.copy().drop_duplicates(subset=["uid", "defect_name", "charge"], keep="last")
+        b = df2.copy().drop_duplicates(subset=["uid", "defect_name", "charge"], keep="last")
+
+        # get intersection of two dataframes and drop duplicates
+        c = pd.merge(a, b, on=["uid", "defect_name", "charge"], how="inner")\
+            .drop_duplicates(subset=["uid", "defect_name", "charge"], keep="last")
+
+        # get a-c
+        d = a.loc[~a.uid.isin(c.uid) | ~a.defect_name.isin(c.defect_name) | ~a.charge.isin(c.charge)]
+        print(f"{len(d)} defects in df1 but not in df2")
+        # get b-c
+        e = b.loc[~b.uid.isin(c.uid) | ~b.defect_name.isin(c.defect_name) | ~b.charge.isin(c.charge)]
+        print(f"{len(e)} defects in df2 but not in df1")
+
+        # get count of df1 following c
+        df1_intersection = df1.loc[df1.uid.isin(c.uid) & df1.defect_name.isin(c.defect_name) & df1.charge.isin(
+            c.charge)].drop_duplicates(subset=["uid", "defect_name", "charge"])
+        print(f"df1_intersection: {df1_intersection.shape}")
+
+        # get count of df2 following c
+        df2_intersection = df2.loc[df2.uid.isin(c.uid) & df2.defect_name.isin(c.defect_name) & df2.charge.isin(
+            c.charge)].drop_duplicates(subset= ["uid", "defect_name", "charge"])
+        print(f"df2_intersection: {df2_intersection.shape}")
+
+        print(f"df1 intersection + (df1 - df1 intersection): {df1_intersection.shape[0] + d.shape[0]}")
+        print(f"df2 intersection + (df2 - df2 intersection): {df2_intersection.shape[0] + e.shape[0]}")
+
+        return d, e
+
+#concate defect_qubit_df and defect_qubit_df_new based on task_id
+
+class DefectAnalysis(SheetCollection):
+    def __init__(self, df, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.hse_candidate_df = df if df is not None else self.get_hse_candidate_df()
+        self.ptmcs = self.hse_candidate_df.loc[
+            (self.hse_candidate_df.prototype.isin(["GaS", "GaSe"])) &
+            (self.hse_candidate_df.chemsys.isin(["Ga-S", "Ga-Se", "Ga-Te", "In-S", "In-Se", "In-Te"]))]
+
+        self.xm = self.ptmcs.loc[self.ptmcs.charge == -1]
+        self.mx = self.ptmcs.loc[self.ptmcs.charge == 1]
+
+    def scp_files_from_server(self, taskid, files=None, db=None, base_path=None, open_file=False):
+        base_path = base_path if base_path is not None else ""
+        files = files if files else ["POSCAR"]
+        db = db if db else HSEQubitDefect
+        db_name = db.db.name
+        col = db.collection
+        col_name = col.name
+        from subprocess import check_output
+        for i in col.find({"task_id": taskid}):
+            task_id = i["task_id"]
+            dir_name = i["dir_name"].split("/")[-1]
+            server_base_path = "/mnt/sdc/tsai/Research/projects"
+            os.makedirs(os.path.join("structures",base_path, str(task_id)), exist_ok=True)
+            for f in files:
+                check_output(f"scp -P 12348 qimin@localhost:{server_base_path}/{db_name}/{col_name}/{dir_name}/"
+                             f"{f}.gz structures/{base_path}/{task_id}/".split(" "))
+                if f == "POSCAR":
+                    check_output(f"gunzip structures/{base_path}/{taskid}/POSCAR.gz".split(" "), input=b"Y")
+                    check_output(f"mv structures/{base_path}/{taskid}/POSCAR structures/{base_path}/{taskid}"
+                                 f"/{taskid}.vasp".split(" "))
+                    if open_file:
+                        check_output(f"open structures/{base_path}/{taskid}/{taskid}.vasp".split(" "))
+
+
+    def get_chg_from_wv(self, taskid, band, spin=0, base_path=None):
+        from pymatgen.io.vasp.outputs import Wavecar
+        from pymatgen.io.vasp.inputs import Poscar
+        base_path = base_path if base_path else ""
+        try:
+            check_output(f"gunzip structures/{base_path}/{taskid}/WAVECAR.gz".split(" "), input=b"Y")
+            check_output(f"gunzip structures/{base_path}/{taskid}/POSCAR.gz".split(" "), input=b"Y")
+        except Exception:
+            pass
+        wv = Wavecar(f"structures/{base_path}/{taskid}/WAVECAR")
+        wv.get_parchg(Poscar.from_file(f"structures/{base_path}/{taskid}/{taskid}.vasp"), 0, band-1, spin,
+                      phase=True).write_file(
+            f"structures/{base_path}/{taskid}/{taskid}-{band}_spin-{spin}.vasp")
+        check_output(f"open structures/{base_path}/{taskid}/{taskid}-{band}_spin-{spin}.vasp".split(" "))
+
+
+    def get_local_env(self):
+
+        # if self.xm doesn't have column NN, self.get_NN() will be called to get NN for self.xm
+        self.xm = self.get_NN(self.xm) if not "NN" in list(self.xm.columns) else self.xm
+
+        self.xm_GaS = self.xm.loc[self.xm.prototype == "GaS"]
+        self.xm_GaSe = self.xm.loc[self.xm.prototype == "GaSe"]
+        def plot_dz_vs_source_specie():
+            # plot dz vs source specie for xm
+            fig, ax = plt.subplots()
+            # group by chemsys
+            for i, (name, group) in enumerate(self.xm_GaSe.groupby("chemsys")):
+                # plot line for each group
+                ax.plot(group.level_source_specie, group.dn_tran_en, label=name, marker="o", linestyle="-")
+            ax.set_xlabel("source specie")
+            ax.set_ylabel("dz")
+            ax.set_title(r"\mathrm{dz} vs \mathrm{source specie} in $\mathrm{X_{M}^{1-}}$")
+            # set legend outside of plot
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            return fig
+
+
+        plot_dz_vs_source_specie()
+
+    def get_proj_analysis(self, df=None):
+        df = df if df is not None else self.xm_GaS
+        self.proj_analysis = []
+        for taskid in df["task_id"]:
+            e_df = df.loc[df["task_id"] == taskid]
+            nn = e_df.NN.values[0]
+            print(nn)
+            a, b, c, d = Tools.extract_defect_levels_v2_hse(taskid,
+                localisation=float(e_df["localisation_threshold"].iloc[0]), tol=(0.5, 0.5)
+        )
+
+            d["vertical_species_proj"] = d.apply(lambda x: x[nn[0]] + x[nn[-1]], axis=1)
+            d["horizontal_species_proj"] = d.apply(lambda x: sum([x[i] for i in nn[1:4]]), axis=1)
+            d.reset_index(drop=False, inplace=True)
+            d = d.loc[:, ["band_index", "spin", "orbital", "vertical_species_proj", "horizontal_species_proj"]]
+            # fill a column with task_id
+            d["task_id"] = pd.Series([taskid] * len(d))
+            # create a new dataframe with all d
+            self.proj_analysis.append(d)
+        self.proj_analysis = pd.concat(self.proj_analysis, axis=0)
+        self.proj_analysis.reset_index(drop=True, inplace=True)
+
+        # plot horizontal and vertical projection
+
+
+    def get_geo_NN(self, df=None):
+        df = df if df is not None else self.ptmcs
+        from pymatgen import PeriodicSite
+        dist_df = {"task_id": [], "a":[], "b":[], "gamma":[], "NN_dist": [], "NN_index": [], "distinct_NN_dist": [],
+                   "host_NN_dist":[], "host_NN_index":[], "distinct_host_NN_dist":[], "gap_hse_line":[],
+                   "d1 in host": [], "d2 in host": [], "d1 in defect": [], "d2 in defect": [], "C2DB_uid": [],
+                   "defect_name": [], "charge": []}
+        # electronic_df = {"bandgap": []}
+
+        for taskid in df.loc[:, "task_id"].tolist():
+            dist_df["task_id"].append(taskid)
+            dist_df["C2DB_uid"].append(df.loc[df["task_id"] == taskid, "C2DB_uid"].values[0])
+            dist_df["defect_name"].append(df.loc[df["task_id"] == taskid, "defect_name"].values[0])
+            dist_df["charge"].append(df.loc[df["task_id"] == taskid, "charge"].values[0])
+
+            e = HSEQubitDefect.collection.find_one({"task_id": taskid})
+
+            bulk_site = PeriodicSite.from_dict(e["defect_entry"]["unique_site"])
+            host_st = Structure.from_dict(e["defect_entry"]["supercell"]["bulk"])
+
+            NN_in_bulk = host_st.get_neighbors(bulk_site, 3, include_index=True, include_image=False)
+            NN_in_bulk_sites = [site.index for site in NN_in_bulk]
+            host_NN_dist = np.array([site.nn_distance for site in NN_in_bulk]).round(3)
+            dist_df["host_NN_dist"].append(list(host_NN_dist))
+
+            distinct_host_NN_dist, counts = np.unique(host_NN_dist, return_counts=True)
+            sort_index = np.argsort(counts)
+            distinct_host_NN_dist = distinct_host_NN_dist[sort_index]
+            distinct_host_NN_dist = distinct_host_NN_dist[-2:] # take the last two
+            dist_df["distinct_host_NN_dist"].append(list(distinct_host_NN_dist))
+            dist_df["d1 in host"].append(distinct_host_NN_dist[0])
+            dist_df["d2 in host"].append(distinct_host_NN_dist[1] if len(distinct_host_NN_dist) > 1 else "None")
+            dist_df["host_NN_index"].append(NN_in_bulk_sites)
+            dist_df["a"].append(host_st.lattice.a/e["defect_entry"]["supercell"]["size"][0],)
+            dist_df["b"].append(host_st.lattice.b/e["defect_entry"]["supercell"]["size"][1],)
+            dist_df["gamma"].append(host_st.lattice.gamma,)
+
+            dist_df["gap_hse_line"].append(e["host_info"]["c2db_ir_hse_line"]["bandgap"])
+
+            # defect
+            nn = e["NN"]
+            st = Structure.from_dict(e["output"]["structure"])
+            NN_in_defect = st.get_neighbors(st.sites[nn[-1]], 3.5, include_index=True, include_image=False)
+            NN_in_defect_sites = [site.index for site in NN_in_defect]
+
+            NN_dist = np.array([i.nn_distance for i in NN_in_defect]).round(3)
+            dist_df["NN_dist"].append(list(NN_dist))
+            # find distinct entries in distinct_NN_dist, and sort them by counts in distinct_NN_dist
+            distinct_NN_dist, counts = np.unique(NN_dist, return_counts=True)
+            # sort the NN_dist by counts
+            sort_index = np.argsort(counts)
+            # sort the NN_dist by sort_index
+            distinct_NN_dist = distinct_NN_dist[sort_index]
+            dist_df["distinct_NN_dist"].append(list(distinct_NN_dist))
+            dist_df["d1 in defect"].append(distinct_NN_dist[0])
+            dist_df["d2 in defect"].append(distinct_NN_dist[1] if len(distinct_NN_dist) > 1 else "None")
+            dist_df["NN_index"].append(list(NN_in_defect_sites))
+
+        dist_df = pd.DataFrame(dist_df)
+        # replace the rows of columns "d1 in host", "d2 in host", "distinct_host_NN_dist", "host_NN_dist,
+        # and "NN_index" with the last rows that have the same C2DB_uid
+        good_host = dist_df.groupby(["C2DB_uid"]).last().reset_index()
+        good_host = good_host.loc[:, ["C2DB_uid", "d1 in host", "d2 in host", "distinct_host_NN_dist",
+                                       "host_NN_dist", "host_NN_index"]]
+        display(good_host)
+        # if C2DB_uid in dist_df is same as C2DB_uid in good_host, replace the columns with those in good_host
+        dist_df.loc[:, ["d1 in host", "d2 in host", "distinct_host_NN_dist", "host_NN_dist", "host_NN_index"]] = \
+            dist_df.loc[:, ["C2DB_uid"]].merge(good_host, on="C2DB_uid", how="left")
+
+
+        # self.ptmcs = pd.merge(self.ptmcs, dist_df, on="task_id", how="left").round(3)
+        return dist_df.round(3)
+
+    def get_host_materials_info(self, df):
+        def gap_hse_line_plt():
+            fig, ax = plt.subplots()
+            GaS_df = df.loc[df["prototype"] == "GaS"]
+            GaSe_df = df.loc[df["prototype"] == "GaSe"]
+            ax.scatter(GaSe_df["chemsys"].tolist()[::-1], GaS_df["gap_hse_line"].tolist()[::-1], label="GaS-hse-line",)
+            ax.scatter(GaSe_df["chemsys"].tolist()[::-1], GaSe_df["gap_hse_line"].tolist()[::-1], label="GaSe-hse-line")
+            ax.set_xlabel("Chemical system")
+            ax.set_ylabel("Bandgap (eV)")
+            ax.set_title("Bandgap from HSE-line/ Lattice constant a")
+            # set legend position at the upper left of the plot
+            ax.legend(loc="upper left", bbox_to_anchor=(-0.4, 1))
+
+            ax2 = ax.twinx()
+            ax2.scatter(GaSe_df["chemsys"].tolist()[::-1], GaS_df["a"].tolist()[::-1], label="a", color="red")
+            ax2.set_ylabel("a (Å)")
+            ax2.legend(loc="upper right", bbox_to_anchor=(1.2, 1))
+            return fig
+
+        return gap_hse_line_plt()
+
+
+    def get_defects_info(self):
+        def singlet_triplet_en_diff():
+            triplets = self.ptmcs["task_id"].unique()
+            singlets = {"task_id": [], "singlet_taskid": [], "C2DB_uid": [], "defect_name": [], "charge":[],
+                        "singlet_energy": [], "triplet_energy": [], "singlet_triplet_energy_diff": [],}
+            for t in triplets:
+                print(t)
+                triplet_e = HSEQubitDefect.collection.find_one({"task_id": int(t)})
+                singlet_e = HSEQubitDefect.collection.find_one({"pc_from": triplet_e["pc_from"], "nupdown_set": 0,
+                                                                "defect_entry.name": triplet_e["defect_entry"]["name"],
+                                                                "charge_state": triplet_e["charge_state"]})
+
+                singlets["singlet_taskid"].append(singlet_e["task_id"])
+                singlets["task_id"].append(int(t))
+                singlets["singlet_energy"].append(singlet_e["output"]["energy"])
+
+                singlets["C2DB_uid"].append(self.ptmcs.loc[self.ptmcs["task_id"] == t]["C2DB_uid"].tolist()[0])
+                singlets["defect_name"].append(self.ptmcs.loc[self.ptmcs["task_id"] == t]["defect_name"].tolist()[0])
+                singlets["charge"].append(self.ptmcs.loc[self.ptmcs["task_id"] == t]["charge"].tolist()[0])
+                singlets["triplet_energy"].append(triplet_e["output"]["energy"])
+                singlets["singlet_triplet_energy_diff"].append(singlet_e["output"]["energy"] - triplet_e["output"]["energy"])
+            return pd.DataFrame(singlets).round(3)
+        return singlet_triplet_en_diff()
+
+
+
 
 if __name__ == '__main__':
+    # df = pd.read_csv("/home/yluo/Documents/defect_qubit_df.csv")
+    #
     pass
-
-
 

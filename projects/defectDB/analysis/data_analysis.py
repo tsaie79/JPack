@@ -25,9 +25,12 @@ SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", 
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dIR = get_db("Scan2dDefect", "ir_data", port=12347)
 
-HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347, user="Jeng")
+HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347, user="Jeng_ro")
 HSEQubitIR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data-pbe_pc", port=12347)
-HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12347, user="Jeng")
+HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12347, user="Jeng_ro")
+
+C2DB_IR = get_db("C2DB_IR", "calc_data", port=12345, user="Jeng_ro")
+
 
 DB1_PATH = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
 
@@ -79,7 +82,7 @@ class Tools:
         return level_info, levels
 
     @classmethod
-    def extract_defect_levels_v2(cls, defect_taskid):
+    def extract_defect_levels_v2(cls, defect_taskid, localisation=0.05, edge_tol=(0.25, 0.25), selected_bands=None):
         from qubitPack.qc_searching.analysis.main import get_defect_state_v3
         from qubitPack.tool_box import get_db
 
@@ -105,12 +108,13 @@ class Tools:
                 "all",
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
-                0.05,  #0.2
+                localisation,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
-                edge_tol=(0.25, 0.25),
+                edge_tol=edge_tol,
                 ir_db=ir_db,
                 ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
+                selected_bands=selected_bands,
             )
             tot, proj, d_df, levels, defect_levels = state
             level_info = d_df.to_dict("records")[0]
@@ -122,7 +126,7 @@ class Tools:
         return level_info, levels, defect_levels
 
     @classmethod
-    def extract_defect_levels_v2_hse(cls, defect_taskid, localisation=0.2):
+    def extract_defect_levels_v2_hse(cls, defect_taskid, localisation=0.2, edge_tol=(0.5, 0.5), selected_bands=None):
         from qubitPack.qc_searching.analysis.main import get_defect_state_v3
         from qubitPack.tool_box import get_db
 
@@ -147,12 +151,13 @@ class Tools:
                 localisation,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
-                edge_tol= (-0.025, -0.025), # defect state will be picked only if it's above vbm by
+                edge_tol= edge_tol, # defect state will be picked only if it's above vbm by
                 # 0.025 eV
             # and below
                 # cbm by 0.025 eV
                 ir_db=ir_db, #ir_db,
                 ir_entry_filter={"prev_fw_taskid": defect_taskid},
+                selected_bands=selected_bands,
             )
             tot, proj, d_df, levels, defect_levels = state
             level_info = d_df.to_dict("records")[0]
@@ -161,7 +166,8 @@ class Tools:
             level_info = {}
             levels = {}
             defect_levels = {}
-        return level_info, levels, defect_levels
+            proj = None
+        return level_info, levels, defect_levels, proj
 
 class Host:
     def __init__(self, host_xlsx="host_2021-10-25"):
@@ -360,6 +366,7 @@ class Defect:
                 info.update(host_info)
 
             d_df, levels, in_gpa_levels = Tools.extract_defect_levels_v2(e["task_id"])
+            info.update({"localisation_threshold": localisation})
             info.update(d_df)
             info.update(levels)
             info.update(in_gpa_levels)
@@ -432,7 +439,8 @@ class Defect:
                 localisation = 0.05
             else:
                 localisation = 0.2
-            d_df, levels, in_gpa_levels = Tools.extract_defect_levels_v2_hse(e["task_id"], localisation=localisation)
+            d_df, levels, in_gpa_levels, proj_df = Tools.extract_defect_levels_v2_hse(e["task_id"],
+                                                                                 localisation=localisation)
 
             info.update(d_df)
             info.update(levels)
@@ -707,42 +715,6 @@ class Defect:
 
                     # append all entries as dict in defect to defects list
                     defects.append(defect.to_dict())
-                    # defects.append(
-                    #     {
-                    #         "cbm": defect["level_cbm"],
-                    #         "vbm": defect["level_vbm"],
-                    #         "level_edge_ir": defect["level_edge_ir"].iloc[0],
-                    #         "up": defect["up_in_gap_level"].iloc[0],
-                    #         "dn": defect["dn_in_gap_level"].iloc[0],
-                    #         "up_deg": defect["up_in_gap_deg"].iloc[0] ,
-                    #         "dn_deg": defect["dn_in_gap_deg"].iloc[0],
-                    #         "up_ir": defect["up_in_gap_ir"].iloc[0],
-                    #         "dn_ir": defect["dn_in_gap_ir"].iloc[0],
-                    #         "up_occ": defect["up_in_gap_occ"].iloc[0],
-                    #         "dn_occ": defect["dn_in_gap_occ"].iloc[0],
-                    #         "up_id": defect["up_in_gap_band_id"].iloc[0],
-                    #         "dn_id": defect["dn_in_gap_band_id"].iloc[0],
-                    #         "up_band": defect["up_in_gap_band_index"].iloc[0],
-                    #         "dn_band": defect["dn_in_gap_band_index"].iloc[0],
-                    #
-                    #         "vbm_max_el": defect["vbm_max_el"].iloc[0],
-                    #         "vbm_max_proj_orbital": defect["vbm_max_proj_orbital"].iloc[0],
-                    #         "cbm_max_el": defect["cbm_max_el"].iloc[0],
-                    #         "cbm_max_proj_orbital": defect["cbm_max_proj_orbital"].iloc[0],
-                    #
-                    #         "up_tran_bottom": defect["up_tran_bottom"].iloc[0] + defect["level_vbm"].iloc[0] if
-                    #         defect["up_tran_bottom"].iloc[0] != "None" else None,
-                    #         "up_tran_en": defect["up_tran_en"].iloc[0] if defect["up_tran_en"].iloc[0] != "None" else
-                    #         None,
-                    #         "dn_tran_bottom": defect["dn_tran_bottom"].iloc[0] + defect["level_vbm"].iloc[0] if
-                    #         defect["dn_tran_bottom"].iloc[0] != "None" else None,
-                    #         "dn_tran_en": defect["dn_tran_en"].iloc[0] if defect["dn_tran_en"].iloc[0] != 'None' else
-                    #         None,
-                    #
-                    #         "transition_from": defect["transition_from"].iloc[0]
-                    #
-                    #     }
-                    # )
 
                     taskid_labels.append(defect["task_id"])
                     mags.append(defect["mag"])
@@ -781,7 +753,8 @@ class Defect:
                     up_tran_en = defect["up_tran_en"]
                     dn_tran_bottom = defect["dn_tran_bottom"] + defect["level_vbm"]
                     dn_tran_en = defect["dn_tran_en"]
-                    transition_from = defect["transition_from"]
+
+                    transition_from = defect.get("transition_from", None)
                     #print transition_from
                     print(f"transition_from: {transition_from}")
 
@@ -835,9 +808,10 @@ class Defect:
                     ax.text(x, cbm+3, "{}-{}-{}|{}".format(cbm_max_el, cbm_max_proj_orbital, level_edge_ir[0][1], cbm),
                             bbox=dict(
                         facecolor='white', edgecolor='black'), size=12)
-                    if up_tran_en and (up_tran_bottom or up_tran_bottom != "None") and transition_from == "up":
-                        ax.arrow(x=x-1.25, y=up_tran_bottom, dx=0, dy=up_tran_en, width=0.02,
-                                 length_includes_head=True, facecolor="gray")
+                    if up_tran_en and (up_tran_bottom or up_tran_bottom != "None"):
+                        if transition_from == "up" or not transition_from:
+                            ax.arrow(x=x-1.25, y=up_tran_bottom, dx=0, dy=up_tran_en, width=0.02,
+                                     length_includes_head=True, facecolor="gray")
 
                     dx = 1
                     for level, occ, deg, id in zip(dn, dn_occ, dn_deg, dn_id):
@@ -874,9 +848,14 @@ class Defect:
                     ax.text(x, vbm_lim-fig_y_height[0]+4, "{}-{}-{}|{}".format(vbm_max_el, vbm_max_proj_orbital,
                                                                             level_edge_ir[0][0], vbm),
                             bbox=dict(facecolor='white', edgecolor='black'), size=12)
-                    if dn_tran_en and dn_tran_bottom and transition_from == "dn":
-                        ax.arrow(x=x+1.25, y=dn_tran_bottom, dx=0, dy=dn_tran_en, width=0.02,
-                                 length_includes_head=True, facecolor="gray")
+                    if dn_tran_en and dn_tran_bottom:
+                        if transition_from == "dn" or not transition_from:
+                            ax.arrow(x=x+1.25, y=dn_tran_bottom, dx=0, dy=dn_tran_en, width=0.02,
+                                     length_includes_head=True, facecolor="gray")
+
+                    # if dn_tran_en and dn_tran_bottom and transition_from == "dn":
+                    #     ax.arrow(x=x+1.25, y=dn_tran_bottom, dx=0, dy=dn_tran_en, width=0.02,
+                    #              length_includes_head=True, facecolor="gray")
 
                 ax.yaxis.set_minor_locator(AutoMinorLocator(5))
                 for tick in ax.get_yticklabels():
@@ -896,7 +875,8 @@ class Defect:
                 ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
                 ax.text(-0.1, 1.05, "{}-{}".format(uid, host_taskid), size=30, transform=ax.transAxes)
 
-                save_plt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/latest_results/plt/2021-11-18/defect/table_6"
+                save_plt_path = "/Users/jeng-yuantsai/Research/project/Scan2dDefect/latest_results/plt/2021-11-18" \
+                                "/defect/table_1"
                 os.makedirs(os.path.join(save_plt_path, set_prototype), exist_ok=True)
                 fig.savefig(
                     os.path.join(
@@ -1276,7 +1256,6 @@ class CDFT:
                 "dn_TDM_sq_X": [], "dn_TDM_sq_Y": [], "dn_TDM_sq_Z": []
         }
         for e in es:
-            print("cdft_task_id:", e["task_id"])
             gs_taskid = int(e["source_entry"].split("/")[-1])
             gs_e = self.calc_db.collection.find_one({"task_id": gs_taskid})
             data["task_id"].append(e["task_id"])
@@ -1311,7 +1290,6 @@ class CDFT:
         # get unique gs_taskid from es
         gs_taskids = list(set(data["gs_taskid"]))
         for gs_taskid in gs_taskids:
-            print("gs_taskid: {}".format(gs_taskid))
             gs_e = self.calc_db.collection.find_one({"task_id": gs_taskid})
             data["task_id"].append(gs_taskid)
             data["defect_name"].append(gs_e["defect_entry"]["name"])
@@ -1336,13 +1314,11 @@ class CDFT:
             for idx, component in enumerate(["X", "Y", "Z"]):
                 data["up_TDM_sq_{}".format(component)].append(None)
                 data["dn_TDM_sq_{}".format(component)].append(None)
-        # print all the entry length of data
-        for k, v in data.items():
-            print(k, len(v))
 
         df = pd.DataFrame(data)
         BackProcess(df).add_tdm_input()
         self.foundation_df = df
+        print(f"\nCDFT_data:\n{df}")
         # IOTools(cwd=os.path.join(DB1_PATH, save_xlsx_path), pandas_df=df).to_excel("hse_screened_qubit_cdft_2021-11-18")
         return df
 
@@ -1355,7 +1331,6 @@ class CDFT:
         }
 
         for src_taskid in df["gs_taskid"].unique():
-            print(src_taskid)
             base_entry = df.loc[df["gs_taskid"]==src_taskid]
             up_occ = base_entry["up_cdft_occ"].unique().tolist()
             up_occ.remove('ground-state')
@@ -1428,8 +1403,10 @@ class CDFT:
             up_TDM_rate_X = row["up_TDM_rate_X"]
             up_TDM_rate_Y = row["up_TDM_rate_Y"]
             up_TDM_rate_Z = row["up_TDM_rate_Z"]
-            print("up_TDM_rate_X: {}".format(up_TDM_rate_X), "up_TDM_rate_Y: {}".format(up_TDM_rate_Y),
-                  "up_TDM_rate_Z: {}".format(up_TDM_rate_Z))
+            print(f"\n==gs_taskid: {row['gs_taskid']}==")
+            print(f"\nup_TDM_rate_X: {up_TDM_rate_X}\nup_TDM_rate_Y: {up_TDM_rate_Y}\nup_TDM_rate_Z: {up_TDM_rate_Z}")
+            # print("up_TDM_rate_X: {}".format(up_TDM_rate_X), "up_TDM_rate_Y: {}".format(up_TDM_rate_Y),
+            #       "up_TDM_rate_Z: {}".format(up_TDM_rate_Z))
             if up_TDM_rate_X != 0 and up_TDM_rate_Y == 0 and up_TDM_rate_Z == 0:
                 result_df.loc[idx, "up_polarization"] = "X"
                 result_df.loc[idx, "up_allowed"] = True
@@ -1476,13 +1453,15 @@ class CDFT:
                 result_df.loc[idx, "up_polarization"] = np.nan
                 result_df.loc[idx, "up_allowed"] = False
                 result_df.loc[idx, "up_transition"] =  True
-            print("up_polarization: {}, {}".format(result_df.loc[idx, "up_polarization"], type(result_df.loc[idx, "up_polarization"])))
+            print(f"\nup_polarization: {result_df.loc[idx, 'up_polarization']}")
+            # print("up_polarization: {}, {}".format(result_df.loc[idx, "up_polarization"], type(result_df.loc[idx, "up_polarization"])))
             # get the dn TDM rate
             dn_TDM_rate_X = row["dn_TDM_rate_X"]
             dn_TDM_rate_Y = row["dn_TDM_rate_Y"]
             dn_TDM_rate_Z = row["dn_TDM_rate_Z"]
-            print("dn_TDM_rate_X: {}".format(dn_TDM_rate_X), "dn_TDM_rate_Y: {}".format(dn_TDM_rate_Y),
-                  "dn_TDM_rate_Z: {}".format(dn_TDM_rate_Z))
+            print(f"\ndn_TDM_rate_X: {dn_TDM_rate_X}\ndn_TDM_rate_Y: {dn_TDM_rate_Y}\ndn_TDM_rate_Z: {dn_TDM_rate_Z}")
+            # print("dn_TDM_rate_X: {}".format(dn_TDM_rate_X), "dn_TDM_rate_Y: {}".format(dn_TDM_rate_Y),
+            #       "dn_TDM_rate_Z: {}".format(dn_TDM_rate_Z))
             if dn_TDM_rate_X != 0 and dn_TDM_rate_Y == 0 and dn_TDM_rate_Z == 0:
                 result_df.loc[idx, "dn_polarization"] = "X"
                 result_df.loc[idx, "dn_allowed"] = True
@@ -1529,8 +1508,10 @@ class CDFT:
                 result_df.loc[idx, "dn_polarization"] = np.nan
                 result_df.loc[idx, "dn_allowed"] = False
                 result_df.loc[idx, "dn_transition"] =  True
-            print("dn_polarization: {}, {}".format(result_df.loc[idx, "dn_polarization"], type(result_df.loc[idx, "dn_polarization"])))
+            print("\ndn_polarization: {}".format(result_df.loc[idx, "dn_polarization"]))
+            # print("dn_polarization: {}, {}".format(result_df.loc[idx, "dn_polarization"], type(result_df.loc[idx, "dn_polarization"])))
             result_df.loc[idx, "allowed"] = result_df.loc[idx, "up_allowed"] or result_df.loc[idx, "dn_allowed"]
+
             if result_df.loc[idx, "up_transition"] and not result_df.loc[idx, "dn_transition"]:
                 result_df.loc[idx, "transition_from"] = "up"
             elif result_df.loc[idx, "dn_transition"] and not result_df.loc[idx, "up_transition"]:
@@ -1539,7 +1520,6 @@ class CDFT:
                 result_df.loc[idx, "transition_from"] = "both"
             else:
                 result_df.loc[idx, "transition_from"] = np.nan
-
         result_df.drop(columns=["up_allowed", "dn_allowed"], inplace=True)
 
         result_df.drop(["up_TDM_sq_{}".format(component) for component in ["X", "Y", "Z"]], axis=1, inplace=True)
@@ -1642,70 +1622,62 @@ class COHP:
 
 class TransitionLevels:
     @classmethod
-    def regular_antisite(cls, project, collection_name, compounds, aexx=0.25):
-        path = "/Users/jeng-yuantsai/Research/project/qubit/calculations/"
-        c = [20, 25]
-        # bulk_k = [[0.25, 0.25, 0], [-0.5, -0.5, 0]]
-        bulk_k = [[0,0,0]]
-        vbm_k = [[0, 0, 0], [-0.33333333, -0.33333333, 0], [0.33333333, 0.33333333,0]]
+    def regular_antisite(cls, db_files, compounds, c2db_uid, Cs, defect_name):
+        # c = [24.650893, 24.666774, 29.650893, 29.666774]
+        bulk_k = [[1,1,1]]
+        vbm_k = [[0, 0, 0]]
         results = []
-        for compound in compounds:
+        sites = [[33, 31], [51, 49]] if defect_name == "M_on_X" else [[31, 33], [49, 51]]
+        for compound, c in zip(compounds, Cs):
             se_antisite = FormationEnergy2D(
-                bulk_db_files=[os.path.join(path, project, collection_name, "db.json")],
+                bulk_db_files=db_files,
                 bulk_entry_filter={
                     # "nsites": {"$ne":48},
                     "chemsys": compound,
-                    "formula_anonymous": "AB2",
-                    "calcs_reversed.run_type": "HSE06",
                     "input.structure.lattice.c": {"$in": c},
                     "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
-                    "input.parameters.AEXX": aexx,
-                    "charge_state": 0,
                     "defect_type": "host",
-                    "task_label": "HSE_scf"
+                    "task_label": "HSE_scf",
+                    "c2db_uid": {"$regex": c2db_uid}
                 },
-                bk_vbm_bg_db_files=[os.path.join(path, project, collection_name, "db.json")],
+                bk_vbm_bg_db_files=db_files,
                 bk_vbm_bg_filter={
                     # "nsites": {"$ne":48},
                     "chemsys": compound,
-                    "formula_anonymous": "AB2",
-                    "calcs_reversed.run_type": "HSE06",
                     "calcs_reversed.input.kpoints.kpoints.0": {"$in": vbm_k},
                     "input.structure.lattice.c": {"$in": c},
-                    "charge_state": 0,
-                    "input.parameters.AEXX": aexx,
                     "defect_type": "vbm",
-                    "task_label": "HSE_scf"
+                    "task_label": "HSE_scf",
+                    "c2db_uid": {"$regex": c2db_uid},
                 },
-                defect_db_files=[os.path.join(path, project, collection_name, "db.json")],
+                defect_db_files=db_files,
                 defect_entry_filter={
                     # "nsites": {"$ne":48},
                     "charge_state": {"$in": [1, 0, -1]},
+                    "nupdown_set": {"$in": [2, 3, 0]},
                     "chemsys": compound,
-                    "formula_anonymous": {"$in": ["A26B49", "A37B71", "A17B31"]}, #"A17B31"
+                    "$or": [{ "formula_pretty": {"$regex": "[a-zA-Z]+{}[a-zA-Z]+{}".format(*sites[0])}},
+                            {"formula_pretty": {"$regex": "[a-zA-Z]+{}[a-zA-Z]+{}".format(*sites[1])}}],
                     "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
-                    "input.incar.NSW": 0,
-                    "input.incar.LASPH": True,
-                    "calcs_reversed.run_type": "HSE06",
                     "input.structure.lattice.c": {"$in": c},
-                    "input.parameters.AEXX": aexx,
-                    "defect_type": {"$in":["defect_new", "defect"]},
-                    "task_label": "HSE_scf"
-                    # "calcs_reversed.output.outcar.total_magnetization": {"$lte": 3.1, "$gte": 0},
-                    # "task_id": {"$nin": [327]}
-                    #for ws2
-                    #[3510, 3537] for mos2
+                    "defect_type": "defect",
+                    "task_label": "HSE_scf",
+                    "c2db_uid": {"$regex": c2db_uid},
                 }
             )
             se_antisite.transition_levels()
-            for a in se_antisite.ionized_energy(collection_name, compound):
-                a.update({"name": compound})
+            for a in se_antisite.ionized_energy(fig_title="{}-{}-{}".format(defect_name, compound, c2db_uid)):
+                a.update({"chemsys": compound, "c2db_uid": c2db_uid, "defect_name": defect_name})
                 results.append(a)
-        # print("$$"*50, "all")
-        # print(pd.DataFrame(results))
 
-    # # regular_antisite("antisiteQubit", "W_Se_Ef_gamma", ["Se-W"])
-    # regular_antisite("antisiteQubit", "W_Te_Ef_gamma", ["Te-W"])
+        print("$$"*50, "all")
+        tls = pd.DataFrame(results)
+        tls["IE0"] = tls.apply(lambda x: x["IE0"][0], axis=1)
+        tls["window"] = tls.apply(lambda x: x["Bandgap_avg"] - x["IE0"], axis=1)
+        # set tls["tl"] as window if charge == (0, 1) else set tls["tl"] as IE0
+        tls["tl"] = tls.apply(lambda x: x["window"] if x["charge"] == (0, 1) else x["IE0"], axis=1)
+        display(tls)
+        return tls
 
 
 
@@ -1736,7 +1708,8 @@ def main():
     # a.get_defect_df_gp(screened, "triplet_max-tran_gp_2021-11-18")
 
     # read excel file by IOTools
-    df = IOTools(cwd=input_path, excel_file="Table_6_df_2022-04-13").read_excel()
+    df = IOTools(cwd=input_path, excel_file="Table_1_df_2022-04-15").read_excel()
+    # from JPack_independent.projects.defectDB.analysis.analysis_api import hse_candidate_df
     Defect.bar_plot_defect_levels_v2(df)
 
     # cdft = CDFT()
@@ -1747,7 +1720,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
     # a = Defect(defect_xlsx="hse_screened_qubit_2021-11-18")
     # show = a.defect_df.loc[(a.defect_df["up_tran_en"]==0) & (a.defect_df["dn_tran_en"]!=0)]
     # # print(a.defect_df.dn_tran_lumo_homo_deg.unique())
@@ -1765,6 +1738,10 @@ if __name__ == '__main__':
     # df1 = cdft.get_zpl_data()
     # IOTools(cwd=os.path.join(DB1_PATH, save_xlsx_path), pandas_df=df1).to_excel("hse_screened_qubit_cdft_zpl_2021-11-18")
 
-    # Tools.extract_defect_levels_v2_hse(1313)
+    # a = [839, 898, 903, 957, 1023, 1056]
+    # for i in [2569]:
+    #     Tools.extract_defect_levels_v2_hse(i, localisation=0.05, tol=(0.5, 0.5))
     # COHP.analysis()
 
+
+    Tools.extract_defect_levels_v2(1820, localisation=0.05, edge_tol=(0.5, 0.5))

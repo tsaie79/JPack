@@ -3,7 +3,6 @@ import shutil
 import subprocess
 
 import monty.serialization
-from monty.subprocess import Popen
 
 from fireworks import LaunchPad, Workflow
 
@@ -48,7 +47,7 @@ from pathlib import Path
 import pandas as pd
 
 from JPack_independent.projects.antisiteQubit.wf_defect import ZPLWF
-from analysis.data_analysis import Defect
+# from analysis.data_analysis import Defect
 
 MODULE_DIR = Path("__file__").resolve().parent
 print(MODULE_DIR)
@@ -442,10 +441,11 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
 
 def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvsp_fw=True): #1e-4
     def antisite_TMD_pc():
-        # 3091: S-W, 3083: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
+        # 3083: S-W, 3091: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
         db_name, col_name = "owls", "mx2_antisite_pc"
         col = get_db(db_name, col_name, port=12345).collection
-        taskids = [3091, 3083, 3093, 3097, 3094, 3102]
+        # taskids = [3091, 3083, 3093, 3097, 3094, 3102]
+        taskids = [3093]
         mx2s = col.find({"task_id":{"$in": taskids}})
         pcs = [Structure.from_dict(mx2["output"]["structure"]) for mx2 in mx2s]
         defect_inputs = {"pc": [], "defect_name": [], "charge": [], "defect_type": [], "scan_taskids":[], "db_name":
@@ -650,7 +650,7 @@ def cdft(task, std_taskid, nbands=None, occ=None, std_base_dir=None, category="c
     up_occ, dn_occ = None, None
     up_occ_no_excite, dn_occ_no_excite = get_lowest_unocc_band_idx_v2(std_taskid, std_db, nbands)
     wf = None
-    if occ["1"] and occ["-1"] == "None":
+    if occ["1"] and pd.isna(occ["-1"]):
         up_occ = occ["1"]
         dn_occ = dn_occ_no_excite
         print("up_occ: {}, dn_occ:{}".format(up_occ, dn_occ))
@@ -662,7 +662,7 @@ def cdft(task, std_taskid, nbands=None, occ=None, std_base_dir=None, category="c
         )
         wf = add_additional_fields_to_taskdocs(wf, {"cdft_occ": {"up": up_occ, "dn": dn_occ}})
 
-    elif occ["-1"] and occ["1"] == "None":
+    elif occ["-1"] and pd.isna(occ["1"]):
         dn_occ = occ["-1"]
         up_occ = up_occ_no_excite
         print("up_occ: {}, dn_occ:{}".format(up_occ, dn_occ))
@@ -759,8 +759,8 @@ def transition_dipole_moment(input_cdft_df):
         taskid = row["task_id"]
         print(taskid)
         gs_taskid = row["gs_taskid"]
-        up_TDM_input = ast.literal_eval(row["up_TDM_input"])
-        dn_TDM_input = ast.literal_eval(row["dn_TDM_input"])
+        up_TDM_input = ast.literal_eval(row["up_TDM_input"]) if type(row["up_TDM_input"]) == str else row["up_TDM_input"]
+        dn_TDM_input = ast.literal_eval(row["dn_TDM_input"]) if type(row["dn_TDM_input"]) == str else row["dn_TDM_input"]
         up_TDM_input = up_TDM_input if up_TDM_input != ((),) else None
         dn_TDM_input = dn_TDM_input if dn_TDM_input != ((),) else None
         print(up_TDM_input, dn_TDM_input)
@@ -1101,7 +1101,7 @@ def transition_level_wf(category="charge_state"):
         defect_type = "substitutions"
         for idx, antisite in enumerate(range(len(defect[defect_type]))):
             print(cation, anion)
-            if "{}_on_{}".format(cation, anion) not in defect["substitutions"][antisite]["name"]:
+            if "{}_on_{}".format(anion, cation) not in defect["substitutions"][antisite]["name"]:
                 continue
             for na, thicks in geo_spec.items():
                 sc_size = np.eye(3, dtype=int)*math.sqrt(na/3)
@@ -1119,10 +1119,10 @@ def transition_level_wf(category="charge_state"):
 
                         wf_antisite = get_wf_full_hse(
                             structure=antisite_st.defect_st,
-                            charge_states=[1, 0, -1],
+                            charge_states=[-2, -3],
                             gamma_only=False,#[list(find_K_from_k(sc_size, [0, 0, 0])[0])],
                             gamma_mesh=True,
-                            nupdowns=[2, 1, 0],
+                            nupdowns=[1, 0],
                             task="hse_relax-hse_scf",
                             vasptodb={
                                 "category": category,
@@ -1133,7 +1133,15 @@ def transition_level_wf(category="charge_state"):
                                 "c2db_uid": mx2["uid"]
                             },
                             wf_addition_name="{}:{}".format(na, thick),
-                            task_arg={"parse_dos":False}
+                            task_arg={"parse_dos":True}
+                        )
+
+                        wf_antisite = bash_scp_files(
+                            wf_antisite,
+                            dest="/mnt/sdc/tsai/Research/projects/defect_qubit_in_36_group/charge_state/",
+                            port=12348,
+                            task_name_constraint="ToDb",
+                            fw_name_constraint="HSE_scf"
                         )
 
                         wf_antisite = add_modify_incar(
@@ -1141,8 +1149,8 @@ def transition_level_wf(category="charge_state"):
                             {"incar_update":{"AEXX": aexx, "LWAVE": False}},
                         )
                         wf_antisite = add_modify_incar(wf_antisite)
-                        wf_antisite = set_queue_options(wf_antisite, "32:00:00", fw_name_constraint="HSE_scf")
-                        wf_antisite = set_queue_options(wf_antisite, "32:00:00", fw_name_constraint="HSE_relax")
+                        wf_antisite = set_queue_options(wf_antisite, "06:00:00", fw_name_constraint="HSE_scf")
+                        wf_antisite = set_queue_options(wf_antisite, "06:00:00", fw_name_constraint="HSE_relax")
                         # related to directory
                         wf_antisite = set_execution_options(wf_antisite, category=category)
                         wf_antisite = preserve_fworker(wf_antisite)
@@ -1178,7 +1186,7 @@ def transition_level_wf(category="charge_state"):
                         wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_scf")
                         wf_bulk = set_queue_options(wf_bulk, "24:00:00", fw_name_constraint="HSE_relax")
                         wf_bulk = preserve_fworker(wf_bulk)
-                        wfs.append(wf_bulk)
+                        # wfs.append(wf_bulk)
 
                     #+++++++++++++++++++++ bulk VBM++++++++++++++++++++++++++++++++++++++++++++++++++++
                     def vbm_wf():
@@ -1243,18 +1251,37 @@ def main():
                 os.path.expanduser("~"),
                 "config/project/HSE_triplets_from_Scan2dDefect/calc_data/my_launchpad.yaml"))
         wfs = binary_triplet_HSE_wf(irvsp_fw=True)
-        for idx, wf in enumerate(wfs[1:]):
+        for idx, wf in enumerate(wfs[:1]):
             wf = set_execution_options(wf, fworker_name="efrc")
             wf = preserve_fworker(wf)
+
+            wte2_magmom = [0.006, 0.0, 0.001, -0.0, -0.001, 0.0, -0.002, -0.0, -0.001,
+                           0.001, -0.002, 0.0, -0.0, -0.0, 0.0, -0.0, -0.001, 0.0, -0.002,
+                           0.006, 0.001, -0.0, -0.002, 0.001, 0.056, -0.0, -0.0, -0.001,
+                           0.005, 0.005, 0.006, -0.002, 0.0, -0.003, -0.001, -0.002,  -0.0, 0.0, 0.0, -0.0, -0.001,
+                           -0.001, -0.0, -0.002, -0.0, 0.001, -0.0, -0.002, 0.006,  -0.135, -0.004, -0.004, -0.012,
+                           0.192, -0.213, -0.142, 0.046, 0.004, 0.047, 0.045, 0.207,  0.018, -0.002, -0.004, 0.003,
+                           -0.012, -0.001, -0.002, -0.002, 0.044, -0.003, 0.014, -0.001, 0.018, 1.224]
+            mote2_magmom = [-0.001, 0.003, 0.0, 0.004, 0.002, 0.008, -0.003, 0.001, -0.005, 0.0,  -0.001, 0.001,
+                            0.001, 0.001, 0.002, -0.0, 0.001, 0.0, -0.003, -0.001, -0.007,  -0.0, -0.0, 0.009, 0.075,
+                            0.007, 0.002, 0.0, -0.003, -0.003, 0.007, -0.003, 0.001, -0.003,  0.0, -0.001, -0.0,
+                            0.001, 0.001, 0.002, -0.001, 0.001, -0.0, -0.003, 0.006, -0.007,  -0.0, -0.0, 0.006,
+                            -0.427, 0.427, -0.032, -0.005, 0.093, -0.218, -0.446, 0.024,  -0.012, 0.031, 0.026,
+                            0.135, 0.067, -0.002, -0.001, -0.012, -0.008, -0.021, -0.004,  -0.002, 0.019, -0.028,
+                            0.009, -0.017, 0.07, 1.843]
+
+
+
+            wf = add_modify_incar(wf, {"incar_update": {"MAGMOM": wte2_magmom}})
             lpad.add_wf(wf)
             print(idx, wf.name)
 
     def run_cdft():
         # qubit_df = IOTools(excel_file="hse_screened_qubit_2021-11-18", cwd=INPUT_PATH).read_excel()
-        qubit_df = IOTools(excel_file="defects_36_groups_cdft_complement_2022-03-09", cwd=INPUT_PATH).read_excel()
+        qubit_df = IOTools(excel_file="wte2_mote2", cwd=INPUT_PATH).read_excel()
         fworker = "efrc"
         taskids = qubit_df.loc[qubit_df["fworker"]==fworker, "task_id"]
-        for taskid in taskids[:1]:
+        for taskid in taskids[:]:
             print("{}=".format(taskid)*20)
             nbands = qubit_df.loc[qubit_df["task_id"] == taskid, "nbands"].iloc[0]
             up_occ = qubit_df.loc[qubit_df["task_id"] == taskid, "up_tran_cdft_occ"].iloc[0]
@@ -1329,10 +1356,11 @@ def main():
                              "my_launchpad.yaml")
             )
             lpad.add_wf(wf)
+
     def run_TDM():
         p_path = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
-        zpl_df = IOTools(excel_file="ptcs_tdm_compl_tmp", cwd=os.path.join(p_path, INPUT_PATH)).read_excel()
-        transition_dipole_moment(zpl_df)
+        tgt_df = IOTools(excel_file="wte2_mote2", cwd=os.path.join(p_path, INPUT_PATH)).read_excel()
+        transition_dipole_moment(tgt_df)
 
 
     def run_finite_size_effect_wf():
@@ -1398,17 +1426,17 @@ def main():
         wfs = transition_level_wf()
         print(*wfs)
         for wf in wfs:
-            wf = set_execution_options(wf, category=cat, fworker_name="owls")
+            wf = set_execution_options(wf, category=cat, fworker_name="gpu_nersc")
             # add wf tags
-
-
             lpad.add_wf(wf)
         print(len(wfs))
 
-    run_triplet_HSE_wf()
+    run_transition_levels()
 
 
 if __name__ == '__main__':
     main()
+
+
 
 

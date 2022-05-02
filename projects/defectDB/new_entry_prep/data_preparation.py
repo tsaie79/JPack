@@ -1,4 +1,5 @@
-from JPack_independent.projects.defectDB.analysis.data_analysis import BackProcess, CDFT, HSEQubitDefect, HSEQubitIR
+from JPack_independent.projects.defectDB.analysis.data_analysis import *
+from JPack_independent.projects.defectDB.analysis.analysis_api import *
 from JPack_independent.projects.defectDB.wf.wf import INPUT_PATH
 
 from qubitPack.tool_box import get_db, get_good_ir_sites, get_unique_sites_from_wy, get_band_edges_characters, IOTools
@@ -219,7 +220,127 @@ class GenerateDefectTable(BackProcess):
         self.df_filter = df_filter
 
 
-    def extract_defect_levels_v2_hse(self, defect_taskid, localisation=0.2):
+    def extract_defect_levels_v2(self, defect_taskid, localisation=0.05, edge_tol=(0.25, 0.25), selected_bands=None):
+        from qubitPack.qc_searching.analysis.main import get_defect_state_v3
+        from qubitPack.tool_box import get_db
+
+        from pymatgen import Structure
+        import os
+
+
+        defect_db =SCAN2dDefect
+        host_db = SCAN2dMat
+        ir_db = SCAN2dIR
+
+        defect = defect_db.collection.find_one({"task_id": defect_taskid})
+        pc_from_id = defect["pc_from_id"]
+        defect_name = defect["defect_name"]
+        charge_state = defect["charge_state"]
+        level_info, levels, defect_levels = None, None, None
+        try:
+            state = get_defect_state_v3(
+                defect_db,
+                {"task_id": defect_taskid},
+                -10, 10,
+                None,
+                "eigen",
+                None,
+                None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
+                localisation,  #0.2
+                locpot_c2db=None,  #(c2db, c2db_uid, 0)
+                is_vacuum_aligment_on_plot=True,
+                edge_tol=edge_tol,
+                ir_db=ir_db,
+                ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
+                selected_bands=selected_bands,
+            )
+            tot, proj, d_df, levels, defect_levels = state
+            level_info = d_df.to_dict("records")[0]
+        except Exception as er:
+            print(er)
+            level_info = {}
+            levels = {}
+            defect_levels = {}
+        return level_info, levels, defect_levels
+
+    def get_defect_df_v2(self):
+        data = []
+        col = SCAN2dDefect.collection
+        # condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 6084}}
+        for e in list(col.find(self.df_filter))[:]:
+            print(e["task_id"])
+            host_c2db_info = e["host_info"]["c2db_info"]
+            for field in ["spacegroup", "pmg_point_gp", "irreps", "formula"]:
+                if host_c2db_info.get(field):
+                    host_c2db_info.pop(field)
+
+            host_band_edges = e["host_info"]["scan_bs"]["band_edges"]
+            for field in ["vbm_up_proj_on_el", "vbm_up_orbital_proj_on_el", "vbm_down_proj_on_el",
+                          "vbm_down_orbital_proj_on_el", "cbm_up_proj_on_el", "cbm_up_orbital_proj_on_el"]:
+                if host_band_edges.get(field):
+                    host_band_edges.pop(field)
+
+            host_sym_data = e["host_info"]["sym_data"]
+            host_sym_data.update({"reduced_site_sym": tuple(e["host_info"]["sym_data"]["good_ir_info"]["site_sym"]),
+                                  "reduced_site_specie": tuple(e["host_info"]["sym_data"]["good_ir_info"]["species"])
+                                 })
+            for field in ["unique_wyckoff", "good_ir_info"]:
+                host_sym_data.pop(field)
+
+            is_nelect_even = None
+            if e["input"]["incar"]["NELECT"] % 2 == 0:
+                is_nelect_even = True
+            else:
+                is_nelect_even = False
+
+            # host_pot_a, defect_pot_a = Potential(e["task_id"], SCAN2dDefect, SCAN2dMat).linear_fit_potential()
+
+            info = {
+                "task_id": e["task_id"],
+                "host_taskid": e["pc_from_id"],
+                "gap_scan": e["host_info"]["scan_bs"]["bandgap"],
+                "defect_name": e["defect_name"],
+                "defect_type": e["defect_entry"]["defect_type"],
+                "charge": e["charge_state"],
+                "mag": e["calcs_reversed"][0]["output"]["outcar"]["total_magnetization"],
+                "chemsys": e["chemsys"],
+                "is_nelect_even": is_nelect_even,
+                # "is_host_pot_steep": abs(host_pot_a[0]) > 5e-4,
+                # "is_defect_pot_steep": abs(defect_pot_a[0]) > 5e-4,
+                # "host_pot_a": host_pot_a[0],
+                # "defect_pot_a": defect_pot_a[0],
+                "site_oxi_state": tuple([tuple(i) for i in e["host_info"]["scan_bs"]["site_oxi_state"]]),
+                "number_NN": len(e["NN"]),
+                "nbands": e["input"]["parameters"]["NBANDS"]
+
+            }
+            for host_info in [host_c2db_info, host_band_edges, host_sym_data]:
+                info.update(host_info)
+
+            localisation, selected_bands, edge_tol = 0.05, None, (0.5, 0.5)
+            d_df, levels, in_gpa_levels = self.extract_defect_levels_v2(
+                e["task_id"], localisation=localisation,
+                selected_bands=selected_bands,
+                edge_tol=edge_tol
+            )
+            info.update({"localisation_threshold": localisation})
+            info.update(d_df)
+            info.update(levels)
+            info.update(in_gpa_levels)
+            data.append(info)
+
+        self.defect_df = pd.DataFrame(data)
+        self.defect_df.fillna("None", inplace=True)
+        self.defect_df.replace({"up_tran_en": "None"}, 0, inplace=True)
+        self.defect_df.replace({"dn_tran_en": "None"}, 0, inplace=True)
+
+        self.input_df = self.defect_df
+
+        # IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("defect")
+
+
+
+    def extract_defect_levels_v2_hse(self, defect_taskid, localisation=0.2, selected_bands=None, edge_tol=(0.5, 0.5)):
         from qubitPack.qc_searching.analysis.main import get_defect_state_v3
         from qubitPack.tool_box import get_db
 
@@ -244,12 +365,13 @@ class GenerateDefectTable(BackProcess):
                 localisation,  #0.2
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
-                edge_tol= (0.25, 0.25), # defect state will be picked only if it's above vbm by
+                edge_tol=edge_tol, # defect state will be picked only if it's above vbm by
                 # 0.025 eV
                 # and below
                 # cbm by 0.025 eV
                 ir_db=ir_db,
                 ir_entry_filter={"prev_fw_taskid": defect_taskid},
+                selected_bands=selected_bands,
             )
             tot, proj, d_df, levels, defect_levels = state
             level_info = d_df.to_dict("records")[0]
@@ -258,7 +380,8 @@ class GenerateDefectTable(BackProcess):
             level_info = {}
             levels = {}
             defect_levels = {}
-        return level_info, levels, defect_levels
+            proj = None
+        return level_info, levels, defect_levels, proj
 
 
     def get_defect_df_v2_hse(self, read_c2db_uid_key=False):
@@ -319,16 +442,52 @@ class GenerateDefectTable(BackProcess):
             for host_info in [host_c2db_info, host_band_edges, host_sym_data]:
                 info.update(host_info)
 
-            localisation = None
-            if e["task_id"] in [575]:
-                localisation = 0.35
-            elif e["task_id"] in [1088, 2590, 585, 545, 571, 2563, 603, 644, ]:
-                localisation = 0.1
-            elif e["task_id"] in [605, 2569]:
-                localisation = 0.05
-            else:
-                localisation = 0.2
-            d_df, levels, in_gpa_levels = self.extract_defect_levels_v2_hse(e["task_id"], localisation=localisation)
+           # if e["task_id"] in [575]:
+            #     localisation = 0.2
+            # elif e["task_id"] in [1088, 2590, 585, 545, 571, 2563, 603, 644, ]:
+            #     localisation = 0.1
+            # elif e["task_id"] in [605, 2569]:
+            #     localisation = 0.05
+            # else:
+            #     localisation = 0.2
+            def settings_for_36group(task_id):
+                localisation, selected_bands, edge_tol = 0.2, None, (0.5, 0.5)
+                if task_id in [238]:
+                    localisation = 0.25
+                elif task_id in [220]:
+                    localisation = 0.114
+                elif task_id in [1088]:
+                    localisation = 0.1
+                elif task_id in [585]:
+                    localisation = 0.08
+                    selected_bands = {"1": [306, 307, 308], "-1": [306, 307, 309]}
+                elif task_id in [2576]:
+                    localisation = 0.02
+                    selected_bands = {"1": [306, 307, 312], "-1": [306, 307, 312]}
+                elif task_id in [605]:
+                    localisation = 0.11
+                    selected_bands = {"1": [306, 307, 309], "-1": [306, 307, 309]}
+                elif task_id in [2592]:
+                    localisation = 0.05
+                    selected_bands = {"1": [306, 307, 313], "-1": [306, 307, 324]}
+                    edge_tol = (1, 1)
+                elif task_id in [571]:
+                    localisation = 0.085
+                elif task_id in [545]:
+                    localisation = 0.15
+                elif task_id in [2569]:
+                    localisation = 0.14
+                return localisation, selected_bands, edge_tol
+
+            localisation, selected_bands, edge_tol = settings_for_36group(e["task_id"])
+
+
+            d_df, levels, in_gpa_levels, proj_df = self.extract_defect_levels_v2_hse(
+                e["task_id"],
+                localisation=localisation,
+                selected_bands=selected_bands,
+                edge_tol=edge_tol
+            )
             info.update({"localisation_threshold": localisation})
             info.update(d_df)
             info.update(levels)
@@ -341,7 +500,7 @@ class GenerateDefectTable(BackProcess):
         self.defect_df.replace({"dn_tran_en": "None"}, 0, inplace=True)
 
         self.input_df = self.defect_df
-        # IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("defects_36_groups")
+        # IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("taskid_970")
 
     def backprocess(self, excel_name=None):
         self.add_band_edges_and_defects()
@@ -354,7 +513,7 @@ class GenerateDefectTable(BackProcess):
 
 class DataPrepCDFT(CDFT):
     def __init__(self, defect_entry_df):
-        super(DataPrepCDFT, self).__init__()
+        super().__init__()
         self.defect_entry_df = defect_entry_df # hse_screened_qubits_df
         self.zpl_df = None
 
@@ -367,7 +526,6 @@ class DataPrepCDFT(CDFT):
         transition_dipole_moment(self.foundation_df)
 
     def get_zpl_df(self):
-        self.get_data_sheet({"taskid": {"$in": list(self.defect_entry_df["task_id"])}}, read_c2db_uid_key=True)
         zpl_df = self.get_zpl_data()
         zpl_df["task_id"] = zpl_df["gs_taskid"]
         zpl_df.drop(columns=["charge", "prototype"], inplace=True)
@@ -392,8 +550,8 @@ def main():
     # define a function to generate a table of defects
     def get_defect_table():
         from analysis.analysis_api import hse_qubit_df
-        antisite_tmd = {"pc_from": {"$regex": "owls"}, "task_label": "HSE_scf",
-                        "chemsys": {"$in": ["S-W", "Se-W", "Te-W", "Mo-S", "Mo-Se", "Mo-Te"]}}
+        # antisite_tmd = {"pc_from": {"$regex": "owls"}, "task_label": "HSE_scf",
+        #                 "chemsys": {"$in": ["S-W", "Se-W", "Te-W", "Mo-S", "Mo-Se", "Mo-Te"]}}
 
         # hse_qubit = hse_qubit_df.copy()
         # taskid_list = hse_qubit["task_id"].to_list()
@@ -401,15 +559,26 @@ def main():
         #     taskid_list.remove(i)
         # print(taskid_list)
 
-        filter = antisite_tmd
-        DataPrepDefect.cp_symdata_bandedges(filter, read_c2db_uid_key=True)
-        DataPrepDefect.is_site_sym_uniform(filter)
-        DataPrepDefect.cp_site_oxi_state(filter, read_c2db_uid_key=True)
+        tkids = defects_36_groups_df["task_id"].to_list()
 
-        test = GenerateDefectTable(filter)
-        test.get_defect_df_v2_hse(read_c2db_uid_key=True)
-        test.backprocess("tmd_antisites")
+        # filter = antisite_tmd
+        # DataPrepDefect.cp_symdata_bandedges(filter, read_c2db_uid_key=True)
+        # DataPrepDefect.is_site_sym_uniform(filter)
+        # DataPrepDefect.cp_site_oxi_state(filter, read_c2db_uid_key=True)
 
+        test = GenerateDefectTable({"task_id": {"$in": tkids}})
+        test.get_defect_df_v2_hse(read_c2db_uid_key=False)
+        test.backprocess()
+        test.df_to_excel(excel_name="defects_36_groups")
+
+    def get_defect_table_scan():
+        table1_df_failed = table1_df.loc[(table1_df["up_tran_en"]==0) & (table1_df["dn_tran_en"]==0)]
+        tkids = table1_df["task_id"].to_list()[:]
+
+        test = GenerateDefectTable({"task_id": {"$in": tkids}})
+        test.get_defect_df_v2()
+        test.backprocess()
+        test.df_to_excel(excel_name="table1_failed")
 
     def get_zpl_df():
         # run TDM in db1
@@ -422,6 +591,17 @@ def main():
         IOTools(pandas_df=zpl.zpl_df, cwd=os.path.join(p_path, "analysis/output/xlsx")).to_excel(
             "test_zpl_df")
 
-    get_defect_table()
+    get_defect_table_scan()
+
 if __name__ == '__main__':
     main()
+    # run TDM in db1
+    # p_path = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
+    # tgt_df = IOTools(excel_file="Table_4_df_2022-04-21", cwd=INPUT_PATH).read_excel()
+    # zpl = DataPrepCDFT(defect_entry_df=tgt_df.loc[tgt_df["task_id"] == 605])
+    # zpl.one_shot_calc_TDM()
+    # zpl.one_shot_zpl_df()
+    # zpl.get_zpl_df()
+    # a = zpl.zpl_df
+    # IOTools(pandas_df=zpl.zpl_df, cwd="analysis/output/xlsx").to_excel(
+    #     "test_zpl_df")
