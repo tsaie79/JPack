@@ -70,7 +70,7 @@ class DataPrepHost:
         # 3
         db = C2DB_IR_calc_data
         col = db.collection
-        filter = {"task_label": "hse line"}
+        filter = {"task_label": "hse line", "task_id": 8565}
 
         for e in list(col.find(filter)):
             print(e["task_id"], e["c2db_uid"])
@@ -211,7 +211,6 @@ class DataPrepDefect:
                 site_oxi_state = {}
             db.collection.update_one({"task_id": e["task_id"]}, {"$set": {"host_info.c2db_ir_hse_line.site_oxi_state":
                                                                               site_oxi_state}})
-
 
 class GenerateDefectTable(BackProcess):
     def __init__(self, df_filter):
@@ -428,7 +427,7 @@ class GenerateDefectTable(BackProcess):
                 "task_id": e["task_id"],
                 "host_taskid": "{}-{}-{}".format(C2DB_IR_calc_data.db_name, C2DB_IR_calc_data.collection.name,
                                                  e_from_host["task_id"]),
-                "gap_hse_nosoc": e_from_host["output"]["bandgap"],
+                "gap_hse_c2db_ir": e_from_host["output"]["bandgap"],
                 "defect_name": e["defect_entry"]["name"],
                 "defect_type": e["defect_entry"]["defect_type"],
                 "charge": e["charge_state"],
@@ -542,10 +541,10 @@ class DataPrepCDFT(CDFT):
 def main():
     # define a function that updates c2db_ir_calc_data with the new data
     def update_c2db_ir_calc_data():
-        DataPrepHost.sym_data()
+        # DataPrepHost.sym_data()
         DataPrepHost.band_edge()
-        DataPrepHost.site_oxi_state()
-        DataPrepHost.cp_c2db_info()
+        # DataPrepHost.site_oxi_state()
+        # DataPrepHost.cp_c2db_info()
 
     # define a function to generate a table of defects
     def get_defect_table():
@@ -591,7 +590,7 @@ def main():
         IOTools(pandas_df=zpl.zpl_df, cwd=os.path.join(p_path, "analysis/output/xlsx")).to_excel(
             "test_zpl_df")
 
-    get_defect_table_scan()
+    update_c2db_ir_calc_data()
 
 if __name__ == '__main__':
     main()
