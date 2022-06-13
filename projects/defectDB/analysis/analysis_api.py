@@ -42,10 +42,11 @@ defects_36_groups_df = IOTools(cwd=input_path, excel_file="defects_36_groups_202
 defects_36_groups_zpl_zfs_df = IOTools(cwd=input_path, excel_file="defects_36_groups_zpl_zfs").read_excel()
 
 # hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-04-15").read_excel()
-hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-04-27").read_excel()
+hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-06-01").read_excel()
+
 
 table1_df = IOTools(cwd=input_path, excel_file="Table_1_df_2022-04-15").read_excel()
-
+table4_df = IOTools(cwd=input_path, excel_file="Table_4_df_2022-05-22").read_excel()
 
 
 # os.environ["PATH"] += os.pathsep + "/Library/TeX/texbin/latex"
@@ -54,31 +55,47 @@ table1_df = IOTools(cwd=input_path, excel_file="Table_1_df_2022-04-15").read_exc
 
 class Toolbox:
     @classmethod
-    def get_poscar_and_wavecar(cls, taskid):
+    def get_poscar_and_wavecar(cls, taskid, hse, files=["POSCAR"]):
         from qubitPack.tool_box import get_db
-        col = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347).collection
+        if hse:
+            col = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347).collection
+        else:
+            col = get_db("Scan2dDefect", "calc_data", port=12347).collection
         def scp(taskid):
             for i in col.find({"task_id": taskid}):
                 task_id = i["task_id"]
                 dir_name = i["dir_name"].split("/")[-1]
-                os.makedirs(os.path.join("structures", str(task_id)), exist_ok=True)
-                for f in ["POSCAR", "WAVECAR"]:
-                    check_output("scp -P 12348 qimin@localhost:{}/{}/{}.gz structures/{}/".format(
-                        "/mnt/sdc/tsai/Research/projects/backup/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc",
-                        dir_name, f, task_id).split(" "))
+                if hse:
+                    src_dir = "/home/qimin/sdc_tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc/"
+                    tgt_dir = str(task_id)
+                else:
+                    src_dir = "/home/qimin/sdc_tsai/Research/projects/Scan2dDefect/calc_data/scf"
+                    tgt_dir = str(task_id)+"_SCAN"
+                os.makedirs(os.path.join("structures", tgt_dir), exist_ok=True)
+                for f in files:
+                    f_out = f"{taskid}_{f}.gz"
+                    check_output("scp -P 12348 qimin@localhost:{}/{}/{}.gz structures/{}/{}".format(
+                        src_dir,
+                        dir_name, f, tgt_dir, f_out).split(" "))
         scp(taskid)
     @classmethod
-    def get_parcharg(cls, taskid, band, spin):
+    def get_parcharg(cls, taskid, band, spin, hse):
         try:
-            check_output("gunzip structures/{}/WAVECAR.gz".format(taskid).split(" "), input=b"Y")
-            check_output("gunzip structures/{}/POSCAR.gz".format(taskid).split(" "), input=b"Y")
+            if hse:
+                tgt_dir = str(taskid)
+            else:
+                tgt_dir = str(taskid)+"_SCAN"
+            check_output("gunzip structures/{}/{}_WAVECAR.gz".format(tgt_dir, taskid).split(" "),
+                         input=b"Y")
+            check_output("gunzip structures/{}/{}_POSCAR.gz".format(tgt_dir, taskid).split(" "), input=b"Y")
         except Exception:
             pass
-        wv = Wavecar("structures/{}/WAVECAR".format(taskid))
-        wv.get_parchg(Poscar.from_file("structures/{}/POSCAR".format(taskid)), 0, band-1, spin, phase=True).\
-            write_file("structures/{}/{}-{}_spin-{}.vasp".format(taskid, taskid, band, spin))
-        check_output("open structures/{}/{}-{}_spin-{}.vasp".format(taskid, taskid, band, spin).split(" "))
-
+        wv = Wavecar("structures/{}/{}_WAVECAR".format(tgt_dir, taskid))
+        wv.get_parchg(Poscar.from_file("structures/{}/{}_POSCAR".format(tgt_dir, taskid)), 0, band-1, spin, phase=True). \
+            write_file("structures/{}/{}-{}_spin-{}.vasp".format(tgt_dir, taskid, band, spin))
+        check_output("open structures/{}/{}-{}_spin-{}.vasp".format(tgt_dir, taskid, band, spin).split(" "))
+        check_output("gzip structures/{}/{}_WAVECAR".format(tgt_dir, taskid).split(" "))
+        check_output("gzip structures/{}/{}_POSCAR".format(tgt_dir, taskid).split(" "))
 
     @classmethod
     def plot_defect_levels(cls, task_ids, is_hse):
@@ -159,7 +176,7 @@ class Task1:
                         (df["chemsys"].str.contains("I-")) | (df["chemsys"].str.contains("-I"))]
         elif halogenide is False:
             df = df.loc[~((df["chemsys"].str.contains("Cl")) | (df["chemsys"].str.contains("Br")) |
-                        (df["chemsys"].str.contains("I-")) | (df["chemsys"].str.contains("-I")))]
+                          (df["chemsys"].str.contains("I-")) | (df["chemsys"].str.contains("-I")))]
         elif halogenide is None:
             pass
 
@@ -305,9 +322,9 @@ class Task3Qubit:
 
     def get_halogenides(self, df):
         halogen_df = df.loc[(df["chemsys"].str.contains("I-")) |
-                                      (df["chemsys"].str.contains("-I")) |
-                                      (df["chemsys"].str.contains("Br")) |
-                                      (df["chemsys"].str.contains("Cl"))]
+                            (df["chemsys"].str.contains("-I")) |
+                            (df["chemsys"].str.contains("Br")) |
+                            (df["chemsys"].str.contains("Cl"))]
         return halogen_df
 
     @property
@@ -468,7 +485,7 @@ class Task5(Task3Qubit):
         zpl_df = zpl_df.loc[zpl_df["non-source-group"] == non_source_group]
 
         display(zpl_df.groupby(["source-group", "Z", "prototype", "host","defect", "source-specie",
-                          "non-source-specie"]).agg({"gs_taskid": ["unique", "count"]}))
+                                "non-source-specie"]).agg({"gs_taskid": ["unique", "count"]}))
 
         groups = zpl_df["source-group"].unique().tolist()
 
@@ -878,19 +895,22 @@ class SheetCollection:
         self.hse_candidate_df_gp = None
 
         self.grouping = [
-            "prototype", "spacegroup", "C2DB_uid", "good_site_sym", "good_site_specie",
-            "defect_type", "defect_name", "charge", "perturbed_vbm", "perturbed_cbm",
+            "prototype",
+            "spacegroup", "C2DB_uid", "good_site_sym", "good_site_specie",
+            "defect_type", "charge", "perturbed_vbm", "perturbed_cbm",
             "perturbed_bandgap", "level_edge_category",
             "LUMO-HOMO_up",  "LUMO-HOMO_down"
         ]
 
         self.grouping_hse_candidate = [
-            "prototype", "spacegroup", "C2DB_uid", "defect_type", "defect_name", "charge",
-            "perturbed_bandgap","zfs_D", "zfs_E",  "LUMO-HOMO_up", "LUMO-HOMO_down", "LUMO_HOMO_deg", "transition_from",
+            "prototype", "spacegroup", "C2DB_uid", "defect_type", "defect_name", "charge", "defect_symmetry",
+            "perturbed_bandgap","zfs_D", "zfs_E",  "LUMO-HOMO_up", "LUMO-HOMO_down", "LUMO_HOMO_deg",
+            "LUMO_HOMO_splitting_type",
+            "transition_from",
             "gap_tran_bottom_to_vbm", "gap_tran_top_to_cbm",
             "ZPL", "AB", "BC", "CD", 'DA',
             "up_TDM_rate_X", "up_TDM_rate_Y", "up_TDM_rate_Z", "dn_TDM_rate_X", "dn_TDM_rate_Y", "dn_TDM_rate_Z",
-            "TDM_rate", "up_polarization", "dn_polarization", "allowed", "class"
+            "TDM_rate", "up_polarization", "dn_polarization", "allowed", "class", "singlet_triplet_energy_diff",
         ]
 
 
@@ -907,7 +927,7 @@ class SheetCollection:
                                              and np.all(np.array(x["up_in_gap_level"]) - x["level_cbm"] <= cbm_distance),
                                    axis=1)
         df["in_gap_dn"] = df.apply(lambda x: np.all(np.array(x["dn_in_gap_level"]) - x["level_vbm"] >= vbm_distance)
-                                         and np.all(np.array(x["dn_in_gap_level"]) - x["level_cbm"] <= cbm_distance),
+                                             and np.all(np.array(x["dn_in_gap_level"]) - x["level_cbm"] <= cbm_distance),
                                    axis=1)
 
         df["in_gap"] = df.apply(lambda x: x["in_gap_up"] or x["in_gap_dn"], axis=1)
@@ -947,6 +967,7 @@ class SheetCollection:
         return zfs_zpl_df
 
     def get_scan_defect_df(self):
+        # defect_df is generated by data_preparation.py
         df = defect_df.copy()
         df["level_cat"] = df.apply(lambda x: self.cat_revision(x), axis=1)
 
@@ -977,6 +998,7 @@ class SheetCollection:
         df = df.reset_index(drop=True)
 
         self.scan_defect_df = df
+        # use {"task_id": "unique"} to make sure there is no duplicated defects, then use {"task_id": "max"}
         self.scan_defect_df_gp = self.scan_defect_df.groupby(self.grouping).agg({"task_id": "unique"})
 
         return self.scan_defect_df
@@ -1051,8 +1073,44 @@ class SheetCollection:
         if remove_duplicates_based_on:
             df = df.drop_duplicates(
                 subset=remove_duplicates_based_on, keep="first").sort_values("task_id", ascending=True)
+
+        #add singlet informaion
+        da = DefectAnalysis(df)
+        da.get_singlet_triplet_en_diff()
+        df = df.merge(da.singlet_df, on=["C2DB_uid", "defect_name", "charge", "task_id"], how="left")
+        # compliment TMDs' results
+        for tmd_taskid in tmd_antisites_df["task_id"].unique():
+            chemsys = tmd_antisites_df.loc[tmd_antisites_df["task_id"] == tmd_taskid, "chemsys"].iloc[0]
+            if chemsys == "S-W":
+                df.loc[(df["task_id"] == tmd_taskid) & (df["chemsys"] == "S-W"), "singlet_triplet_energy_diff"] = \
+                    0.273
+            elif chemsys == "Se-W":
+                df.loc[(df["task_id"] == tmd_taskid) & (df["chemsys"] == "Se-W"), "singlet_triplet_energy_diff"] = \
+                    0.295
+            elif chemsys == "Te-W":
+                df.loc[(df["task_id"] == tmd_taskid) & (df["chemsys"] == "Te-W"), "singlet_triplet_energy_diff"] = \
+                    0.301
+            elif chemsys == "Mo-S":
+                df.loc[(df["task_id"] == tmd_taskid) & (df["chemsys"] == "Mo-S"), "singlet_triplet_energy_diff"] = \
+                    0.349
+            elif chemsys == "Mo-Se":
+                df.loc[(df["task_id"] == tmd_taskid) & (df["chemsys"] == "Mo-Se"), "singlet_triplet_energy_diff"] = \
+                    0.343
+            elif chemsys == "Mo-Te":
+                df.loc[(df["task_id"] == tmd_taskid) & (df["chemsys"] == "Mo-Te"), "singlet_triplet_energy_diff"] = \
+                    0.264
+
+        df = df.loc[df["singlet_triplet_energy_diff"].notnull()]
+
+        #add defect symmetry
+        da.get_defect_symmetry(df)
+        df = df.merge(da.defect_symmetry_df, on=["task_id"], how="left")
+
         self.hse_triplet_df = df
-        self.hse_triplet_df_gp = df.groupby(self.grouping).agg({"task_id": ["unique", "count"]})
+        grouping = self.grouping.copy()
+        grouping.append("singlet_triplet_energy_diff")
+        grouping.append("defect_symmetry")
+        self.hse_triplet_df_gp = df.groupby(grouping).agg({"task_id": ["unique", "count"]})
 
         return self.hse_triplet_df
 
@@ -1101,7 +1159,7 @@ class SheetCollection:
         # df["gap_tran_top_to_cbm"] = df.apply(
         #     lambda x: x["level_gap"] - x["dn_tran_top"] if x["transition_from"] == "dn" else x["level_gap"] - x["up_tran_top"], axis=1)
 
-        def get_filtered_df(df, D_zfs=0.95, wavelength_zpl=2500, homo_to_vmb=0.095, lumo_to_cbm=0.095):
+        def get_filtered_df(df, D_zfs=0.95, wavelength_zpl=2500, homo_to_vbm=0.095, lumo_to_cbm=0.095):
             df = df.loc[df["zfs_D"] != "None"]
             df = df.loc[df["zfs_D"] >= D_zfs]
 
@@ -1109,7 +1167,7 @@ class SheetCollection:
             df = df.loc[df["ZPL"] != "None"]
             df = df.loc[df["ZPL_wavelength"] <= wavelength_zpl]
 
-            df = df.loc[df["gap_tran_bottom_to_vbm"] >= homo_to_vmb]
+            df = df.loc[df["gap_tran_bottom_to_vbm"] >= homo_to_vbm]
             df = df.loc[df["gap_tran_top_to_cbm"] >= lumo_to_cbm]
 
             problematic_taskids = FigureAndStats().test_valid_opt_tran(df).loc[:, "task_id"]
@@ -1137,12 +1195,48 @@ class SheetCollection:
 
         passed_df = exclude_weird_zfs(passed_df)
         self.hse_candidate_df = passed_df.replace(np.nan, "None").copy()
+        self.hse_candidate_df["LUMO_HOMO_splitting_type"] = self.hse_candidate_df.apply(
+            lambda x: f"{x['LUMO_HOMO_deg'][1]}-{x['LUMO_HOMO_deg'][0]}_type",axis=1)
+
         self.hse_candidate_df_gp = self.hse_candidate_df.copy().replace(np.nan, "None").groupby(
-            self.grouping_hse_candidate).agg({"task_id": "unique"})
+            self.grouping_hse_candidate).agg({"task_id": "max"})
         self.hse_candidate_not_passed_df = not_passed_df.replace(np.nan, "None").copy()
         self.hse_candidate_not_passed_df_gp = self.hse_candidate_not_passed_df.copy().replace(np.nan, "None").groupby(
             self.grouping_hse_candidate).agg(
             {"task_id": "unique"})
+
+    def get_final_hse_candidate_df(self, hse_candidate_df=None, remove_e_config_summary_cols=True):
+        df = hse_candidate_df.copy()
+        # remove e_config, h_config, and e2_from. This must be done if get_e_config_summary_df was utilized
+        if remove_e_config_summary_cols:
+            df = df.drop(["e_config", "h_config", "e2_from"], axis=1)
+        # get_e_config
+        da = DefectAnalysis(df)
+        updated_df = da.get_e_config_summary_df() # these e_config are explicitly identified by eyes
+
+        # screen out some candidates
+        updated_df = updated_df.loc[
+            (updated_df["e_config"]!="unknown") &
+            (updated_df["h_config"]!="unknown") &
+            (updated_df["e2_from"]!="unknown")
+            ]
+        updated_df = updated_df.loc[updated_df["singlet_triplet_energy_diff"]!="None"]
+
+        # remove D3h 109, 129 since they don't have proper intersystem-crossings for qubit operations.
+        updated_df = updated_df.loc[~(updated_df["task_id"].isin([109, 129]))]
+
+        #remove D3, task_id == 107 for complex defect levels
+        updated_df = updated_df.loc[~(updated_df["task_id"].isin([107]))]
+
+        #remove strange structure task_id == 1234
+        updated_df = updated_df.loc[~(updated_df["task_id"].isin([1234]))]
+
+        self.updated_hse_candidate_df = updated_df.copy()
+        grouping = self.grouping_hse_candidate
+        grouping.extend(["e_config", "h_config", "e2_from"])
+        self.updated_hse_candidate_df_gp = self.updated_hse_candidate_df.groupby(grouping).agg({"task_id": "unique"})
+
+
 
 
 class FigureAndStats(SheetCollection):
@@ -1345,6 +1439,152 @@ class FigureAndStats(SheetCollection):
         fig.savefig("/Users/jeng-yuantsai/Research/project/Scan2dDefect/manuscript/fig/test.pdf", format="pdf")
         return fig
 
+    def get_plain_grand_defect_level_plot(self, df, sym_name, ylim):
+        # plot a bar chart containing the defect levels for a mutiple defects
+        plot_df = df if df.shape[0] > 0 else self.hse_candidate_df
+
+        defects = []
+        taskid_labels = []
+        mags =[]
+        defect_name_labels = []
+        charge_labels = []
+        host_labels = []
+        print(f"task_id :{plot_df['task_id'].tolist()}")
+        for idx, taskid in enumerate(plot_df["task_id"].tolist()):
+            print("=="*20, "\n", f"taskid: {taskid}, idx: {idx}")
+            defect = plot_df.loc[(plot_df["task_id"] == taskid), :]
+            if len(defect) == 1:
+                idx = 0
+            defect = defect.iloc[idx, :]
+            mag = defect["mag"]
+
+            # append all entries as dict in defect to defects list
+            defects.append(defect.to_dict())
+            taskid_labels.append(defect["task_id"])
+            mags.append(defect["mag"])
+            defect_name_labels.append(defect["defect_name"])
+            if int(defect["charge"]) == -1:
+                charge_labels.append("1-")
+            elif int(defect["charge"]) == 1:
+                charge_labels.append("1+")
+            else:
+                charge_labels.append(defect["charge"])
+
+            host_labels.append(defect["C2DB_uid"])
+
+        vbm_lim, cbm_lim = plot_df["level_vbm"].median(), plot_df["level_cbm"].median()
+
+        fig, ax = plt.subplots(figsize=(12,11), dpi=300)
+        fig_y_height = 5, 5
+        font_size = 7.25
+        ax.set_ylim(vbm_lim-fig_y_height[0], cbm_lim+fig_y_height[1])
+
+        print("len of defects: {}".format(len(defects)))
+        # plot mutilple bars
+        for defect, x in zip(defects, np.arange(0, len(defects)*5, 5)):
+            # readout all the data from defect dict
+            vbm = defect["level_vbm"]
+            cbm = defect["level_cbm"]
+            up = defect["up_in_gap_level"]
+            dn = defect["dn_in_gap_level"]
+            up_deg = defect["up_in_gap_deg"]
+            dn_deg = defect["dn_in_gap_deg"]
+            up_occ = defect["up_in_gap_occ"]
+            dn_occ = defect["dn_in_gap_occ"]
+            up_band = defect["up_in_gap_band_index"]
+            dn_band = defect["dn_in_gap_band_index"]
+
+            if not up_deg:
+                up_deg = ["" for i in up]
+            if not up_occ:
+                up_occ = ["" for i in up]
+
+            if not dn_deg:
+                dn_deg = ["" for i in dn]
+            if not dn_occ:
+                dn_occ = ["" for i in dn]
+
+            ax.bar(x, vbm-(vbm_lim-fig_y_height[0]), 4, (vbm_lim-fig_y_height[0]), color="deepskyblue")
+            ax.bar(x, (cbm_lim+fig_y_height[1])-cbm, 4, cbm, color="orange")
+
+            dx = 0.35
+            for level, occ, deg, id in zip(up, up_occ, up_deg, up_band):
+                print(f"level: {level}, occ: {occ}, deg: {deg}, id: {id}")
+                # dx += 0.2
+                # ax.text(x-2, level, id)
+                color = None
+                if deg == 1:
+                    color = "black"
+                    ax.hlines(level, x-2, x-1, colors=color)
+                    if occ == 1:
+                        # plot upward arrow
+                        ax.arrow(x-1.5, level-0.05, 0, 0.1, head_width=0.5, head_length=0.1, color=color)
+
+                elif deg == 2:
+                    color = "black"
+                    ax.hlines(level, x-2, x-1, colors=color)
+                    ax.hlines(level, x-0.5, x+0.5, colors=color)
+                    if occ == 1:
+                        # plot upward arrow
+                        ax.arrow(x-1.5, level-0.05, 0, 0.1, head_width=0.5, head_length=0.1, color=color)
+                        ax.arrow(x, level-0.05, 0, 0.1, head_width=0.5, head_length=0.1, color=color)
+                elif deg == 3:
+                    color = "green"
+                elif deg == 4:
+                    color = "yellow"
+                else:
+                    color = "black"
+
+
+            dx = 1
+            for level, occ, deg, id in zip(dn, dn_occ, dn_deg, dn_band):
+                # ax.text(x+2, level, id)
+                color = None
+                if deg == 1:
+                    color = "black"
+                    ax.hlines(level, x+1, x+2, colors=color)
+                    if occ == 1:
+                        # plot downward arrow
+                        ax.arrow(x+1.5, level+0.05, 0, -0.1, head_width=0.5, head_length=0.1, color=color)
+                elif deg == 2:
+                    color = "black"
+                    ax.hlines(level, x-0.5, x+0.5, colors=color)
+                    ax.hlines(level, x+1, x+2, colors=color)
+                    if occ == 1:
+                        ax.arrow(x, level+0.05, 0, -0.1, head_width=0.5, head_length=0.1, color=color)
+                        ax.arrow(x+1.5, level+0.05, 0, -0.1, head_width=0.5, head_length=0.1, color=color)
+                elif deg == 3:
+                    color = "green"
+                elif deg == 4:
+                    color = "yellow"
+                else:
+                    color = "black"
+
+
+        ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        for tick in ax.get_yticklabels():
+            tick.set_fontsize(15)
+
+        ax.tick_params(axis="x", bottom=False, labelbottom=True)
+        ax.tick_params(axis="y", right=False, which="both")
+
+
+        ax.set_xticks(np.arange(0, len(defects)*5, 5))
+
+        ax.set_xticklabels([rf"$\mathrm{{{defect_name_labels[i].split('_')[2]}_{{"
+                            rf"{defect_name_labels[i].split('_')[4]}}}^{{{charge_labels[i]}}}}}$"+
+                            rf"@{''.join(host_labels[i].split('-')[0].split('2'))}" for
+                            i in range(len(mags))], fontdict={"fontsize": 10}, rotation=0)
+
+        # remove minor and major xticks
+        ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=True)
+        print(f"taskid_label: {taskid_labels}, mags: {mags}")
+
+        ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
+        ax.set_ylim(ylim[0], ylim[1])
+        return fig, ax
+
+
     def get_zpl_fig(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
         # get a histogram plot of ZPL_wave values for df
@@ -1394,12 +1634,12 @@ class FigureAndStats(SheetCollection):
             edgecolor="black",
         )
         # set count of ZPL-wavelength at the top of each bar except the zero-height bar
-        for i in range(250, 2000, 50):
-            if df1.loc[(df1 >= i) & (df1 < i + 50)].count() != 0:
-                ax.text(i + 25, df1.loc[(df1 >= i) & (df1 < i + 50)].count(),
-                        str(df1.loc[(df1 >= i) & (df1 < i + 50)].count()),
-                        horizontalalignment="center",
-                        verticalalignment="bottom")
+        # for i in range(250, 2000, 50):
+        #     if df1.loc[(df1 >= i) & (df1 < i + 50)].count() != 0:
+        #         ax.text(i + 25, df1.loc[(df1 >= i) & (df1 < i + 50)].count(),
+        #                 str(df1.loc[(df1 >= i) & (df1 < i + 50)].count()),
+        #                 horizontalalignment="center",
+        #                 verticalalignment="bottom")
 
 
         ax.set_xlim(250, 2000)
@@ -1484,18 +1724,18 @@ class FigureAndStats(SheetCollection):
             width=0.01,
             label="BC",
             edgecolor="black",
-        )
+            )
 
         # set text of count for each bin at the top of the bar if the count != 0, else remove the text
-        for i in range(len(df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index())):
-            if df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i] != 0:
-                ax.text(
-                    np.arange(0, 0.4-0.01, 0.01)[i]+0.01/2,
-                    df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i],
-                    df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i],
-                    horizontalalignment="center",
-                    verticalalignment="bottom",
-                    )
+        # for i in range(len(df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index())):
+        #     if df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i] != 0:
+        #         ax.text(
+        #             np.arange(0, 0.4-0.01, 0.01)[i]+0.01/2,
+        #             df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i],
+        #             df1.value_counts(bins=np.arange(0, 0.4, 0.01)).sort_index().iloc[i],
+        #             horizontalalignment="center",
+        #             verticalalignment="bottom",
+        #             )
 
         # remove subticks
         ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
@@ -1520,15 +1760,15 @@ class FigureAndStats(SheetCollection):
         )
 
         # set text of count for each bin at the top of the bar if the count != 0, else remove the text
-        for i in range(len(df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index())):
-            if df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i] != 0:
-                axins.text(
-                    np.arange(0, 0.2-0.01, 0.01)[i]+0.01 if i < 2 else np.arange(0, 0.2-0.01, 0.01)[i]+0.01/2,
-                    df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i],
-                    df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i],
-                    horizontalalignment="center",
-                    verticalalignment="bottom",
-                    )
+        # for i in range(len(df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index())):
+        #     if df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i] != 0:
+        #         axins.text(
+        #             np.arange(0, 0.2-0.01, 0.01)[i]+0.01 if i < 2 else np.arange(0, 0.2-0.01, 0.01)[i]+0.01/2,
+        #             df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i],
+        #             df1.value_counts(bins=np.arange(0, 0.2, 0.01)).sort_index().iloc[i],
+        #             horizontalalignment="center",
+        #             verticalalignment="bottom",
+        #         )
 
         axins.legend(loc="upper right")
         axins.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
@@ -1554,7 +1794,7 @@ class FigureAndStats(SheetCollection):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
         # plot histogram of CDFT relaxation energy BC and DA
         bc, da = 0.05, 0.05
-        print("BC<={}, N={}-{}%, DA<={}, N={}-{}%".format(bc, df.loc[df["BC"] <= bc].count().iloc[0],
+        print("BC<={}, N={},{}%, DA<={}, N={},{}%".format(bc, df.loc[df["BC"] <= bc].count().iloc[0],
                                                           df.loc[df["BC"]<= bc].count().iloc[0]/df.count().iloc[0]*100,
                                                           da, df.loc[df["DA"] <= da].count().iloc[0],
                                                           df.loc[df["DA"] <= da].count().iloc[0]/df.count().iloc[
@@ -1594,12 +1834,12 @@ class FigureAndStats(SheetCollection):
         )
 
         # set text of count for each bin at the top of the bar and if the count is 0, then remove the text
-        for i in range(1, 12, 1):
-            count = df1.loc[(df1 >= i) & (df1 < i + 1)].count()
-            if count == 0:
-                ax.text(i+0.5, 0, "", verticalalignment="center", horizontalalignment="center")
-            else:
-                ax.text(i+0.5, count+1, str(count), verticalalignment="center", horizontalalignment="center")
+        # for i in range(1, 12, 1):
+        #     count = df1.loc[(df1 >= i) & (df1 < i + 1)].count()
+        #     if count == 0:
+        #         ax.text(i+0.5, 0, "", verticalalignment="center", horizontalalignment="center")
+        #     else:
+        #         ax.text(i+0.5, count+1, str(count), verticalalignment="center", horizontalalignment="center")
 
         ax.set_xlim(1, 12)
         ax.set_ylim(0, 25)
@@ -1658,7 +1898,46 @@ class FigureAndStats(SheetCollection):
         ax.set_title("ZFS parameter E distribution")
         display(fig)
 
+    def get_zfs_vs_antisite_specie(self, df=None):
+        if df is None:
+            df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+            da = DefectAnalysis(df)
+            df_antisite_proj = da.get_antisite_projection()
+        else:
+            df_antisite_proj = df.copy()
+        df_antisite_proj["group_row"] = df_antisite_proj.apply(lambda x: f'{x["level_source_group"]}-{x["level_source_row"]}', axis=1)
+        x = df_antisite_proj.groupby(["level_source_group"])
+        fig, ax = plt.subplots()
+        for k, v in x:
+            print(k)
+            r = None
+            if k in [16, 17]:
+                r = "Atomic radius calculated"
+            else:
+                r = "Atomic radius calculated"
+            v = v.sort_values("level_source_row")
+            display(v.loc[:, ["level_source_specie", r, "zfs_D"]])
+            ax.scatter(v[r], v["zfs_D"], label=k)
+            # display(v.loc[:, ["group_row", "zfs_D"]])
+            # ax.scatter(v["group_row"], v["zfs_D"])
+        # set y axis range from 0 to 12
+        ax.set_ylim(0, 12)
+        ax.set_xlim(0.8, 2)
+        # rotate legend by 90 degree
+        ax.legend(loc="upper center", ncol=4, frameon=True)
+        ax.set_ylabel("ZFS D (GHz)")
+        ax.set_xlabel("Atomic radius (Å)")
+        ax.set_title("ZFS parameter D vs. atomic radius of antisite atom")
 
+        #remove subticks in x-axis
+        ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
+        ax.tick_params(axis="x", which="major", bottom=True, top=False, labelbottom=True, direction="out")
+        ax.tick_params(axis="y", which="minor", left=True, right=False, labelbottom=False, direction="out")
+        ax.tick_params(axis="y", which="major", left=True, right=False, labelbottom=True, direction="out")
+
+        #rotate x-axis labels by 90 degrees
+        # plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        return fig
 
 
     def get_tdm_fig(self, df=None):
@@ -1686,9 +1965,9 @@ class FigureAndStats(SheetCollection):
         axins.tick_params(axis="x", which="major", bottom=False, top=False, direction="out")
         axins.tick_params(axis="y", which="both", left=True, right=False, labelbottom=True, direction="out")
         # set text of count for each bin at the top of the bar and if the count is 0, then remove the text
-        for i in [0, 1]:
-            count = bin1.count() if i == 0 else bin2.count()
-            axins.text(i, count-1.8, str(count), verticalalignment="center", horizontalalignment="center")
+        # for i in [0, 1]:
+        #     count = bin1.count() if i == 0 else bin2.count()
+        #     axins.text(i, count-1.8, str(count), verticalalignment="center", horizontalalignment="center")
 
         df1 = df.loc[:, "TDM_rate"]
         # plot bar chart for the distribution of the data in the main plot, with the range from 0 to 175 with increment of 5
@@ -1701,24 +1980,24 @@ class FigureAndStats(SheetCollection):
         ax.set_xlim(0, 175)
 
         # set text of count for each bin at the top of the bar and if the count is 0, then remove the text
-        for i in range(len(ax.patches)):
-            if ax.patches[i].get_height() == 0:
-                ax.patches[i].set_visible(False)
-            else:
-                ax.text(
-                    ax.patches[i].get_x() + ax.patches[i].get_width() / 2 + 2 if i < 2 else ax.patches[i].get_x() +
-                                                                                             ax.patches[i].get_width() / 2,
-                    ax.patches[i].get_height(),
-                    str(int(ax.patches[i].get_height())),
-                    ha="center",
-                    va="bottom",
-                )
+        # for i in range(len(ax.patches)):
+        #     if ax.patches[i].get_height() == 0:
+        #         ax.patches[i].set_visible(False)
+        #     else:
+        #         ax.text(
+        #             ax.patches[i].get_x() + ax.patches[i].get_width() / 2 + 2 if i < 2 else ax.patches[i].get_x() +
+        #                                                                                     ax.patches[i].get_width() / 2,
+        #             ax.patches[i].get_height(),
+        #             str(int(ax.patches[i].get_height())),
+        #             ha="center",
+        #             va="bottom",
+        #         )
 
         # ax.set_xlim(0, 175)
         # ax.set_ylim(0, 30)
-        ax.set_xlabel("TDM rate (MHz)")
+        ax.set_xlabel("Dipole transition rate (MHz)")
         ax.set_ylabel("Frequency")
-        ax.set_title("TDM rate distribution")
+        ax.set_title("Dipole transition rate distribution")
         ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
         ax.tick_params(axis="x", which="major", bottom=True, top=False, direction="out")
         ax.tick_params(axis="y", which="minor", left=False, right=False, labelbottom=True, direction="out")
@@ -1765,16 +2044,6 @@ class FigureAndStats(SheetCollection):
               f" {round(df1.loc[df1 >= 6].count() / df1.count()*100, 2)}%")
 
 
-
-
-
-
-
-
-
-
-
-
     def test_valid_opt_tran(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
         df["valid_zpl"] = df.apply(lambda x: x["ZPL"] <= x["vertical_transition_up"] if x["transition_from"] == "up"
@@ -1788,8 +2057,9 @@ class FigureAndStats(SheetCollection):
                                               and x["DA"] >= 0, axis=1)
 
         return df.loc[df["valid_cdft"] == False, ["task_id",  "C2DB_uid", "ZPL", "LUMO-HOMO_up", "LUMO-HOMO_down",
-                       "diff_zpl_vertical_transition", "AB", "BC", "CD", "DA", "transition_from", "up_tran_cdft_occ",
-                       "dn_tran_cdft_occ", "dn_in_gap_deg", "up_in_gap_deg"]]
+                                                  "diff_zpl_vertical_transition", "AB", "BC", "CD", "DA",
+                                                  "transition_from", "up_tran_cdft_occ",
+                                                  "dn_tran_cdft_occ", "dn_in_gap_deg", "up_in_gap_deg"]]
 
 
     @staticmethod
@@ -1798,7 +2068,7 @@ class FigureAndStats(SheetCollection):
         b = df2.copy().drop_duplicates(subset=["uid", "defect_name", "charge"], keep="last")
 
         # get intersection of two dataframes and drop duplicates
-        c = pd.merge(a, b, on=["uid", "defect_name", "charge"], how="inner")\
+        c = pd.merge(a, b, on=["uid", "defect_name", "charge"], how="inner") \
             .drop_duplicates(subset=["uid", "defect_name", "charge"], keep="last")
 
         # get a-c
@@ -1834,7 +2104,13 @@ class DefectAnalysis(SheetCollection):
             (self.hse_candidate_df.chemsys.isin(["Ga-S", "Ga-Se", "Ga-Te", "In-S", "In-Se", "In-Te"]))]
 
         self.xm = self.ptmcs.loc[self.ptmcs.charge == -1]
+        self.xm_GaS = self.xm.loc[self.xm.prototype == "GaS"]
+        self.xm_GaSe = self.xm.loc[self.xm.prototype == "GaSe"]
+
         self.mx = self.ptmcs.loc[self.ptmcs.charge == 1]
+        self.mx_GaS = self.mx.loc[self.mx.prototype == "GaS"]
+        self.mx_GaSe = self.mx.loc[self.mx.prototype == "GaSe"]
+
 
     def scp_files_from_server(self, taskid, files=None, db=None, base_path=None, open_file=False):
         base_path = base_path if base_path is not None else ""
@@ -1877,12 +2153,6 @@ class DefectAnalysis(SheetCollection):
 
 
     def get_local_env(self):
-
-        # if self.xm doesn't have column NN, self.get_NN() will be called to get NN for self.xm
-        self.xm = self.get_NN(self.xm) if not "NN" in list(self.xm.columns) else self.xm
-
-        self.xm_GaS = self.xm.loc[self.xm.prototype == "GaS"]
-        self.xm_GaSe = self.xm.loc[self.xm.prototype == "GaSe"]
         def plot_dz_vs_source_specie():
             # plot dz vs source specie for xm
             fig, ax = plt.subplots()
@@ -1902,29 +2172,179 @@ class DefectAnalysis(SheetCollection):
 
         plot_dz_vs_source_specie()
 
-    def get_proj_analysis(self, df=None):
-        df = df if df is not None else self.xm_GaS
-        self.proj_analysis = []
-        for taskid in df["task_id"]:
-            e_df = df.loc[df["task_id"] == taskid]
-            nn = e_df.NN.values[0]
-            print(nn)
-            a, b, c, d = Tools.extract_defect_levels_v2_hse(taskid,
-                localisation=float(e_df["localisation_threshold"].iloc[0]), tol=(0.5, 0.5)
-        )
+    def get_proj_analysis(self, taskids):
+        geo_df = self.get_geo_NN()
+        self.xm_GaS = self.xm_GaS.merge(geo_df.loc[:, ["task_id", "nn"]], on="task_id", how="left") \
+            if "nn" not in self.xm_GaS.columns else self.xm_GaS
 
-            d["vertical_species_proj"] = d.apply(lambda x: x[nn[0]] + x[nn[-1]], axis=1)
-            d["horizontal_species_proj"] = d.apply(lambda x: sum([x[i] for i in nn[1:4]]), axis=1)
-            d.reset_index(drop=False, inplace=True)
-            d = d.loc[:, ["band_index", "spin", "orbital", "vertical_species_proj", "horizontal_species_proj"]]
-            # fill a column with task_id
-            d["task_id"] = pd.Series([taskid] * len(d))
-            # create a new dataframe with all d
-            self.proj_analysis.append(d)
-        self.proj_analysis = pd.concat(self.proj_analysis, axis=0)
-        self.proj_analysis.reset_index(drop=True, inplace=True)
+        def get_proj_hor_vs_vert(taskids):
+            hor_vs_vert = {"taskid": [], "band":[], "hor-vs-vert": [], "hor-proj": [], "vert-proj": [],
+                           "BandName": [], "level_source_specie": [], "chemsys": [], }
+            for taskid in taskids:
+                e_df = self.xm_GaS.loc[self.xm_GaS["task_id"]==taskid]
+                a, b, c, d = Tools.extract_defect_levels_v2_hse(int(e_df["task_id"].iloc[0]), localisation=float(
+                    e_df["localisation_threshold"].iloc[0]), edge_tol=(0.5, 0.5), fig_on=None)
 
-        # plot horizontal and vertical projection
+                a1_band = []
+                a1_band.append(e_df["dn_in_gap_band_index"].iloc[0][-1])
+                a1_band = tuple(a1_band)
+                e_band = e_df["dn_in_gap_band_index"].iloc[0][:2]
+
+                for bands, band_name in zip([a1_band, e_band], ["a1", "e"]):
+                    for band in bands:
+                        print(band)
+                        hor_vs_vert["BandName"].append(band_name)
+                        hor_vs_vert["band"].append(band)
+                        hor_vs_vert["level_source_specie"].append(e_df["level_source_specie"].iloc[0])
+                        hor_vs_vert["chemsys"].append(e_df["chemsys"].iloc[0])
+                        d["vertical_species_proj"] = d.apply(lambda x: x[e_df["nn"].iloc[0][0]], axis=1)
+                        d["horizontal_species_proj"] = d.apply(lambda x: sum([x[i] for i in e_df["nn"].iloc[0][1:5]]), axis=1)
+                        df = d.loc[(d["orbital"].isin(["s", "pz", "px", "py"])) & (d["spin"]=="-1") &
+                                   (d.index==band-1)]
+                        display(df)
+
+                        hor_vs_vert["taskid"].append(taskid)
+                        hor_vs_vert["hor-vs-vert"].append(df["horizontal_species_proj"].sum()/
+                                                          df["vertical_species_proj"].sum())
+                        hor_vs_vert["hor-proj"].append(df["horizontal_species_proj"].sum())
+                        hor_vs_vert["vert-proj"].append(df["vertical_species_proj"].sum())
+
+            df = pd.DataFrame(hor_vs_vert)
+            # sum columns of hor-vs-vert, hor-proj, and vert-proj for the rows with the same taskid and BandName
+
+            df = df.groupby(["taskid", "BandName"]).agg({"hor-vs-vert": "sum", "hor-proj": "sum", "vert-proj": "sum",
+                                                         "band": "first", "level_source_specie": "first", "chemsys": "first"})
+            df = df.reset_index()
+            df = df.sort_values(by=["level_source_specie"])
+            df = df.round(3)
+            #rear
+
+            display(df)
+
+            fig, axes = plt.subplots(2, 1)
+            ax = axes[0]
+            #plot taskid vs hor-proj with labels of BandName
+            for band in df["BandName"].unique():
+                df_band = df.loc[df["BandName"]==band]
+                # rearrange the order of chemsys to [In-S, In-Se, In-Te]
+
+                df_band = df_band.sort_values(by=["chemsys"])
+                ax.plot(df_band["chemsys"], df_band["hor-proj"], label=band, marker="o")
+
+            ax = axes[1]
+            #plot taskid vs vert-proj with labels of BandName
+            for band in df["BandName"].unique():
+                df_band = df.loc[df["BandName"]==band]
+                ax.plot(df_band["chemsys"], df_band["vert-proj"], label=band, marker="o")
+
+            # share xticks and xticklabels
+            axes[0].get_shared_x_axes().join(axes[0], axes[1])
+            axes[0].set_xticklabels(axes[1].get_xticklabels())
+            # set no minor xticks
+            from matplotlib import ticker
+            axes[0].xaxis.set_minor_locator(ticker.NullLocator())
+            axes[1].xaxis.set_minor_locator(ticker.NullLocator())
+
+            #set ylabel for both axes
+            axes[0].set_ylabel("Arb. unit")
+            axes[1].set_ylabel("Arb. unit")
+
+            #set title for both axes
+            axes[0].set_title("Projection of anions")
+            axes[1].set_title("Projection of cation")
+
+            # set legend for both axes
+            axes[0].legend()
+            axes[1].legend()
+
+
+            fig.tight_layout()
+            fig.savefig("anion_cation_proj.pdf", format="pdf")
+            return df
+
+
+        def get_proj_low3_vs_antisite(taskids):
+            hor_vs_vert = {"taskid": [], "band":[], "hor-vs-vert": [], "hor-proj": [], "vert-proj": [], "tran-en": [],
+                           "BandName": [],  "level_source_specie": [], "chemsys": []}
+            for taskid in taskids:
+                e_df = self.xm_GaS.loc[self.xm_GaS["task_id"]==taskid]
+                a, b, c, d = Tools.extract_defect_levels_v2_hse(
+                    int(e_df["task_id"].iloc[0]),
+                    localisation=float(e_df["localisation_threshold"].iloc[0]),
+                    edge_tol=(0.5, 0.5),
+                    fig_on=None
+                )
+                a1_band = []
+                a1_band.append(e_df["dn_in_gap_band_index"].iloc[0][-1])
+                a1_band = tuple(a1_band)
+                e_band = e_df["dn_in_gap_band_index"].iloc[0][:2]
+
+                for bands, band_name in zip([a1_band, e_band], ["a1", "e"]):
+                    for band in bands:
+                        print(band)
+                        hor_vs_vert["BandName"].append(band_name)
+                        hor_vs_vert["band"].append(band)
+                        hor_vs_vert["taskid"].append(taskid)
+                        hor_vs_vert["level_source_specie"].append(e_df["level_source_specie"].iloc[0])
+                        hor_vs_vert["chemsys"].append(e_df["chemsys"].iloc[0])
+
+                        d["vertical_species_proj"] = d.apply(lambda x: x[e_df["nn"].iloc[0][-1]], axis=1)
+                        d["horizontal_species_proj"] = d.apply(lambda x: sum([x[i] for i in e_df["nn"].iloc[0][1:4]]), axis=1)
+                        df = d.loc[(d["orbital"].isin(["s", "pz", "px", "py"])) & (d["spin"]=="-1") &
+                                   (d.index==band-1)]
+                        display(df)
+
+                        hor_vs_vert["hor-vs-vert"].append(df["horizontal_species_proj"].sum()/df[
+                            "vertical_species_proj"].sum())
+                        hor_vs_vert["hor-proj"].append(df["horizontal_species_proj"].sum())
+                        hor_vs_vert["vert-proj"].append(df["vertical_species_proj"].sum())
+                        hor_vs_vert["tran-en"].append(e_df["dn_tran_en"].iloc[0])
+
+            df = pd.DataFrame(hor_vs_vert)
+            df = df.groupby(["taskid", "BandName"]).agg({"hor-vs-vert": "sum", "hor-proj": "sum", "vert-proj": "sum",
+                                                         "band": "first", "level_source_specie": "first", "chemsys": "first"})
+            df = df.reset_index()
+            df = df.sort_values(by=["level_source_specie"])
+            df = df.round(3)
+
+            fig, axes = plt.subplots(2, 1)
+            ax = axes[0]
+            #plot taskid vs hor-proj with labels of BandName
+            for band in df["BandName"].unique():
+                df_band = df.loc[df["BandName"]==band]
+                ax.plot(df_band["chemsys"], df_band["hor-proj"], label=band, marker="o")
+
+            ax = axes[1]
+            #plot taskid vs vert-proj with labels of BandName
+            for band in df["BandName"].unique():
+                df_band = df.loc[df["BandName"]==band]
+                ax.plot(df_band["chemsys"], df_band["vert-proj"], label=band, marker="o")
+
+            # share xticks and xticklabels
+            axes[0].get_shared_x_axes().join(axes[0], axes[1])
+            axes[0].set_xticklabels(axes[1].get_xticklabels())
+            # set no minor xticks
+            from matplotlib import ticker
+            axes[0].xaxis.set_minor_locator(ticker.NullLocator())
+            axes[1].xaxis.set_minor_locator(ticker.NullLocator())
+
+            #set ylabel for both axes
+            axes[0].set_ylabel("Arb. unit")
+            axes[1].set_ylabel("Arb. unit")
+
+            #set title for both axes
+            axes[0].set_title("Projection of bottom anions")
+            axes[1].set_title("Projection of antisite")
+
+            # set legend for both axes
+            axes[0].legend()
+            axes[1].legend()
+
+            fig.tight_layout()
+            fig.savefig("antisite_bottom_anions_proj.pdf", format="pdf")
+            return df
+
+        return get_proj_hor_vs_vert(taskids), get_proj_low3_vs_antisite(taskids)
 
 
     def get_geo_NN(self, df=None):
@@ -1933,7 +2353,7 @@ class DefectAnalysis(SheetCollection):
         dist_df = {"task_id": [], "a":[], "b":[], "gamma":[], "NN_dist": [], "NN_index": [], "distinct_NN_dist": [],
                    "host_NN_dist":[], "host_NN_index":[], "distinct_host_NN_dist":[], "gap_hse_line":[],
                    "d1 in host": [], "d2 in host": [], "d1 in defect": [], "d2 in defect": [], "C2DB_uid": [],
-                   "defect_name": [], "charge": []}
+                   "defect_name": [], "charge": [], "nn": []}
         # electronic_df = {"bandgap": []}
 
         for taskid in df.loc[:, "task_id"].tolist():
@@ -1984,13 +2404,14 @@ class DefectAnalysis(SheetCollection):
             dist_df["d1 in defect"].append(distinct_NN_dist[0])
             dist_df["d2 in defect"].append(distinct_NN_dist[1] if len(distinct_NN_dist) > 1 else "None")
             dist_df["NN_index"].append(list(NN_in_defect_sites))
+            dist_df["nn"].append(nn)
 
         dist_df = pd.DataFrame(dist_df)
         # replace the rows of columns "d1 in host", "d2 in host", "distinct_host_NN_dist", "host_NN_dist,
         # and "NN_index" with the last rows that have the same C2DB_uid
         good_host = dist_df.groupby(["C2DB_uid"]).last().reset_index()
         good_host = good_host.loc[:, ["C2DB_uid", "d1 in host", "d2 in host", "distinct_host_NN_dist",
-                                       "host_NN_dist", "host_NN_index"]]
+                                      "host_NN_dist", "host_NN_index"]]
         display(good_host)
         # if C2DB_uid in dist_df is same as C2DB_uid in good_host, replace the columns with those in good_host
         dist_df.loc[:, ["d1 in host", "d2 in host", "distinct_host_NN_dist", "host_NN_dist", "host_NN_index"]] = \
@@ -2000,7 +2421,7 @@ class DefectAnalysis(SheetCollection):
         # self.ptmcs = pd.merge(self.ptmcs, dist_df, on="task_id", how="left").round(3)
         return dist_df.round(3)
 
-    def get_host_materials_info(self, df):
+    def get_host_materials_info(self):
         def gap_hse_line_plt():
             fig, ax = plt.subplots()
             GaS_df = df.loc[df["prototype"] == "GaS"]
@@ -2022,35 +2443,1177 @@ class DefectAnalysis(SheetCollection):
         return gap_hse_line_plt()
 
 
-    def get_defects_info(self):
-        def singlet_triplet_en_diff():
-            triplets = self.ptmcs["task_id"].unique()
-            singlets = {"task_id": [], "singlet_taskid": [], "C2DB_uid": [], "defect_name": [], "charge":[],
-                        "singlet_energy": [], "triplet_energy": [], "singlet_triplet_energy_diff": [],}
-            for t in triplets:
-                print(t)
-                triplet_e = HSEQubitDefect.collection.find_one({"task_id": int(t)})
-                singlet_e = HSEQubitDefect.collection.find_one({"pc_from": triplet_e["pc_from"], "nupdown_set": 0,
-                                                                "defect_entry.name": triplet_e["defect_entry"]["name"],
-                                                                "charge_state": triplet_e["charge_state"]})
+    def get_singlet_triplet_en_diff(self, df=None):
+        df = df if df is not None else self.hse_candidate_df
+        triplets = df["task_id"].unique()
+        singlets = {"task_id": [], "singlet_taskid": [], "C2DB_uid": [], "defect_name": [], "charge":[],
+                    "singlet_energy": [], "triplet_energy": [], "singlet_triplet_energy_diff": [],}
+        for t in triplets:
+            triplet_e = HSEQubitDefect.collection.find_one({"task_id": int(t)})
 
-                singlets["singlet_taskid"].append(singlet_e["task_id"])
-                singlets["task_id"].append(int(t))
-                singlets["singlet_energy"].append(singlet_e["output"]["energy"])
+            singlet_e = HSEQubitDefect.collection.find_one({"pc_from": triplet_e["pc_from"], "nupdown_set": 0,
+                                                            "defect_entry.name": triplet_e["defect_entry"]["name"],
+                                                            "charge_state": triplet_e["charge_state"]})
+            if singlet_e is None:
+                print(f"Processing triplet taskid:{t}, No singlet found!")
+                continue
+            else:
+                print(f"Processing triplet taskid:{t}, Found singlet taskid:{singlet_e['task_id']}!")
 
-                singlets["C2DB_uid"].append(self.ptmcs.loc[self.ptmcs["task_id"] == t]["C2DB_uid"].tolist()[0])
-                singlets["defect_name"].append(self.ptmcs.loc[self.ptmcs["task_id"] == t]["defect_name"].tolist()[0])
-                singlets["charge"].append(self.ptmcs.loc[self.ptmcs["task_id"] == t]["charge"].tolist()[0])
-                singlets["triplet_energy"].append(triplet_e["output"]["energy"])
-                singlets["singlet_triplet_energy_diff"].append(singlet_e["output"]["energy"] - triplet_e["output"]["energy"])
-            return pd.DataFrame(singlets).round(3)
-        return singlet_triplet_en_diff()
+            singlets["singlet_taskid"].append(singlet_e["task_id"])
+            singlets["task_id"].append(int(t))
+            singlets["singlet_energy"].append(singlet_e["output"]["energy"])
+
+            singlets["C2DB_uid"].append(df.loc[df["task_id"] == t]["C2DB_uid"].tolist()[0])
+            singlets["defect_name"].append(df.loc[df["task_id"] == t]["defect_name"].tolist()[0])
+            singlets["charge"].append(df.loc[df["task_id"] == t]["charge"].tolist()[0])
+            singlets["triplet_energy"].append(triplet_e["output"]["energy"])
+            singlets["singlet_triplet_energy_diff"].append(
+                singlet_e["output"]["energy"] - triplet_e["output"]["energy"])
+
+        self.singlet_df = pd.DataFrame(singlets).round(3)
+
+    def get_defect_symmetry(self, df=None):
+        def convert_character_table(t):
+            d = {}
+            import sympy as sy
+            for row in range(len(t)):
+                if row == 0:
+                    d["class"] = [i for i in t[0].split(" ") if i !=""]
+                    mult = []
+                    for i in t[row].split(" "):
+                        if i != "":
+                            try:
+                                mult.append(int(i[0]))
+                            except Exception:
+                                mult.append(1)
+                    d["mult"] = mult
+                else:
+                    v = [i for i in t[row].split(" ") if i !=""]
+                    ir = v[0]
+                    ir2 = v[1]
+                    character = []
+                    e = np.exp(2/3*np.pi*1j)
+                    for scalar in v[2:]:
+                        if scalar == "/3":
+                            scalar = 1/3
+                        elif scalar == "-/3":
+                            scalar = -1/3
+                        elif scalar == "/2":
+                            scalar = 1/2
+                        elif scalar == "-/2":
+                            scalar = -1/2
+                        elif scalar == "i":
+                            scalar = 1j
+                        elif scalar == "-i":
+                            scalar = -1j
+                        elif scalar == "e":
+                            scalar = e
+                        elif scalar == "e*":
+                            scalar = np.conj(e)
+                        elif scalar == "-e":
+                            scalar = -1*e
+                        elif scalar == "-e*":
+                            scalar = -1*np.conj(e)
+                        elif scalar == "ie":
+                            scalar = 1j*e
+                        elif scalar == "ie*":
+                            scalar = 1j*np.conj(e)
+                        elif scalar == "-ie":
+                            scalar = -1j*e
+                        elif scalar == "-ie*":
+                            scalar = -1j*np.conj(e)
+                        else:
+                            scalar = float(sy.Rational(scalar))
+                        character.append(scalar)
+
+                    d[ir] = character
+                    d[ir2] = character
+            return d
+
+        df = df if df is not None else self.hse_candidate_df
+        taskids = df["task_id"].unique()
+        defect_symmetry_df = {"task_id": [], "defect_symmetry": [], "defect_sym_character_table": [],}
+        for taskid in taskids:
+            defect_ir_e = HSEQubitIR.collection.find_one({"prev_fw_taskid": int(taskid)})
+            defect_symmetry_df["task_id"].append(taskid)
+            if defect_ir_e is not None:
+                print(f"{taskid} has defect symmetry")
+                defect_symmetry = defect_ir_e["irvsp"]["parity_eigenvals"]["single_kpt"]["(0.0, 0.0, 0.0)"]["up"][
+                    "point_group"]
+                defect_sym_charac_table = defect_ir_e["irvsp"]["parity_eigenvals"]["single_kpt"]["(0.0, 0.0, 0.0)"][
+                    "up"]["pg_character_table"]
+                defect_sym_charac_table = convert_character_table(defect_sym_charac_table)
+                defect_symmetry_df["defect_symmetry"].append(defect_symmetry)
+                defect_symmetry_df["defect_sym_character_table"].append(defect_sym_charac_table)
+            else:
+                print(f"No defect symmetry found for {taskid}")
+                defect_symmetry_df["defec_symmetry"].append("None")
+                defect_symmetry_df["defect_sym_character_table"].append("None")
+
+        self.defect_symmetry_df = pd.DataFrame(defect_symmetry_df)
+
+    def get_electronic_config(self, pg, df=None):
+        df = df if df is not None else self.hse_candidate_df.copy()
+        df = df.loc[df["defect_symmetry"] == pg]
+
+        # if transition_from is "up", df["focused_homo_lumo"] = df[up_tran_lumo_homo_ir
+        df["focused_ir"] = df.apply(lambda x: x["up_tran_ir"] if x["transition_from"] == "up" else
+        x["dn_tran_ir"], axis=1)
+
+        df["focused_occ"] = df.apply(lambda x: x["up_tran_occ"] if x["transition_from"] == "up" else
+        x["dn_tran_occ"], axis=1)
+
+        df["focused_deg"] = df.apply(lambda x: x["up_tran_deg"] if x["transition_from"] == "up" else
+        x["dn_tran_deg"], axis=1)
+
+        df["focused_lumo_homo_ir"] = df.apply(lambda x: x["up_tran_lumo_homo_ir"] if x["transition_from"] == "up"
+        else x["dn_tran_lumo_homo_ir"], axis=1)
+
+        df["focused_lumo_homo_deg"] = df.apply(lambda x: x["up_tran_lumo_homo_deg"] if x["transition_from"] == "up"
+        else x["dn_tran_lumo_homo_deg"], axis=1)
+
+        analysis_df = df.loc[:, ["defect_symmetry", "task_id", "prototype", "defect_name", "focused_ir", "focused_occ",
+                                 "focused_deg", "focused_lumo_homo_ir", "focused_lumo_homo_deg"]]
+        grouping = ["focused_lumo_homo_ir", "focused_lumo_homo_deg", "prototype",
+                    "defect_name", "focused_ir", "focused_deg", "focused_occ"]
+        analysis_df_gp = analysis_df.groupby(grouping).agg({"task_id": "unique"})
+
+        return analysis_df, analysis_df_gp
+
+    def get_e_config_summary_df(self):
+        get_electronic_config = lambda pg: self.get_electronic_config(pg)
+        def D3_df():
+            d3_df, d3_df_gp = get_electronic_config("D3")
+            d3_df.loc[d3_df["task_id"]==124, "e_config_G"] = "unknown"
+            d3_df.loc[d3_df["task_id"]==654, "e_config_G"] = "unknown"
+            d3_df.loc[d3_df["task_id"]==124, "e_config"] = "unknown"
+            d3_df.loc[d3_df["task_id"]==654, "e_config"] = "unknown"
+
+            d3_df.loc[d3_df["task_id"]==107, "e_config_G"] = "G3.2/G2.0"
+            d3_df.loc[d3_df["task_id"]==107, "h_config_G"] = "G2.2/G3.2"
+            d3_df.loc[d3_df["task_id"]==107, "e_config"] = "E.2/A2.0"
+            d3_df.loc[d3_df["task_id"]==107, "h_config"] = "A2.2/E.2"
+
+            d3_df.loc[d3_df["task_id"]==107, "e2_from"] = "e"
+            return d3_df
+
+        def D3h_df():
+            d3h_df, d3h_df_gp = get_electronic_config("D3h")
+            d3h_df.loc[d3h_df["task_id"]==109, "e_config_G"] = "G5.4/G1.2/G6.2"
+            d3h_df.loc[d3h_df["task_id"]==109, "h_config_G"] = "G6.2/G1.0/G5.0"
+            d3h_df.loc[d3h_df["task_id"]==109, "e_config"] = 'E".4/A1`.2/E`.2'
+            d3h_df.loc[d3h_df["task_id"]==109, "h_config"] = 'E`.2/A1`.0/E".0'
+            d3h_df.loc[d3h_df["task_id"]==109, "e2_from"] = "h"
+
+            d3h_df.loc[d3h_df["task_id"]==129, "e_config_G"] = "G4.2/G1.2/G6.2"
+            d3h_df.loc[d3h_df["task_id"]==129, "h_config_G"] = "G6.2/G1.0/G4.0"
+            d3h_df.loc[d3h_df["task_id"]==129, "e_config"] = 'A2".2/A1`.2/E`.2'
+            d3h_df.loc[d3h_df["task_id"]==129, "h_config"] = 'E`.2/A1`.0/A2".0'
+            d3h_df.loc[d3h_df["task_id"]==129, "e2_from"] = "h"
+            return d3h_df
+
+        def D2d_df():
+            d2d_df, d2d_df_gp = get_electronic_config("D2d")
+            d2d_df.loc[:, "e_config_G"] = "G4.2/G5.2"
+            d2d_df.loc[:, "h_config_G"] = "G5.2/G4.0"
+            d2d_df.loc[:, "e_config"] = "B2.2/E.2"
+            d2d_df.loc[:, "h_config"] = "E.2/B2.0"
+            d2d_df.loc[:, "e2_from"] = "h"
+            return d2d_df
+
+        def C3v_df():
+            c3v_df, c3v_df_gp = get_electronic_config("C3v")
+            c3v_df.loc[c3v_df["task_id"].isin([383, 499]), "e_config_G"] = "G1.2/G3.2/G1.0"
+            c3v_df.loc[c3v_df["task_id"].isin([383, 499]), "h_config_G"] = "G1.2/G3.2/G1.0"
+            c3v_df.loc[c3v_df["task_id"].isin([383, 499]), "e_config"] = "A1.2/E.2/A1.0"
+            c3v_df.loc[c3v_df["task_id"].isin([383, 499]), "h_config"] = "A1.2/E.2/A1.0"
+            c3v_df.loc[c3v_df["task_id"].isin([383, 499]), "e2_from"] = "h"
+
+            c3v_df.loc[c3v_df["task_id"].isin(
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "e_config_G"] = "G3.2/G1.0"
+            c3v_df.loc[c3v_df["task_id"].isin(
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "h_config_G"] = "G1.2/G3.2"
+            c3v_df.loc[c3v_df["task_id"].isin(
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "e_config"] = "E.2/A1.0"
+            c3v_df.loc[c3v_df["task_id"].isin(
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "h_config"] = "A1.2/E.2"
+            c3v_df.loc[c3v_df["task_id"].isin(
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "e2_from"] = "e"
+
+            c3v_df.loc[c3v_df["task_id"].isin([441, 722, 774, 727, 1033, 929,
+                                               2590, 151, 135, 162, 182, 208, 575, 171,
+                                               970, 238, 253, 196, 258, 291, 2563,
+                                               70
+                                               ]), "e_config_G"] = "G1.2/G3.2"
+
+            c3v_df.loc[c3v_df["task_id"].isin([441, 722, 774, 727, 1033, 929,
+                                               2590, 151, 135, 162, 182, 208, 575, 171,
+                                               970, 238, 253, 196, 258, 291, 2563,
+                                               70
+                                               ]), "h_config_G"] = "G3.2/G1.0"
+
+            c3v_df.loc[c3v_df["task_id"].isin([441, 722, 774, 727, 1033, 929,
+                                               2590, 151, 135, 162, 182, 208, 575, 171,
+                                               970, 238, 253, 196, 258, 291, 2563,
+                                               70
+                                               ]), "e_config"] = "A1.2/E.2"
+
+            c3v_df.loc[c3v_df["task_id"].isin([441, 722, 774, 727, 1033, 929,
+                                               2590, 151, 135, 162, 182, 208, 575, 171,
+                                               970, 238, 253, 196, 258, 291, 2563,
+                                               70
+                                               ]), "h_config"] = "E.2/A1.0"
+
+
+            c3v_df.loc[c3v_df["task_id"].isin([441, 722, 774, 727, 1033, 929,
+                                               2590, 151, 135, 162, 182, 208, 575, 171,
+                                               970, 238, 253, 196, 258, 291, 2563,
+                                               70
+                                               ]), "e2_from"] = "h"
+            return c3v_df
+
+        self.e_config_summary_df = pd.concat([D3_df(), D3h_df(), D2d_df(), C3v_df()])
+        self.e_config_summary_df = self.e_config_summary_df.fillna("unknown")
+        self.e_config_summary_df_gp = self.e_config_summary_df.groupby(
+            ["defect_symmetry", "focused_lumo_homo_ir", "focused_lumo_homo_deg", "prototype",
+             "defect_name", "focused_ir", "focused_deg", "focused_occ", "e_config", "h_config", "e2_from"]).agg(
+            {'task_id': "unique"})
+
+
+        df = self.e_config_summary_df.copy()
+        df["LUMO_HOMO_deg"] = df["focused_lumo_homo_deg"]
+        df.set_index(["task_id", "LUMO_HOMO_deg"], inplace=True)
+        df = df.loc[:, ["e_config", "h_config", "e2_from"]]
+        # merge with self.hse_candidate_df with df on task_id
+        updated_hse_candidate_df = pd.merge(self.hse_candidate_df, df, how="left", on=["task_id", "LUMO_HOMO_deg"])
+
+        return updated_hse_candidate_df
+
+
+    def get_antisite_projection(self):
+        df = self.hse_candidate_df.copy()
+        def add_lumo_homo_projections(x):
+            task_id = x["task_id"]
+            transition_from = x["transition_from"]
+            transition_lumo_homo = x["up_tran_lumo_homo_band_id"] if transition_from == "up" else x[
+                "dn_tran_lumo_homo_band_id"]
+            lumo_band_id, homo_band_id  = transition_lumo_homo[0], transition_lumo_homo[1]
+            a, b, c, d, e = Tools.extract_defect_levels_v2_hse(task_id, localisation=0.1, edge_tol=[1, 1],
+                                                               fig_on=None)
+            lumo_antisite_proj = a.loc[(a.band_id==lumo_band_id) & (a.spin=="1" if transition_from == "up" else
+                                                                    a.spin=="-1"),
+                                       "antisite_proj"].iloc[0].round(0)
+            homo_antisite_proj = a.loc[(a.band_id==homo_band_id) & (a.spin=="1" if transition_from == "up" else
+                                                                    a.spin=="-1"),
+                                       "antisite_proj"].iloc[0].round(0)
+
+            return (lumo_antisite_proj, homo_antisite_proj)
+
+        def add_lumo_homo_max_antisite_proj(x):
+            lumo_antisite_proj = x["lumo_homo_antisite_proj"][0]
+            homo_antisite_proj = x["lumo_homo_antisite_proj"][1]
+            lumo_homo_deg = x["LUMO_HOMO_deg"]
+            lumo_homo_deg_proj = dict(zip(lumo_homo_deg, [lumo_antisite_proj, homo_antisite_proj]))
+            lumo_homo_name_proj = dict(zip(["lumo", "homo"], [lumo_antisite_proj, homo_antisite_proj]))
+            # find the key with largest value for lumo_homo_deg_proj
+            level_deg_with_max_antisite_proj = max(lumo_homo_deg_proj, key=lumo_homo_deg_proj.get)
+            level_name_with_max_antisite_proj = max(lumo_homo_name_proj, key=lumo_homo_name_proj.get)
+            return (level_deg_with_max_antisite_proj, level_name_with_max_antisite_proj)
+
+        def add_corr_antisite_proj_and_level_cat(x):
+            level_cat = x["level_cat"]
+            lumo_antisite_proj, homo_antisite_proj =  x["lumo_homo_antisite_proj"][0], x["lumo_homo_antisite_proj"][1]
+            if level_cat == 2:
+                if lumo_antisite_proj >= homo_antisite_proj:
+                    farest_level_antisite_proj_dominates = True
+                else:
+                    farest_level_antisite_proj_dominates = False
+            elif level_cat == 3:
+                if homo_antisite_proj >= lumo_antisite_proj:
+                    farest_level_antisite_proj_dominates = True
+                else:
+                    farest_level_antisite_proj_dominates = False
+            else:
+                farest_level_antisite_proj_dominates = "unknown"
+            return farest_level_antisite_proj_dominates
+
+        df["lumo_homo_antisite_proj"] = df.apply(lambda x: add_lumo_homo_projections(x), axis=1)
+        df["lumo_antisite_proj"] = df.apply(lambda x: x["lumo_homo_antisite_proj"][0], axis=1)
+        df["homo_antisite_proj"] = df.apply(lambda x: x["lumo_homo_antisite_proj"][1], axis=1)
+        df["lumo_homo_max_antisite_proj"] = df.apply(lambda x: add_lumo_homo_max_antisite_proj(x), axis=1)
+        df["farest_level_antisite_proj_dominates"] = df.apply(lambda x: add_corr_antisite_proj_and_level_cat(x), axis=1)
+
+        def get_table9(df=df):
+            df = df.loc[:, ["prototype", "spacegroup", "uid", "task_id", "defect_name", "charge",
+                                          "level_cat","chemsys", "site_oxi_state", "defect_symmetry",
+                                          "transition_from", "LUMO-HOMO_down", "LUMO-HOMO_up",
+                                          "lumo_homo_antisite_proj", "lumo_homo_max_antisite_proj",
+                                          "farest_level_antisite_proj_dominates", "lumo_antisite_proj", "homo_antisite_proj",
+                                          "LUMO_HOMO_deg","LUMO_HOMO_splitting_type",
+                                          "level_source_specie", "zfs_D", "zfs_E"]].sort_values(["prototype"])
+
+            df["level_source_gs"] = df.apply(lambda x: Element(x["level_source_specie"]).electronic_structure, axis=1)
+            df["level_source_group"] = df.apply(lambda x: Element(x["level_source_specie"]).group, axis=1)
+            df["level_source_row"] = df.apply(lambda x: Element(x["level_source_specie"]).row, axis=1)
+
+            df.loc[df["task_id"].isin([171, 2563, 196, 182, 349, 135, 208, 258]), "level_cat"] = 2
+            df.loc[df["task_id"].isin([1033]), "level_cat"] = 3
+
+            def fun(x):
+                level_source_specie = x["level_source_specie"]
+                el = Element(level_source_specie)
+                gs_term = None
+                try:
+                    gs_term = el.ground_state_term_symbol
+                except Exception:
+                    gs_term = "unknown"
+                return gs_term
+
+            df["level_source_gs_term"] = df.apply(lambda x: fun(x), axis=1)
+
+            def fun(x):
+                transition_from = x["transition_from"]
+                lumo_homo_dn = x["LUMO-HOMO_down"]
+                lumo_homo_up = x["LUMO-HOMO_up"]
+                lumo_homo_gap = lumo_homo_up if transition_from == "up" else lumo_homo_dn
+                return lumo_homo_gap
+
+            df["lumo_homo_gap"] = df.apply(lambda x: fun(x), axis=1)
+            df["lumo_homo_deg"] = df["LUMO_HOMO_deg"]
+
+            df.loc[df.task_id.isin([2688, 2657]), "level_source_gs_term"] = "5D0.0"
+
+            df = df.loc[~(df["task_id"].isin([383, 499]) & (df["LUMO_HOMO_deg"] == (1,2)))]
+            return df
+
+        return get_table9()
+
+
+class HostAnaylsis:
+    def __init__(self, host_db):
+        self.host_db = host_db
+
+    def get_element_e_a1_resolved_dos(self, dos):
+        from pymatgen import Orbital
+        import functools
+        from pymatgen.electronic_structure.dos import Dos, add_densities
+
+        z_orbs = {"P": (Orbital.s, Orbital.pz), "D": (Orbital.s, Orbital.dz2)}
+        xy_orbs = {"P": (Orbital.px, Orbital.py), "D": (Orbital.dxy, Orbital.dx2)}
+
+        e_dos = {}
+        a1_dos = {}
+
+        for site, atom_dos in dos.pdos.items():
+            el = site.specie
+            ground_state_term = el.ground_state_term_symbol
+            el = el.name
+            if "S" in ground_state_term or "P" in ground_state_term:
+                a1_orbs = z_orbs["P"]
+                e_orbs = xy_orbs["P"]
+            elif "D" in ground_state_term:
+                a1_orbs = z_orbs["D"]
+                e_orbs = xy_orbs["D"]
+            for orb, pdos in atom_dos.items():
+                if orb in e_orbs:
+                    if el not in e_dos:
+                        e_dos[el] = pdos
+                    else:
+                        e_dos[el] = add_densities(e_dos[el], pdos)
+                if orb in a1_orbs:
+                    if el not in a1_dos:
+                        a1_dos[el] = pdos
+                    else:
+                        a1_dos[el] = add_densities(a1_dos[el], pdos)
+        print(a1_dos.keys(), e_dos.keys())
+        out_dict = {el+":a1": Dos(dos.efermi, dos.energies, densities) for el, densities in a1_dos.items()}
+        out_dict.update({el+":e": Dos(dos.efermi, dos.energies, densities) for el, densities in e_dos.items()})
+        return out_dict
+
+    def get_element_orb_pdos(self, dos):
+        from pymatgen import Orbital
+        import functools
+        from pymatgen.electronic_structure.dos import Dos, add_densities
+
+        orbs = {"P": (Orbital.s, Orbital.pz, Orbital.px, Orbital.py),
+                "D": (Orbital.s, Orbital.dz2, Orbital.dxy, Orbital.dx2, Orbital.dxz, Orbital.dyz)}
+
+        orb_dos = {}
+        for site, atom_dos in dos.pdos.items():
+            el = site.specie
+            ground_state_term = el.ground_state_term_symbol
+            el = el.name
+            if "S" in ground_state_term or "P" in ground_state_term:
+                orbitals = orbs["P"]
+            elif "D" in ground_state_term:
+                orbitals = orbs["D"]
+            for orb, pdos in atom_dos.items():
+                if orb in orbitals:
+                    if el not in orb_dos:
+                        orb_dos[el+f":{orb.name}"] = pdos
+                    else:
+                        orb_dos[el+f":{orb.name}"]  = add_densities( orb_dos[el+f":{orb.name}"], pdos)
+        out_dict = {el: Dos(dos.efermi, dos.energies, densities) for el, densities in orb_dos.items()}
+        return out_dict
+
+    def get_host_dos(self, task_id):
+        from pymatgen.electronic_structure.plotter import DosPlotter
+        from pymatgen import Orbital
+
+        host_db = self.host_db
+        dos = self.host_db.get_dos(task_id)
+        plotter = DosPlotter(sigma=0.07, stack=True)
+        plotter.add_dos_dict(dos.get_element_dos())
+        el_fig = plotter.get_plot(xlim=[-5, 8])
+
+
+        plotter = DosPlotter(sigma=0.07, stack=True)
+        element_orb_dos = self.get_element_orb_pdos(dos)
+        plotter.add_dos_dict(element_orb_dos)
+        el_orb_fig = plotter.get_plot(xlim=[-5, 8])
+
+
+        plotter = DosPlotter(sigma=0.07, stack=True)
+        e_a1_dos = self.get_element_e_a1_resolved_dos(dos)
+        plotter.add_dos_dict(e_a1_dos)
+        e_a1_fig = plotter.get_plot(xlim=[-5, 8])
+        return el_orb_fig, el_fig, e_a1_fig
+
+    def get_host_bs_proj(self, df):
+        from pymatgen.electronic_structure.plotter import BSPlotterProjected
+        must_group_by = ["C2DB_uid", "defect_name", "level_source_specie", "vbm_max_el", "cbm_max_el", "host_taskid"]
+        df = df.loc[:, must_group_by]
+        display(df)
+        for idx, row in df.iterrows():
+            uid = row[0]
+            defect_name = row[1]
+            level_source_specie = row[2]
+            vbm_el = row[3]
+            cbm_el = row[4]
+            task_id = row[5].split("-")[-1]
+
+            vbm_orbitals = ["s", "pz", "px", "py"] # ["s", "dz2", "dx2", "dxy", "dxz", "dyz"] if Element(vbm_el).group in range(3, 13) else ["s", "pz", "px", "py"]
+            cbm_orbitals = ["s", "pz", "px", "py"] #["s", "dz2", "dx2", "dxy", "dxz", "dyz"] if Element(cbm_el).group in range(3, 13) else ["s", "pz", "px", "py"]
+
+            bs = self.host_db.get_band_structure(int(task_id))
+            from pymatgen import Spin
+            vbm_en, vbm_band = bs.get_vbm()["energy"], bs.get_vbm()["band_index"][Spin.up][0]
+            plotter = BSPlotterProjected(bs)
+            print(f"vbm: {vbm_en}, en@gamma: {bs.bands[Spin.up][vbm_band][0]}, diff: {bs.bands[Spin.up][vbm_band][0]-vbm_en}")
+
+            print("=="*30, row[-1], uid, defect_name, level_source_specie)
+
+            print("***"*20, f"vbm: {vbm_el}")
+            fig_vbm = plotter.get_projected_plots_dots_patom_pmorb(
+                {vbm_el: vbm_orbitals},
+                dictpa={vbm_el:["all"]},
+                sum_atoms={vbm_el: ["all"]},
+                sum_morbs={vbm_el: vbm_orbitals[-2:]},
+                selected_branches=[1,2,3])
+
+
+            print("***"*20, f"cbm: {cbm_el}")
+            fig_cbm = plotter.get_projected_plots_dots_patom_pmorb(
+                {cbm_el: cbm_orbitals},
+                dictpa={cbm_el:["all"]},
+                sum_atoms={cbm_el: ["all"]},
+                sum_morbs={cbm_el: cbm_orbitals[-2:]},
+                selected_branches=[1,2,3])
+
+            fig_vbm.show()
+            fig_cbm.show()
+
+
+class DecomposeSymRep:
+    def _character_tables(self, pg):
+        # revising the character table from phonopy to phonopy.phonon.character_table
+        charater_table = {
+            '-42m':
+                [
+                    {'rotation_list': ('E', 'S4', 'C2z', 'C2\'', 'sgd'),
+                     'character_table': {'A1': ( 1, 1, 1, 1, 1 ),
+                                         'A2': ( 1, 1, 1,-1,-1 ),
+                                         'B1': ( 1,-1, 1, 1,-1 ),
+                                         'B2': ( 1,-1, 1,-1, 1 ),
+                                         'E':  ( 2, 0,-2, 0, 0 )},
+                     'mapping_table': {'E'   : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       'S4'  : ((( 0, 1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                (( 0,-1, 0 ),
+                                                 ( 1, 0, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       'C2z' : (((-1, 0, 0 ),
+                                                 ( 0,-1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       'C2\'': (((-1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                (( 1, 0, 0 ),
+                                                 ( 0,-1, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       'sgd':  ((( 0,-1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0, 1 )),
+                                                (( 0, 1, 0 ),
+                                                 ( 1, 0, 0 ),
+                                                 ( 0, 0, 1 )),)}},
+
+                ],
+            'D2d':
+                [
+                    {'rotation_list': ('E', '2IC4', 'C2', '2C2`', '2IC2"'),
+                     "multiplicity": (1, 2, 1, 2, 2),
+                     'character_table': {'A1': ( 1, 1, 1, 1, 1 ),
+                                         'A2': ( 1, 1, 1,-1,-1 ),
+                                         'B1': ( 1,-1, 1, 1,-1 ),
+                                         'B2': ( 1,-1, 1,-1, 1 ),
+                                         'E':  ( 2, 0,-2, 0, 0 ),
+                                         'G1': ( 1, 1, 1, 1, 1 ),
+                                         'G2': ( 1, 1, 1,-1,-1 ),
+                                         'G3': ( 1,-1, 1, 1,-1 ),
+                                         'G4': ( 1,-1, 1,-1, 1 ),
+                                         'G5':  ( 2, 0,-2, 0, 0 )},
+                     'mapping_table': {'E': ((( 1, 0, 0 ),
+                                              ( 0, 1, 0 ),
+                                              ( 0, 0, 1 )),),
+                                       '2IC4'  : ((( 0, 1, 0 ),
+                                                   (-1, 0, 0 ),
+                                                   ( 0, 0,-1 )),
+                                                  (( 0,-1, 0 ),
+                                                   ( 1, 0, 0 ),
+                                                   ( 0, 0,-1 )),),
+                                       'C2' : (((-1, 0, 0 ),
+                                                ( 0,-1, 0 ),
+                                                ( 0, 0, 1 )),),
+                                       '2C2`': (((-1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                (( 1, 0, 0 ),
+                                                 ( 0,-1, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       '2IC2"':  ((( 0,-1, 0 ),
+                                                   (-1, 0, 0 ),
+                                                   ( 0, 0, 1 )),
+                                                  (( 0, 1, 0 ),
+                                                   ( 1, 0, 0 ),
+                                                   ( 0, 0, 1 )),)},
+                     "function": {
+                         'A2': ("Rz"),
+                         "B2": ("z"),
+                         "E":("(x,y)", "(Rx,Ry)"),
+                         "G2": ("Rz"),
+                         "G4": ("z"),
+                         "G5": ("(x,y)", "(Rx,Ry)")}},
+
+                ],
+            '32':
+                [
+                    {'rotation_list': ('E', 'C3', 'C2\''),
+                     'character_table': {'A1': ( 1, 1, 1 ),
+                                         'A2': ( 1, 1,-1 ),
+                                         'E' : ( 2,-1, 0 )},
+                     'mapping_table': {'E'   : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       'C3'  : ((( 0,-1, 0 ),
+                                                 ( 1,-1, 0 ),
+                                                 ( 0, 0, 1 )),
+                                                ((-1, 1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       'C2\'': ((( 0, 1, 0 ),
+                                                 ( 1, 0, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                (( 1,-1, 0 ),
+                                                 ( 0,-1, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                ((-1, 0, 0 ),
+                                                 (-1, 1, 0 ),
+                                                 ( 0, 0,-1 )),)}}
+                ],
+            'D3':
+                [
+                    {'rotation_list': ('E', '2C3', '3C2'),
+                     "multiplicity": (1, 2, 3),
+                     'character_table': {'A1': ( 1, 1, 1 ),
+                                         'A2': ( 1, 1,-1 ),
+                                         'E' : ( 2,-1, 0 ),
+                                         'G1': ( 1, 1, 1 ),
+                                         'G2': ( 1, 1,-1 ),
+                                         'G3' : ( 2,-1, 0 )},
+                     'mapping_table': {'E'   : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       '2C3'  : ((( 0,-1, 0 ),
+                                                  ( 1,-1, 0 ),
+                                                  ( 0, 0, 1 )),
+                                                 ((-1, 1, 0 ),
+                                                  (-1, 0, 0 ),
+                                                  ( 0, 0, 1 )),),
+                                       '3C2': ((( 0, 1, 0 ),
+                                                ( 1, 0, 0 ),
+                                                ( 0, 0,-1 )),
+                                               (( 1,-1, 0 ),
+                                                ( 0,-1, 0 ),
+                                                ( 0, 0,-1 )),
+                                               ((-1, 0, 0 ),
+                                                (-1, 1, 0 ),
+                                                ( 0, 0,-1 )),)},
+                     "function": {"A2": ("z", "Rz"), "E": ("(x,y)", "(Rx,Ry)"), "G2": ("z", "Rz"), "G3": ("z", "Rz")}},
+                ],
+            'D3_cartesian':
+                [
+                    {'rotation_list': ('E', '2C3', '3C2'),
+                     "multiplicity": (1, 2, 3),
+                     'character_table': {'A1': ( 1, 1, 1 ),
+                                         'A2': ( 1, 1,-1 ),
+                                         'E' : ( 2,-1, 0 ),
+                                         'G1': ( 1, 1, 1 ),
+                                         'G2': ( 1, 1,-1 ),
+                                         'G3' : ( 2,-1, 0 )},
+                     'mapping_table': {'E'   : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       '2C3'  : ((( -0.5,-np.sqrt(3)/2, 0 ),
+                                                  ( np.sqrt(3)/2,-0.5, 0 ),
+                                                  ( 0, 0, 1 )),
+                                                 ((-0.5, np.sqrt(3)/2, 0 ),
+                                                  (-np.sqrt(3)/2, -0.5, 0 ),
+                                                  ( 0, 0, 1 )),),
+                                       '3C2': ((( 1, 0, 0 ),
+                                                ( 0, -1, 0 ),
+                                                ( 0, 0,-1 )),
+                                               (( -0.5,np.sqrt(3)/2, 0 ),
+                                                ( np.sqrt(3)/2,0.5, 0 ),
+                                                ( 0, 0,-1 )),
+                                               ((-0.5, -np.sqrt(3)/2, 0 ),
+                                                (-np.sqrt(3)/2, 0.5, 0 ),
+                                                ( 0, 0,-1 )),)},
+                     "function": {"A2": ("z", "Rz"), "E": ("(x,y)", "(Rx,Ry)"), "G2": ("z", "Rz"), "G3": ("z", "Rz")}},
+                ],
+            '3m':
+                [
+                    {'rotation_list': ('E', 'C3', 'sgv'),
+                     'character_table': {'A1': (1, 1, 1),
+                                         'A2': (1, 1,-1),
+                                         'E' : (2,-1, 0)},
+                     'mapping_table': {'E'   : ((( 1, 0, 0),
+                                                 ( 0, 1, 0),
+                                                 ( 0, 0, 1)),),
+                                       'C3'  : ((( 0,-1, 0),
+                                                 ( 1,-1, 0),
+                                                 ( 0, 0, 1)),
+                                                ((-1, 1, 0),
+                                                 (-1, 0, 0),
+                                                 ( 0, 0, 1)),),
+                                       'sgv' : ((( 0,-1, 0),
+                                                 (-1, 0, 0),
+                                                 ( 0, 0, 1)),
+                                                ((-1, 1, 0),
+                                                 ( 0, 1, 0),
+                                                 ( 0, 0, 1)),
+                                                (( 1, 0, 0),
+                                                 ( 1,-1, 0),
+                                                 ( 0, 0, 1)),)}}
+                ],
+            'C3v':
+                [
+                    {'rotation_list': ('E', '2C3', '3IC2'),
+                     "multiplicity": (1, 2, 3),
+                     'character_table': {'A1': (1, 1, 1),
+                                         'A2': (1, 1,-1),
+                                         'E' : (2,-1, 0),
+                                         'G1': (1, 1, 1),
+                                         'G2': (1, 1,-1),
+                                         'G3' : (2,-1, 0)},
+                     'mapping_table': {'E'   : ((( 1, 0, 0),
+                                                 ( 0, 1, 0),
+                                                 ( 0, 0, 1)),),
+                                       '2C3'  : ((( 0,-1, 0),
+                                                  ( 1,-1, 0),
+                                                  ( 0, 0, 1)),
+                                                 ((-1, 1, 0),
+                                                  (-1, 0, 0),
+                                                  ( 0, 0, 1)),),
+                                       '3IC2' : ((( 0,1, 0),
+                                                  (1, 0, 0),
+                                                  ( 0, 0, 1)),
+                                                 ((1, -1, 0),
+                                                  ( 0, -1, 0),
+                                                  ( 0, 0, 1)),
+                                                 (( -1, 0, 0),
+                                                  ( -1,1, 0),
+                                                  ( 0, 0, 1)),)},
+                     "function": {
+                         "A1": ("z"),
+                         "A2": ("Rz"),
+                         "E": ("(x,y)", "(Rx,Ry)"),
+                         "G1": ("z"),
+                         "G2": ("Rz"),
+                         "G3": ("(x,y)", "(Rx,Ry)")}
+                    }
+                ],
+            'C3v_diag':
+                [
+                    {'rotation_list': ('E', '2C3', '3IC2'),
+                     "multiplicity": (1, 2, 3),
+                     'character_table': {'A1': (1, 1, 1),
+                                         'A2': (1, 1,-1),
+                                         'E' : (2,-1, 0),
+                                         'G1': (1, 1, 1),
+                                         'G2': (1, 1,-1),
+                                         'G3' : (2,-1, 0)},
+                     'mapping_table': {'E'   : ((( 1, 0, 0),
+                                                 ( 0, 1, 0),
+                                                 ( 0, 0, 1)),),
+                                       '2C3'  : ((( np.exp(2*np.pi*1j/3), 0, 0),
+                                                  ( 0,  np.exp(-2*np.pi*1j/3), 0),
+                                                  ( 0, 0, 1)),
+                                                 (( np.exp(-2*np.pi*1j/3), 0, 0),
+                                                  (0,  np.exp(2*np.pi*1j/3), 0),
+                                                  ( 0, 0, 1)),),
+                                       '3IC2' : ((( 0,1, 0),
+                                                  (1, 0, 0),
+                                                  ( 0, 0, 1)),
+                                                 ((0,  np.exp(-2*np.pi*1j/3), 0),
+                                                  (  np.exp(2*np.pi*1j/3), 0, 0),
+                                                  ( 0, 0, 1)),
+                                                 (( 0,  np.exp(2*np.pi*1j/3), 0),
+                                                  (  np.exp(-2*np.pi*1j/3),0, 0),
+                                                  ( 0, 0, 1)),)},
+                     "function": {
+                         "A1": ("z"),
+                         "A2": ("Rz"),
+                         "E": ("(x,y)", "(Rx,Ry)"),
+                         "G1": ("z"),
+                         "G2": ("Rz"),
+                         "G3": ("(x,y)", "(Rx,Ry)")}
+                    }
+                ],
+            'C3v_cartesian':
+                [
+                    {'rotation_list': ('E', '2C3', '3IC2'),
+                     "multiplicity": (1, 2, 3),
+                     'character_table': {'A1': (1, 1, 1),
+                                         'A2': (1, 1,-1),
+                                         'E' : (2,-1, 0),
+                                         'G1': (1, 1, 1),
+                                         'G2': (1, 1,-1),
+                                         'G3' : (2,-1, 0)},
+                     'mapping_table': {'E'   : ((( 1, 0, 0),
+                                                 ( 0, 1, 0),
+                                                 ( 0, 0, 1)),),
+                                       '2C3'  : ((( -1/2,-np.sqrt(3)/2, 0),
+                                                  ( np.sqrt(3)/2,-1/2, 0),
+                                                  ( 0, 0, 1)),
+                                                 ((-1/2, np.sqrt(3)/2, 0),
+                                                  (-np.sqrt(3)/2, -1/2, 0),
+                                                  ( 0, 0, 1)),),
+                                       '3IC2' : ((( 1,0, 0),
+                                                  (0, -1, 0),
+                                                  ( 0, 0, 1)),
+                                                 ((-1/2, np.sqrt(3)/2, 0),
+                                                  ( np.sqrt(3)/2, 1/2, 0),
+                                                  ( 0, 0, 1)),
+                                                 (( -1/2, -np.sqrt(3)/2, 0),
+                                                  ( -np.sqrt(3)/2,1/2, 0),
+                                                  ( 0, 0, 1)),)},
+                                       # '3IC2' : ((( -1,0, 0),
+                                       #            (0, 1, 0),
+                                       #            ( 0, 0, 1)),
+                                       #           ((1/2, -np.sqrt(3)/2, 0),
+                                       #            ( -np.sqrt(3)/2, -1/2, 0),
+                                       #            ( 0, 0, 1)),
+                                       #           (( 1/2, np.sqrt(3)/2, 0),
+                                       #            ( np.sqrt(3)/2,-1/2, 0),
+                                       #            ( 0, 0, 1)),)},
+                     "function": {
+                         "A1": ("z"),
+                         "A2": ("Rz"),
+                         "E": ("(x,y)", "(Rx,Ry)"),
+                         "G1": ("z"),
+                         "G2": ("Rz"),
+                         "G3": ("(x,y)", "(Rx,Ry)")}
+                    }
+                ],
+            '-6m2':
+                [
+                    {'rotation_list': ('E', 'C3', 'C\'2', 'sgh', 'S3', 'sgv'),
+                     'character_table': {'A1\''  : ( 1, 1, 1, 1, 1, 1 ),
+                                         'A2\''  : ( 1, 1,-1, 1, 1,-1 ),
+                                         'E\''   : ( 2,-1, 0, 2,-1, 0 ),
+                                         'A1\'\'': ( 1, 1, 1,-1,-1,-1 ),
+                                         'A2\'\'': ( 1, 1,-1,-1,-1, 1 ),
+                                         'E\'\'' : ( 2,-1, 0,-2, 1, 0 )},
+                     'mapping_table': {'E'   : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       'C3'  : ((( 0,-1, 0 ),
+                                                 ( 1,-1, 0 ),
+                                                 ( 0, 0, 1 )),
+                                                ((-1, 1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       'C\'2': ((( 0,-1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                (( 1, 0, 0 ),
+                                                 ( 1,-1, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                ((-1, 1, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       'sgh' : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       'S3'  : ((( 0,-1, 0 ),
+                                                 ( 1,-1, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                ((-1, 1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       'sgv' : ((( 0,-1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0, 1 )),
+                                                (( 1, 0, 0 ),
+                                                 ( 1,-1, 0 ),
+                                                 ( 0, 0, 1 )),
+                                                ((-1, 1, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),)}}
+                ],
+            'D3h':
+                [
+                    {'rotation_list': ('E', 'IC2', '2C3', '2IC6', '3C2`', '3IC2"'),
+                     "multiplicity": (1, 1, 2, 2, 3, 3),
+                     'character_table': {'A1`'  : ( 1, 1, 1, 1, 1, 1 ),
+                                         'A2`'  : ( 1, 1, 1, 1, -1, -1),
+                                         'E`'   : (2, 2, -1, -1, 0, 0),
+                                         'A1"': ( 1, -1, 1, -1, 1, -1),
+                                         'A2"': ( 1, -1, 1, -1, -1, 1),
+                                         'E"' : ( 2, -2, -1, 1, 0, 0),
+                                         'G1'  : ( 1, 1, 1, 1, 1, 1 ),
+                                         'G2'  : ( 1, 1, 1, 1, -1, -1),
+                                         'G6'   : (2, 2, -1, -1, 0, 0),
+                                         'G3': ( 1, -1, 1, -1, 1, -1),
+                                         'G4': ( 1, -1, 1, -1, -1, 1),
+                                         'G5' : ( 2, -2, -1, 1, 0, 0)},
+                     'mapping_table': {'E'   : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       '2C3'  : ((( 0,-1, 0 ),
+                                                  ( 1,-1, 0 ),
+                                                  ( 0, 0, 1 )),
+                                                 ((-1, 1, 0 ),
+                                                  (-1, 0, 0 ),
+                                                  ( 0, 0, 1 )),),
+                                       '3C2`': ((( 0,-1, 0 ),
+                                                 (-1, 0, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                (( 1, 0, 0 ),
+                                                 ( 1,-1, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                ((-1, 1, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       'IC2' : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0,-1 )),),
+                                       '2IC6'  : ((( 0,-1, 0 ),
+                                                   ( 1,-1, 0 ),
+                                                   ( 0, 0,-1 )),
+                                                  ((-1, 1, 0 ),
+                                                   (-1, 0, 0 ),
+                                                   ( 0, 0,-1 )),),
+                                       '3IC2"' : ((( 0,-1, 0 ),
+                                                   (-1, 0, 0 ),
+                                                   ( 0, 0, 1 )),
+                                                  (( 1, 0, 0 ),
+                                                   ( 1,-1, 0 ),
+                                                   ( 0, 0, 1 )),
+                                                  ((-1, 1, 0 ),
+                                                   ( 0, 1, 0 ),
+                                                   ( 0, 0, 1 )),)},
+                     "function": {"A2`": ("Rz"),
+                                  "E`": ("(x,y)"),
+                                  'A2"': ("z"),
+                                  'E"': ("(Rx,Ry)"),
+                                  "G2": ("Rz"),
+                                  "G3": ("(x,y)"),
+                                  'G4': ("z"),
+                                  'G5': ("(Rx,Ry)")}},
+                ],
+            'D3h_cartesian':
+                [
+                    {'rotation_list': ('E', 'IC2', '2C3', '2IC6', '3C2`', '3IC2"'),
+                     "multiplicity": (1, 1, 2, 2, 3, 3),
+                     'character_table': {'A1`'  : ( 1, 1, 1, 1, 1, 1 ),
+                                         'A2`'  : ( 1, 1, 1, 1, -1, -1),
+                                         'E`'   : (2, 2, -1, -1, 0, 0),
+                                         'A1"': ( 1, -1, 1, -1, 1, -1),
+                                         'A2"': ( 1, -1, 1, -1, -1, 1),
+                                         'E"' : ( 2, -2, -1, 1, 0, 0),
+                                         'G1'  : ( 1, 1, 1, 1, 1, 1 ),
+                                         'G2'  : ( 1, 1, 1, 1, -1, -1),
+                                         'G6'   : (2, 2, -1, -1, 0, 0),
+                                         'G3': ( 1, -1, 1, -1, 1, -1),
+                                         'G4': ( 1, -1, 1, -1, -1, 1),
+                                         'G5' : ( 2, -2, -1, 1, 0, 0)},
+                     'mapping_table': {'E'   : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0, 1 )),),
+                                       'IC2' : ((( 1, 0, 0 ),
+                                                 ( 0, 1, 0 ),
+                                                 ( 0, 0,-1 )),),
+
+                                       '2C3'  : ((( -0.5,-np.sqrt(3)/2, 0 ),
+                                                  ( np.sqrt(3)/2,-0.5, 0 ),
+                                                  ( 0, 0, 1 )),
+                                                 ((-0.5, np.sqrt(3)/2, 0 ),
+                                                  (-np.sqrt(3)/2, -0.5, 0 ),
+                                                  ( 0, 0, 1 )),),
+                                       '2IC6'  : ((( -0.5,-np.sqrt(3)/2, 0 ),
+                                                   ( np.sqrt(3)/2,-0.5, 0 ),
+                                                   ( 0, 0,-1 )),
+                                                  ((-0.5, np.sqrt(3)/2, 0 ),
+                                                   (-np.sqrt(3)/2, -0.5, 0 ),
+                                                   ( 0, 0,-1 )),),
+
+                                       '3C2`': ((( 1,0, 0 ),
+                                                 (0, -1, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                (( -0.5, np.sqrt(3)/2, 0 ),
+                                                 ( np.sqrt(3)/2,0.5, 0 ),
+                                                 ( 0, 0,-1 )),
+                                                ((-0.5, -np.sqrt(3)/2, 0 ),
+                                                 ( -np.sqrt(3)/2, 0.5, 0 ),
+                                                 ( 0, 0,-1 )),),
+
+                                       '3IC2"' : ((( 1,0, 0 ),
+                                                   (0, -1, 0 ),
+                                                   ( 0, 0, 1 )),
+                                                  (( -0.5, np.sqrt(3)/2, 0 ),
+                                                   ( np.sqrt(3)/2,0.5, 0 ),
+                                                   ( 0, 0, 1 )),
+                                                  ((-0.5, -np.sqrt(3)/2, 0 ),
+                                                   ( -np.sqrt(3)/2, 0.5, 0 ),
+                                                   ( 0, 0, 1 )),)},
+                     "function": {"A2`": ("Rz"),
+                                  "E`": ("(x,y)"),
+                                  'A2"': ("z"),
+                                  'E"': ("(Rx,Ry)"),
+                                  "G2": ("Rz"),
+                                  "G3": ("(x,y)"),
+                                  'G4': ("z"),
+                                  'G5': ("(Rx,Ry)")}},
+                ],
+        }
+        return charater_table[pg][0]
+
+    def _get_spin_conjugate_reps(self, n_electrons, pg, ir):
+        if n_electrons > 4:
+            raise ValueError("n_electrons must be less than 5")
+        table_pg = self._character_tables(pg)
+        op_to_char = dict(zip(table_pg["rotation_list"], table_pg["character_table"][ir]))
+        origin_ir_vec = np.array(list(op_to_char.values()))
+
+        eqivalent_ops_dict =lambda x: self._get_power_n_operation(pg, x)
+        n_power_rep_vec = lambda x: np.array([op_to_char[i] for i in eqivalent_ops_dict(x).values()])
+
+        rep_vec = {}
+        if n_electrons == 1:
+            doublet = n_power_rep_vec(1)
+            rep_vec[n_electrons] = {"1/2": doublet} #Sn, spin, rep_vec
+            return rep_vec
+        elif n_electrons == 2:
+            singlet = 1/2*origin_ir_vec**2 + 1/2*n_power_rep_vec(2)
+            triplet = 1/2*origin_ir_vec**2 - 1/2*n_power_rep_vec(2)
+            rep_vec[n_electrons] = {"0": singlet, "1": triplet}
+            return rep_vec
+        elif n_electrons == 3:
+            doublet = 1/3*origin_ir_vec**3 - 1/3*n_power_rep_vec(3)
+            quartet = 1/6*origin_ir_vec**3 - 1/2*origin_ir_vec*n_power_rep_vec(2) + 1/3*n_power_rep_vec(3)
+            rep_vec[n_electrons] = {"1/2": doublet, "3/2": quartet}
+            return rep_vec
+        elif n_electrons == 4:
+            singlet = 1/12*origin_ir_vec**4 - 1/3*origin_ir_vec*n_power_rep_vec(3) + 1/4*n_power_rep_vec(2)**2
+            triplet = 1/8*origin_ir_vec**4 - 1/4*origin_ir_vec**2*n_power_rep_vec(2) + 1/4*n_power_rep_vec(4) - \
+                      1/8*n_power_rep_vec(2)**2
+            quintet = 1/24*origin_ir_vec**4 - 1/4*origin_ir_vec**2*n_power_rep_vec(2) + \
+                      1/3*origin_ir_vec*n_power_rep_vec(3) - 1/4*n_power_rep_vec(4) + 1/8*n_power_rep_vec(2)**2
+            rep_vec[n_electrons] = {"0": singlet, "1": triplet, "2": quintet}
+            return rep_vec
+
+
+    def _get_power_n_operation(self, pg, power_n):
+        table_pg = self._character_tables(pg)
+        operations = table_pg["mapping_table"]
+
+        eqivalent_ops_dict = {}
+        for src_op_name, src_ops in operations.items():
+            src_op = src_ops[0] # pick first op for each class
+            power_n_operation = np.linalg.matrix_power(src_op, power_n)
+            for op_name, ops in operations.items():
+                for op in ops:
+                    if np.array_equal(power_n_operation, np.array(op)):
+                        eqivalent_ops_dict[src_op_name] = op_name
+                        break
+
+        eqivalent_ops_dict = {op: eqivalent_ops_dict[op] for op in table_pg["rotation_list"]}
+        print(f"Power of {power_n} Ops:\n{eqivalent_ops_dict}")
+
+        return eqivalent_ops_dict
+
+
+
+    def _decomposition_engine(self, pg, rep):
+        table_pg = self._character_tables(pg)
+        rep = np.repeat(rep, table_pg["multiplicity"])
+        irs, irs_G = {}, {}
+
+        for k,v in table_pg["character_table"].items():
+            if "G" in k:
+                irs_G[k] = np.repeat(v, table_pg["multiplicity"])
+            else:
+                irs[k] = np.repeat(v, table_pg["multiplicity"])
+
+        decomp_coeff, decomp_coeff_G = {}, {}
+        for k, v in irs.items():
+            decomp_coeff[k] = np.dot(rep, v)/np.sum(table_pg["multiplicity"])
+
+        for k, v in irs_G.items():
+            decomp_coeff_G[k] = np.dot(rep, v)/np.sum(table_pg["multiplicity"])
+        return decomp_coeff, decomp_coeff_G
+
+    def _get_tensor_operators(self, config='xy*xy', pg='C3v'):
+        table_pg = self._character_tables(pg)
+        tensor_table = {}
+        for op_name, ops in table_pg["mapping_table"].items():
+            print(op_name, ops)
+            tensor_ops = []
+            for idx, op in enumerate(ops):
+                op = np.array(op)[:2, :2]
+                if config == 'xy*xy':
+                    tensor_op = np.kron(op, op)
+                    tensor_ops.append(tensor_op)
+                elif config == 'xy*z':
+                    for ir, function in table_pg["function"].items():
+                        if "z" in function:
+                            tensor_op = np.kron(op, table_pg["character_table"][ir][idx])
+                            tensor_ops.append(tensor_op)
+                            break
+                    tensor_ops.append(tensor_op)
+            tensor_table.update({op_name: tensor_ops})
+        return tensor_table
+
+    def decomp_product(self, pg, *irs):
+        table_pg = self._character_tables(pg)
+        for idx, i in enumerate(irs):
+            if idx == 0:
+                rep = table_pg["character_table"][i]
+                continue
+            rep *= np.array(table_pg["character_table"][i])
+        print(f"Point_group:: {pg}, Rep: {rep}")
+        return self._decomposition_engine(pg, rep)
+
+    def decomp_any_rep(self, pg, rep):
+        table_pg = self._character_tables(pg)
+        print(f"Point_group: {pg}, Rep: {rep}")
+        return self._decomposition_engine(pg, rep)
+
+    def get_term_symbol(self, n_electrons, pg, ir):
+        from collections import defaultdict
+        term_symbol = {}
+        term_symbol["n_electrons"] = n_electrons
+        term_symbol["pg"] = pg
+        term_symbol["ir"] = ir
+        spin_conjugate_rep = self._get_spin_conjugate_reps(n_electrons, pg, ir)
+        for spin, rep in spin_conjugate_rep[n_electrons].items():
+            print(f"Spin {spin}, Rep: {rep}")
+            term_symbol[spin] =  self.decomp_any_rep(pg, rep)
+        return term_symbol
+
+    def get_sublevel_sym(self, pg, term_symbol):
+        table_pg = self._character_tables(pg)
+        singlet = "G1"
+        ang_mom_xy = []
+        ang_mom_z = []
+        for k, v in table_pg["function"].items():
+            if "(Rx,Ry)" in v:
+                ang_mom_xy.append(k)
+            elif "Rz" in v:
+                ang_mom_z.append(k)
+        print(f"Sx, Sy: {ang_mom_xy}, Sz: {ang_mom_z}")
+
+        ang_mom_xy = [i for i in ang_mom_xy if "G" not in i]
+        ang_mom_z = [i for i in ang_mom_z if "G" not in i]
+
+        triplet_sublevel_sym = {"(Sx,Sy)": self.decomp_product(pg, term_symbol, *ang_mom_xy),
+                                "Sz": self.decomp_product(pg, term_symbol, *ang_mom_z)}
+        singlet_sublevel_sym = {"S0": self.decomp_product(pg, term_symbol, singlet)}
+
+        return triplet_sublevel_sym, singlet_sublevel_sym
+
+    def get_term_symbol_sublevel_sym(self, n_electrons, pg, ir):
+        if n_electrons != 2:
+            raise ValueError("n_electrons must be 2")
+
+        term_symbol = self.get_term_symbol(n_electrons, pg, ir)
+        singlet_terms = term_symbol["0"][0]
+        # get those keys whose value is not 0
+        singlet_terms = [k for k, v in singlet_terms.items() if v != 0]
+        triplet_terms = term_symbol["1"][0]
+        triplet_terms = [k for k, v in triplet_terms.items() if v != 0]
+
+        sublevel_sym = {"0": {}, "1": {}}
+        for term in singlet_terms:
+            print(f"Singlet term: {term}")
+            sublevel_sym["0"][term] = self.get_sublevel_sym(pg, term)[1]
+        for term in triplet_terms:
+            print(f"Triplet term: {term}")
+            sublevel_sym["1"][term] = self.get_sublevel_sym(pg, term)[0]
+        return sublevel_sym
+
+
+    # a numpy vector, each element of it times a set of matrices in the basis
+    def get_sym_adopted_basis(self, ir, pg="D2d", config="xy*xy"):
+        table_pg = self._character_tables(pg)
+        tensor_table = self._get_tensor_operators(config=config, pg=pg)
+        ir_vec = table_pg["character_table"][ir]
+        ir_vec = np.repeat(ir_vec, table_pg["multiplicity"])
+        tensor_ops = np.concatenate(list(tensor_table.values()))
+        print(f"\nir_vec: {ir_vec}, ir: {ir}")
+        print(f"\ntensor_ops:\n{tensor_ops}")
+        proj_op = np.array([m*v for m, v in zip(tensor_ops, ir_vec)])
+        print(f"\nproj_op:\n{proj_op}")
+
+        new_basis = sum(proj_op)/len(ir_vec)*ir_vec[0]
+        print(f"\nnew_basis:\n{new_basis}")
+
+        import scipy as sp
+        orthonormal_basis = sp.linalg.orth(new_basis)
+        print(f"\northonormal_basis:\n{orthonormal_basis}")
+        return new_basis, orthonormal_basis
+
+
+
+
+
 
 
 
 
 if __name__ == '__main__':
-    # df = pd.read_csv("/home/yluo/Documents/defect_qubit_df.csv")
-    #
-    pass
+    a = {1:2, 2:3}
+    #find the key who has the largest value
+    print(max(a, key=a.get))
+
+
+
+
+
 
