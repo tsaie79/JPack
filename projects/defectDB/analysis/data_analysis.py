@@ -112,21 +112,23 @@ class Tools:
                 locpot_c2db=None,  #(c2db, c2db_uid, 0)
                 is_vacuum_aligment_on_plot=True,
                 edge_tol=edge_tol,
-                ir_db=ir_db,
+                ir_db=None,
                 ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
                 selected_bands=selected_bands,
             )
             tot, proj, d_df, levels, defect_levels = state
             level_info = d_df.to_dict("records")[0]
         except Exception as er:
-            print(er)
+            tot = None
             level_info = {}
             levels = {}
             defect_levels = {}
-        return level_info, levels, defect_levels
+            proj = None
+        return tot, level_info, levels, defect_levels, proj
 
     @classmethod
-    def extract_defect_levels_v2_hse(cls, defect_taskid, localisation=0.2, edge_tol=(0.5, 0.5), selected_bands=None):
+    def extract_defect_levels_v2_hse(cls, defect_taskid, localisation=0.2, edge_tol=(0.5, 0.5), selected_bands=None,
+                                     fig_on="all"):
         from qubitPack.qc_searching.analysis.main import get_defect_state_v3
         from qubitPack.tool_box import get_db
 
@@ -145,7 +147,7 @@ class Tools:
                 {"task_id": defect_taskid},
                 -10, 10,
                 None,
-                "all",
+                fig_on,
                 None,
                 None,  #(host_db, host_taskid, 0, vbm_dx, cbm_dx),
                 localisation,  #0.2
@@ -163,11 +165,12 @@ class Tools:
             level_info = d_df.to_dict("records")[0]
         except Exception as er:
             print(er)
+            tot = None
             level_info = {}
             levels = {}
             defect_levels = {}
             proj = None
-        return level_info, levels, defect_levels, proj
+        return tot, level_info, levels, defect_levels, proj
 
 class Host:
     def __init__(self, host_xlsx="host_2021-10-25"):
@@ -310,7 +313,7 @@ class Defect:
         print(self.defect_df)
         IOTools(cwd=save_xlsx_path, pandas_df=self.defect_df).to_excel("defect")
 
-    def get_defect_df_v2(self):
+    def  get_defect_df_v2(self):
         data = []
         col = SCAN2dDefect.collection
         condition = {"task_label": "SCAN_scf", "task_id": {"$lte": 6084}}
@@ -1622,14 +1625,144 @@ class COHP:
 
 class TransitionLevels:
     @classmethod
-    def regular_antisite(cls, db_files, compounds, c2db_uid, Cs, defect_name):
-        # c = [24.650893, 24.666774, 29.650893, 29.666774]
+    def regular_antisite(cls, db_files, compounds, prototype, Cs, defect_name):
+        q0_mag1 = [25,
+                   29,
+                   45,
+                   61,
+                   112,
+                   119,
+                   125,
+                   129,
+                   133,
+                   178,
+                   184,
+                   197,
+                   208,
+                   217,
+                   225,
+                   226,
+                   228,
+                   235,
+                   238,
+                   241,
+                   256,
+                   294,
+                   296,
+                   307,
+                   309,
+                   310,
+                   317,
+                   320,
+                   324,
+                   339,
+                   346,
+                   355,
+                   360,
+                   366,
+                   380,
+                   386,
+                   391,
+                   403,
+                   422,
+                   425,
+                   440,
+                   449,
+                   461,
+                   475,
+                   485,
+                   486,
+                   507,
+                   511,
+                   528,
+                   545,
+                   552,
+                   556,
+                   569,
+                   574,
+                   580,
+                   588,
+                   617,
+                   634,
+                   636,
+                   641,
+                   644,
+                   655,
+                   657,
+                   662,
+                   664,
+                   666,
+                   673,
+                   676,
+                   681,
+                   733,
+                   736,
+                   744,
+                   747,
+                   749,
+                   756,
+                   767,
+                   768,
+                   772,
+                   776,
+                   778]
+        q1_mag0 = [36,
+                   88,
+                   103,
+                   106,
+                   111,
+                   126,
+                   131,
+                   135,
+                   180,
+                   187,
+                   202,
+                   212,
+                   216,
+                   246,
+                   255,
+                   308,
+                   318,
+                   328,
+                   335,
+                   341,
+                   342,
+                   344,
+                   354,
+                   358,
+                   378,
+                   385,
+                   390,
+                   400,
+                   418,
+                   421,
+                   424,
+                   443,
+                   452,
+                   454,
+                   481,
+                   484,
+                   505,
+                   512,
+                   513,
+                   525,
+                   530,
+                   534,
+                   546,
+                   558,
+                   571,
+                   575,
+                   590,
+                   774]
+
         bulk_k = [[1,1,1]]
         vbm_k = [[0, 0, 0]]
-        results = []
         sites = [[33, 31], [51, 49]] if defect_name == "M_on_X" else [[31, 33], [49, 51]]
+        charge_spin_states = [[-1, 0, 1], [2, 1, 0]] if defect_name == "M_on_X" else [[1, 0, -1, -2], [2, 3, 1]]
+        results = []
+        raw_data_df = []
         for compound, c in zip(compounds, Cs):
-            se_antisite = FormationEnergy2D(
+            ionize_en = FormationEnergy2D(
                 bulk_db_files=db_files,
                 bulk_entry_filter={
                     # "nsites": {"$ne":48},
@@ -1638,7 +1771,7 @@ class TransitionLevels:
                     "calcs_reversed.input.kpoints.kpoints.0": {"$in": bulk_k},
                     "defect_type": "host",
                     "task_label": "HSE_scf",
-                    "c2db_uid": {"$regex": c2db_uid}
+                    "c2db_uid": {"$regex": prototype}
                 },
                 bk_vbm_bg_db_files=db_files,
                 bk_vbm_bg_filter={
@@ -1648,13 +1781,13 @@ class TransitionLevels:
                     "input.structure.lattice.c": {"$in": c},
                     "defect_type": "vbm",
                     "task_label": "HSE_scf",
-                    "c2db_uid": {"$regex": c2db_uid},
+                    "c2db_uid": {"$regex": prototype},
                 },
                 defect_db_files=db_files,
                 defect_entry_filter={
-                    # "nsites": {"$ne":48},
-                    "charge_state": {"$in": [1, 0, -1]},
-                    "nupdown_set": {"$in": [2, 3, 0]},
+                    "task_id": {"$nin": q0_mag1+q1_mag0},
+                    "charge_state": {"$in": charge_spin_states[0]},
+                    "nupdown_set": {"$in": charge_spin_states[1]},
                     "chemsys": compound,
                     "$or": [{ "formula_pretty": {"$regex": "[a-zA-Z]+{}[a-zA-Z]+{}".format(*sites[0])}},
                             {"formula_pretty": {"$regex": "[a-zA-Z]+{}[a-zA-Z]+{}".format(*sites[1])}}],
@@ -1662,22 +1795,115 @@ class TransitionLevels:
                     "input.structure.lattice.c": {"$in": c},
                     "defect_type": "defect",
                     "task_label": "HSE_scf",
-                    "c2db_uid": {"$regex": c2db_uid},
+                    "c2db_uid": {"$regex": prototype},
                 }
             )
-            se_antisite.transition_levels()
-            for a in se_antisite.ionized_energy(fig_title="{}-{}-{}".format(defect_name, compound, c2db_uid)):
-                a.update({"chemsys": compound, "c2db_uid": c2db_uid, "defect_name": defect_name})
+
+            # replace problematic entry 1168 with 585 from HSEQubitDefect
+            ionize_en.defect_entries = [i for i in ionize_en.defect_entries if i["task_id"]!=1168]
+            ionize_en.defect_entries.append(HSEQubitDefect.collection.find_one({"task_id": 585}))
+
+            raw_data, tls = ionize_en.get_transition_levels()
+            name = f"{compound.split('-')[0]}_on_{compound.split('-')[1]}" if defect_name == "X_on_M" \
+                else f"{compound.split('-')[1]}_on_{compound.split('-')[0]}"
+            for a in ionize_en.get_ionized_energy(fig_title=f"{name}-{prototype}", tls=tls):
+                a.update({"chemsys": compound, "prototype": prototype, "defect_name": defect_name})
                 results.append(a)
+
+            raw_data_df.append(raw_data)
 
         print("$$"*50, "all")
         tls = pd.DataFrame(results)
         tls["IE0"] = tls.apply(lambda x: x["IE0"][0], axis=1)
-        tls["window"] = tls.apply(lambda x: x["Bandgap_avg"] - x["IE0"], axis=1)
-        # set tls["tl"] as window if charge == (0, 1) else set tls["tl"] as IE0
-        tls["tl"] = tls.apply(lambda x: x["window"] if x["charge"] == (0, 1) else x["IE0"], axis=1)
+        tls["tl"] = tls.apply(lambda x: x["IE0"] if np.any(np.array(x["charge"])<0) else x["Bandgap_avg"] - x["IE0"],
+                              axis=1)
+        # tls["tl"] = tls.apply(lambda x: None if x["IE0"] > x["Bandgap_avg"] else x["tl"], axis=1)
+        # groupby chemsys and subtract tl each row from the next row
+        tls["window"] = tls["tl"].diff()
+
+        raw_data_df = pd.concat(raw_data_df)
+        display(raw_data_df)
         display(tls)
-        return tls
+        return tls, raw_data_df
+
+    def get_tls_plot(self, df, tls_df):
+            # plot a bar chart containing the defect levels for a mutiple defects
+            vbm_df = df.loc[df["defect_type"] == "vbm"]
+            #groupby c2db_uid, chemsys, and formula; and get mean of vbm, cbm
+            vbm_df = vbm_df.groupby(["c2db_uid", "chemsys", "formula", "prototype"]).agg({"vbm": "mean",
+                                                                             "cbm": "mean"}).reset_index()
+
+            tls_df = tls_df.merge(vbm_df, on=["prototype", "chemsys"], how="left")
+
+            fig, ax = plt.subplots(figsize=(12,11), dpi=300)
+            fig_y_height = 1, 1.5
+            font_size = 7.25
+            vbm_lim, cbm_lim = tls_df["vbm"].min(), tls_df["cbm"].max()
+            ax.set_ylim(vbm_lim-fig_y_height[0], cbm_lim+fig_y_height[1])
+
+            defect_labels = []
+            # plot mutilple bars
+
+            # for (defect, df), x in zip(tls_df.groupby(["prototype", "chemsys", "defect_name"]),
+            #                       np.arange(0, len(tls_df.groupby(["prototype", "chemsys", "defect_name"]))*5, 5)):
+            for (defect, df), x in zip(tls_df.groupby(["defect_name", "chemsys"]),
+                                       np.arange(0, len(tls_df.groupby(["defect_name", "chemsys"]))*5, 5)):
+                print(f"defect: {defect}")
+                # name = f"{defect[1].split('-')[1]}_on_{defect[1].split('-')[0]}" if defect[2] == "X_on_M" \
+                #     else f"{defect[1].split('-')[0]}_on_{defect[1].split('-')[1]}"
+                # defect_labels.append(rf'$\mathrm{{{name.split("_")[0]}_{{{name.split("_")[-1]}}}}}$')
+                name = f"{defect[1].split('-')[1]}_on_{defect[1].split('-')[0]}" if defect[0] == "X_on_M" \
+                    else f"{defect[1].split('-')[0]}_on_{defect[1].split('-')[1]}"
+                defect_labels.append(rf'$\mathrm{{{name.split("_")[0]}_{{{name.split("_")[-1]}}} @ '
+                                     rf'{"".join(defect[1].split("-"))}}}$')
+                # readout all the data from defect dict
+                vbm = df["vbm"].mean()
+                cbm = df["cbm"].mean()
+                # level_edge_ir = defect["level_edge_ir"],
+                tl = df["tl"]+df["vbm"]
+                charge = df["charge"]
+
+                ax.bar(x, vbm-(vbm_lim-fig_y_height[0]), 4, (vbm_lim-fig_y_height[0]), color="deepskyblue")
+                ax.bar(x, (cbm_lim+fig_y_height[1])-cbm, 4, cbm, color="orange")
+
+                dx = 0.35
+                for level, q in zip(tl, charge):
+                    print(f"charge: {q}, level: {level}")
+                    q_labels = []
+                    for q_label in q:
+                        if q_label < 0:
+                            q_labels.append(f"-" if q_label == -1 else f"{-1*q_label}-")
+                        elif q_label > 0:
+                            q_labels.append(f"+" if q_label == 1 else f"{q_label}+")
+                        else:
+                            q_labels.append("0")
+
+                    ax.text(x+0.2, level, rf"$\mathrm{{\epsilon({q_labels[1]}/{q_labels[0]})}}$",
+                            fontsize=font_size,
+                            color="black")
+                    color = "black"
+                    ax.hlines(level, x-1.5, x-0.1, colors=color)
+
+                # ax.text(x-1.5, cbm+0.4, f"{cbm}",bbox=dict(facecolor='white', edgecolor='black'), size=font_size)
+                # ax.text(x-1.5, vbm-0.55, f"{vbm}",bbox=dict(facecolor='white', edgecolor='black'), size=font_size)
+
+            ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+            for tick in ax.get_yticklabels():
+                tick.set_fontsize(15)
+
+            ax.tick_params(axis="x", bottom=False, labelbottom=True)
+            ax.tick_params(axis="y", right=False, which="both")
+
+
+            ax.set_xticks(np.arange(0, len(tls_df.groupby(["prototype", "chemsys", "defect_name"]))*5, 5))
+
+            ax.set_xticklabels(defect_labels, fontdict={"fontsize": 10}, rotation=0)
+
+            # remove minor and major xticks
+            ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=True)
+            ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
+
+            return fig, ax
 
 
 
@@ -1730,7 +1956,7 @@ if __name__ == '__main__':
     # # show = show.loc[(show["dn_tran_lumo_homo_deg"] == (1, 2)) | (show["dn_tran_lumo_homo_deg"] == (3, 2))]
 
     # IOTools(cwd=save_xlsx_path, pandas_df=df).to_excel("test")
-    # a, b, c = Tools.extract_defect_levels_v2_hse(2707, localisation=0.2)
+
 
     # cdft = CDFT()
     # cdft.update_entry_with_occ()
@@ -1744,4 +1970,6 @@ if __name__ == '__main__':
     # COHP.analysis()
 
 
-    Tools.extract_defect_levels_v2(1820, localisation=0.05, edge_tol=(0.5, 0.5))
+    # a, b, c, d, e = Tools.extract_defect_levels_v2_hse(2590, localisation=0.2)
+    a, b, c, d, e = Tools.extract_defect_levels_v2(89, localisation=0.1)
+
