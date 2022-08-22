@@ -27,9 +27,11 @@ triplet_df = IOTools(cwd=input_path, excel_file="triplet_2021-11-18").read_excel
 qubit_candidate_df = IOTools(cwd=input_path, excel_file="qubit_2021-11-18_2022-01-10").read_excel()
 
 # hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-04-13").read_excel()
-hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-04-21").read_excel()
+# hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-04-21").read_excel()
+hse_qubit_df = IOTools(cwd=input_path, excel_file="hse_qubit_2022-07-10").read_excel()
 
 tmd_antisites_df = IOTools(cwd=input_path, excel_file="tmd_antisites_2022-04-13").read_excel()
+pure_c2db_pc_tmd_antisite_df = IOTools(cwd=input_path, excel_file="pure_c2db_TMD_2022-07-08").read_excel()
 
 hse_screened_qubit_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_2021-11-18").read_excel()
 hse_screened_qubit_cdft_df = IOTools(cwd=input_path, excel_file="hse_screened_qubit_cdft_2021-11-18_2022-01-31").read_excel()
@@ -46,7 +48,7 @@ hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-06-01").r
 
 
 table1_df = IOTools(cwd=input_path, excel_file="Table_1_df_2022-04-15").read_excel()
-table4_df = IOTools(cwd=input_path, excel_file="Table_4_df_2022-05-22").read_excel()
+table4_df = IOTools(cwd=input_path, excel_file="Table_4_df_2022-06-27").read_excel()
 
 
 # os.environ["PATH"] += os.pathsep + "/Library/TeX/texbin/latex"
@@ -1101,10 +1103,76 @@ class SheetCollection:
                     0.264
 
         df = df.loc[df["singlet_triplet_energy_diff"].notnull()]
+        df = df.loc[df["singlet_triplet_energy_diff"] > 0]
 
         #add defect symmetry
         da.get_defect_symmetry(df)
         df = df.merge(da.defect_symmetry_df, on=["task_id"], how="left")
+
+        self.hse_triplet_df = df
+        grouping = self.grouping.copy()
+        grouping.append("singlet_triplet_energy_diff")
+        grouping.append("defect_symmetry")
+        self.hse_triplet_df_gp = df.groupby(grouping).agg({"task_id": ["unique", "count"]})
+
+        return self.hse_triplet_df
+
+
+    def SP_get_hse_triplet_df(self, df=None, remove_duplicates_based_on=["uid", "defect_name", "charge"],
+                           remove_taskid_in_36group=[186, 1020, 1000, 283, 211, 644, 229, 548, 242, 603]):
+        """
+        Get HSE triplet dataframe WITHOUT MATCHING THE TMD ANTISITES FROM OUR NATURE COMM. PAPER.
+        Therefore, ALL pc are from C2DB.
+        :param df:
+        :param remove_duplicates_based_on:
+        :param remove_taskid_in_36group:
+        :return:
+        """
+        df = df if df is not None else hse_qubit_df.copy()
+        df["level_cat"] = df.apply(lambda x: self.cat_revision(x), axis=1)
+
+        df["spacegroup"] = df["pmg_spg"]
+        df["good_site_sym"] = df["reduced_site_sym"]
+        df["good_site_specie"] = df["reduced_site_specie"]
+        df["C2DB_uid"] = df["uid"]
+
+        df["perturbed_vbm"] = df["level_vbm"]
+        df["perturbed_cbm"] = df["level_cbm"]
+        df["perturbed_bandgap"] = df["level_gap"]
+        df["level_edge_category"] = df["level_cat"]
+        df["vertical_transition_up"] = df["up_tran_en"]
+        df["vertical_transition_down"] = df["dn_tran_en"]
+        df["LUMO-HOMO_up"] = df["up_tran_en"]
+        df["LUMO-HOMO_down"] = df["dn_tran_en"]
+
+        df = df.fillna("None")
+
+        # Remove bad bandedges
+        df = df.loc[(df["perturbed_vbm"] != "None") & (df["perturbed_cbm"] != "None")]
+
+        # Make sure that the definition of in-gap levels are followed (it is no a filter, but a definition)
+        df = self.check_ingap_level(df, -0.50, 0.50)
+        # df = df.loc[df["in_gap"]]
+
+        if remove_taskid_in_36group:
+            df = df.loc[~df["task_id"].isin(remove_taskid_in_36group)]
+
+        if remove_duplicates_based_on:
+            df = df.drop_duplicates(
+                subset=remove_duplicates_based_on, keep="first").sort_values("task_id", ascending=True)
+
+        #add singlet informaion
+        # da = DefectAnalysis(df)
+        # da.get_singlet_triplet_en_diff()
+        # df = df.merge(da.singlet_df, on=["C2DB_uid", "defect_name", "charge", "task_id"], how="left")
+
+        df = df.loc[df["singlet_triplet_energy_diff"] != "None"]
+        df = df.loc[df["singlet_triplet_energy_diff"] > 0]
+
+        #add defect symmetry
+        # da = DefectAnalysis(df)
+        # da.get_defect_symmetry(df)
+        # df = df.merge(da.defect_symmetry_df, on=["task_id"], how="left")
 
         self.hse_triplet_df = df
         grouping = self.grouping.copy()
@@ -1136,19 +1204,13 @@ class SheetCollection:
             "total_TDM_rate_dn"], axis=1)
 
         def fun(x):
+            gap_tran_bottom_to_vbm, gap_tran_top_to_cbm = None, None
             if x["transition_from"] == "dn":
-                gap_tran_bottom_to_vbm = x["dn_tran_bottom"]
-                gap_tran_top_to_cbm = x["level_gap"] - x["dn_tran_top"]
+                gap_tran_bottom_to_vbm = x["dn_tran_bottom_to_vbm"]
+                gap_tran_top_to_cbm = x["dn_tran_top_to_cbm"]
             elif x["transition_from"] == "up":
-                gap_tran_bottom_to_vbm = x["up_tran_bottom"]
-                gap_tran_top_to_cbm = x["level_gap"] - x["up_tran_top"]
-            else:
-                if x["dn_tran_bottom"] == "None":
-                    gap_tran_bottom_to_vbm = x["up_tran_bottom"]
-                    gap_tran_top_to_cbm = x["level_gap"] - x["up_tran_top"]
-                else:
-                    gap_tran_bottom_to_vbm = x["dn_tran_bottom"]
-                    gap_tran_top_to_cbm = x["level_gap"] - x["dn_tran_top"]
+                gap_tran_bottom_to_vbm = x["up_tran_bottom_to_vbm"]
+                gap_tran_top_to_cbm = x["up_tran_top_to_cbm"]
             return gap_tran_bottom_to_vbm, gap_tran_top_to_cbm
 
         df["gap_tran_bottom_to_vbm"] = df.apply(lambda x: fun(x)[0], axis=1)
@@ -1159,7 +1221,15 @@ class SheetCollection:
         # df["gap_tran_top_to_cbm"] = df.apply(
         #     lambda x: x["level_gap"] - x["dn_tran_top"] if x["transition_from"] == "dn" else x["level_gap"] - x["up_tran_top"], axis=1)
 
-        def get_filtered_df(df, D_zfs=0.95, wavelength_zpl=2500, homo_to_vbm=0.095, lumo_to_cbm=0.095):
+        def get_filtered_df(df, D_zfs=0.95, wavelength_zpl=2500, homo_to_vbm=0.050, lumo_to_cbm=0.095):
+            """
+            :param df:
+            :param D_zfs: 0.95
+            :param wavelength_zpl: 2500
+            :param homo_to_vbm: 0.095
+            :param lumo_to_cbm: 0.095
+            :return:
+            """
             df = df.loc[df["zfs_D"] != "None"]
             df = df.loc[df["zfs_D"] >= D_zfs]
 
@@ -1201,8 +1271,10 @@ class SheetCollection:
         self.hse_candidate_df_gp = self.hse_candidate_df.copy().replace(np.nan, "None").groupby(
             self.grouping_hse_candidate).agg({"task_id": "max"})
         self.hse_candidate_not_passed_df = not_passed_df.replace(np.nan, "None").copy()
+        not_passed_grouping = self.grouping_hse_candidate.copy()
+        not_passed_grouping.remove("LUMO_HOMO_splitting_type")
         self.hse_candidate_not_passed_df_gp = self.hse_candidate_not_passed_df.copy().replace(np.nan, "None").groupby(
-            self.grouping_hse_candidate).agg(
+            not_passed_grouping).agg(
             {"task_id": "unique"})
 
     def get_final_hse_candidate_df(self, hse_candidate_df=None, remove_e_config_summary_cols=True):
@@ -1232,7 +1304,7 @@ class SheetCollection:
         updated_df = updated_df.loc[~(updated_df["task_id"].isin([1234]))]
 
         self.updated_hse_candidate_df = updated_df.copy()
-        grouping = self.grouping_hse_candidate
+        grouping = self.grouping_hse_candidate.copy()
         grouping.extend(["e_config", "h_config", "e2_from"])
         self.updated_hse_candidate_df_gp = self.updated_hse_candidate_df.groupby(grouping).agg({"task_id": "unique"})
 
@@ -1476,7 +1548,6 @@ class FigureAndStats(SheetCollection):
 
         fig, ax = plt.subplots(figsize=(12,11), dpi=300)
         fig_y_height = 5, 5
-        font_size = 7.25
         ax.set_ylim(vbm_lim-fig_y_height[0], cbm_lim+fig_y_height[1])
 
         print("len of defects: {}".format(len(defects)))
@@ -1574,13 +1645,13 @@ class FigureAndStats(SheetCollection):
         ax.set_xticklabels([rf"$\mathrm{{{defect_name_labels[i].split('_')[2]}_{{"
                             rf"{defect_name_labels[i].split('_')[4]}}}^{{{charge_labels[i]}}}}}$"+
                             rf"@{''.join(host_labels[i].split('-')[0].split('2'))}" for
-                            i in range(len(mags))], fontdict={"fontsize": 10}, rotation=0)
+                            i in range(len(mags))], fontdict={"fontsize": 20}, rotation=270)
 
         # remove minor and major xticks
         ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=True)
         print(f"taskid_label: {taskid_labels}, mags: {mags}")
 
-        ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
+        ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=20)
         ax.set_ylim(ylim[0], ylim[1])
         return fig, ax
 
@@ -1805,6 +1876,7 @@ class FigureAndStats(SheetCollection):
     def get_zfs_fig(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
         df.rename(columns={"zfs_D": "D"}, inplace=True)
+        df = df.groupby("task_id").agg({"D": "max"}).reset_index()
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -1861,7 +1933,7 @@ class FigureAndStats(SheetCollection):
         import numpy as np
         ## ref: http://www.sb.fsu.edu/~fajer/Fajerlab/LinkedDocuments/Ralph%20Weber.pdf
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
-        df1 = df.loc[:, "zfs_D"]
+        df1 = df.groupby("task_id").agg({"zfs_D": "max"}).reset_index()["zfs_D"]
         minor_f = df1.loc[(df1 >= 0) & (df1 < 1)]
         L = df1.loc[(df1 >= 1) & (df1 < 2)]
         S = df1.loc[(df1 >= 2) & (df1 < 4)]
@@ -1911,18 +1983,21 @@ class FigureAndStats(SheetCollection):
         for k, v in x:
             print(k)
             r = None
-            if k in [16, 17]:
-                r = "Atomic radius calculated"
+            if k in [6]:
+                r = "average_anionic_radius"
+            elif k in [16, 17]:
+                r = "average_anionic_radius"
             else:
                 r = "Atomic radius calculated"
             v = v.sort_values("level_source_row")
             display(v.loc[:, ["level_source_specie", r, "zfs_D"]])
-            ax.scatter(v[r], v["zfs_D"], label=k)
+            label = {6: "VIB", 13: "IIIA", 16: "VIA", 17: "VIIA", 12: "IIA", 14:"IVA"}
+            ax.scatter(v[r], v["zfs_D"], label=label[k])
             # display(v.loc[:, ["group_row", "zfs_D"]])
             # ax.scatter(v["group_row"], v["zfs_D"])
         # set y axis range from 0 to 12
         ax.set_ylim(0, 12)
-        ax.set_xlim(0.8, 2)
+        # ax.set_xlim(0.8, 2)
         # rotate legend by 90 degree
         ax.legend(loc="upper center", ncol=4, frameon=True)
         ax.set_ylabel("ZFS D (GHz)")
@@ -2456,21 +2531,30 @@ class DefectAnalysis(SheetCollection):
                                                             "charge_state": triplet_e["charge_state"]})
             if singlet_e is None:
                 print(f"Processing triplet taskid:{t}, No singlet found!")
-                continue
             else:
                 print(f"Processing triplet taskid:{t}, Found singlet taskid:{singlet_e['task_id']}!")
 
-            singlets["singlet_taskid"].append(singlet_e["task_id"])
             singlets["task_id"].append(int(t))
-            singlets["singlet_energy"].append(singlet_e["output"]["energy"])
+
+            if singlet_e:
+                singlets["singlet_taskid"].append(singlet_e["task_id"])
+            else:
+                singlets["singlet_taskid"].append("None")
+
+            if singlet_e:
+                singlets["singlet_energy"].append(singlet_e["output"]["energy"])
+            else:
+                singlets["singlet_energy"].append("None")
 
             singlets["C2DB_uid"].append(df.loc[df["task_id"] == t]["C2DB_uid"].tolist()[0])
             singlets["defect_name"].append(df.loc[df["task_id"] == t]["defect_name"].tolist()[0])
             singlets["charge"].append(df.loc[df["task_id"] == t]["charge"].tolist()[0])
             singlets["triplet_energy"].append(triplet_e["output"]["energy"])
-            singlets["singlet_triplet_energy_diff"].append(
-                singlet_e["output"]["energy"] - triplet_e["output"]["energy"])
-
+            if singlet_e:
+                singlets["singlet_triplet_energy_diff"].append(
+                    singlet_e["output"]["energy"] - triplet_e["output"]["energy"])
+            else:
+                singlets["singlet_triplet_energy_diff"].append("None")
         self.singlet_df = pd.DataFrame(singlets).round(3)
 
     def get_defect_symmetry(self, df=None):
@@ -2631,15 +2715,16 @@ class DefectAnalysis(SheetCollection):
             c3v_df.loc[c3v_df["task_id"].isin([383, 499]), "e2_from"] = "h"
 
             c3v_df.loc[c3v_df["task_id"].isin(
-                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "e_config_G"] = "G3.2/G1.0"
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671, 870, 13, 785, 868]), "e_config_G"]\
+                = "G3.2/G1.0"
             c3v_df.loc[c3v_df["task_id"].isin(
-                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "h_config_G"] = "G1.2/G3.2"
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671, 870, 13, 785, 868]), "h_config_G"] = "G1.2/G3.2"
             c3v_df.loc[c3v_df["task_id"].isin(
-                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "e_config"] = "E.2/A1.0"
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671, 870, 13, 785, 868]), "e_config"] = "E.2/A1.0"
             c3v_df.loc[c3v_df["task_id"].isin(
-                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "h_config"] = "A1.2/E.2"
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671, 870, 13, 785, 868]), "h_config"] = "A1.2/E.2"
             c3v_df.loc[c3v_df["task_id"].isin(
-                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671]), "e2_from"] = "e"
+                [1088, 585, 1007, 220, 2688, 2657, 924, 306, 1234, 1423, 2658, 2671, 870, 13, 785, 868]), "e2_from"] = "e"
 
             c3v_df.loc[c3v_df["task_id"].isin([441, 722, 774, 727, 1033, 929,
                                                2590, 151, 135, 162, 182, 208, 575, 171,
