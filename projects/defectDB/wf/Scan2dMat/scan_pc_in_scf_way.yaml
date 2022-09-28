@@ -1,5 +1,5 @@
 fireworks:
-  - fw: my_atomate_jyt.vasp.fireworks.ScanStaticFW
+  - fw: my_atomate_jyt.vasp.fireworks.fireworks.ScanStaticFW
     params:
       name: SCAN_scf
       force_gamma: True
@@ -14,7 +14,8 @@ fireworks:
           LCHARG: True
           LWAVE: True
           SIGMA: 0.05
-          METAGGA: R2Scan
+          METAGGA: Scan
+          KSPACING: 0.5
       vasptodb_kwargs:
         additional_fields:
           task_type: ScanStaticFW
@@ -22,17 +23,38 @@ fireworks:
         parse_eigenvalues: False
         parse_chgcar: False
 
-  - fw: my_atomate_jyt.vasp.fireworks.NonSCFFW
+#  - fw: atomate.vasp.fireworks.core.StaticFW
+#    params:
+#      name: PBE_scf
+#      vasp_input_set_params:
+#        user_incar_settings:
+#          ALGO: All
+#          ENCUT: 800
+#          ISPIN: 2
+#          LAECHG: False
+#          EDIFF: 1e-05
+#          ISMEAR: 0
+#          LCHARG: True
+#          LWAVE: True
+#          SIGMA: 0.05
+#      vasptodb_kwargs:
+#        additional_fields:
+#          task_type: PBEStaticFW
+#        parse_dos: False
+#        parse_eigenvalues: False
+#        parse_chgcar: False
+
+  - fw: my_atomate_jyt.vasp.fireworks.fireworks.NonSCFFW
     params:
       parents: 0
       name: SCAN_nscf
       mode: line
-      additional_files: ["WAVECAR"]
+      additional_files: [WAVECAR]
       input_set_overrides:
         other_params:
           user_incar_settings:
             ISTART: 1
-            ICHARG: 1
+            ICHARG: 0
             ALGO: All
             ENCUT: 800
             EDIFF: 1e-5
@@ -44,20 +66,21 @@ fireworks:
             ISMEAR: 0
             SIGMA: 0.05
             ISYM: 2
-            METAGGA: R2Scan
+            METAGGA: Scan
+            KSPACING: 0.5
 
-  - fw: atomate.vasp.fireworks.NonSCFFW
+  - fw: my_atomate_jyt.vasp.fireworks.fireworks.NonSCFFW
     params:
       name: SCAN_nscf
       parents: 0
       mode: uniform
-      additional_files: ["WAVECAR"]
+      additional_files: [WAVECAR]
       input_set_overrides:
         nedos: 0
         other_params:
           user_incar_settings:
             ISTART: 1
-            ICHARG: 1
+            ICHARG: 0
             ALGO: All
             ENCUT: 800
             EDIFF: 1e-5
@@ -68,7 +91,8 @@ fireworks:
             LVHAR: True
             ISMEAR: 0
             SIGMA: 0.05
-            METAGGA: R2Scan
+            METAGGA: Rcan
+            KSPACING: 0.5
 
   - fw: my_atomate_jyt.vasp.fireworks.pytopomat.IrvspFW
     params:

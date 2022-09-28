@@ -17,7 +17,7 @@ LPAD = LaunchPad.from_file(
 
 Rh = Structure.from_file("/home/tug03990/config/project/CO2_hydrogenation/H_ads/structures/"
                          "Rh_mp-74_conventional_standard.cif")
-slab_100 = SlabGenerator(Rh, [1, 1, 1], 10, 15, center_slab=True).get_slab()
+slab_100 = SlabGenerator(Rh, [1, 0, 0], 10, 15, center_slab=True).get_slab()
 
 H = Molecule(["H", "H"], [[0,0,0], [0.74, 0, 0]])
 

@@ -47,6 +47,7 @@ from pathlib import Path
 import pandas as pd
 
 from JPack_independent.projects.antisiteQubit.wf_defect import ZPLWF
+
 # from analysis.data_analysis import Defect
 
 MODULE_DIR = Path("__file__").resolve().parent
@@ -239,6 +240,229 @@ def hse_relax_pc():
                 os.path.expanduser("~"),
                 "config/project/HSE_triplets_from_Scan2dDefect/hse_pc/my_launchpad.yaml"))
         lpad.add_wf(wf)
+
+
+def grand_hse_defect(defect_choice="vacancies", impurity_on_nn=None, pyzfs_fw=True, irvsp_fw=True): #1e-4
+    fworker = "efrc" #"gpu_nersc"
+    defect_db_name = "C2DB_IR_vacancy_HSE"
+
+    col = get_db("C2DB_IR", "calc_data", port=12345).collection
+
+    wfs = []
+    geo_spec = None
+    pc_entries = [e for e in col.find(
+        {
+            "task_label": "hse line",
+            "nelements": {"$lte": 2},
+            "output.bandgap": {"$gte":1.0},
+            "sym_data.good_ir_info.species": {"$ne": []},
+        }
+    )]
+    for pc_entry in pc_entries[316:]: #345 pcs, index: 0-d344
+        print(f"-------{pc_entry['task_id']}"*10)
+        mx2 = pc_entry.copy()
+        pc = Structure.from_dict(mx2["output"]["structure"])
+        good_ir_info = mx2["sym_data"]["good_ir_info"]
+
+        scaling = find_scaling_for_2d_defect(pc, 15)[0]
+        area = scaling[0] * scaling[1]
+        if mx2["nsites"] == 2:
+            geo_spec = {area * 2: [20]}
+        if mx2["nsites"] == 3:
+            geo_spec = {area * 3: [20]}
+        if mx2["nsites"] == 4:
+            geo_spec = {area * 4: [20]}
+        if mx2["nsites"] == 6:
+            geo_spec = {area * 6: [20]}
+        if mx2["nsites"] == 8:
+            geo_spec = {area * 8: [20]}
+
+        defects = ChargedDefectsStructures(pc, antisites_flag=True).defects
+
+        # substitutions or vacancies!
+        site_idxs = {}
+        defect_type = defect_choice
+        for de_idx, defect in enumerate(defects[defect_type]):
+            for specie, site_sym, wy, site_idx in zip(*good_ir_info.values()):
+                if defect["unique_site"] == pc[site_idx]:
+                    site_idxs[de_idx] = [pc[site_idx], specie, site_sym, wy, site_idx, defect["name"]]
+
+        print(site_idxs)
+
+        for de_idx, defect_site in site_idxs.items():
+            for na, thicks in geo_spec.items():
+                for thick in thicks:
+                    for dtort in [0]:
+                        if not impurity_on_nn:
+                            impurity_on_nn = []
+                        try:
+                            gen_defect = GenDefect(
+                                pc, [defect_type, de_idx], na, thick, distort=dtort,
+                                sub_on_side=list(impurity_on_nn)
+                                )
+                        except Exception as e:
+                            print("error", type(e.__str__()))
+                            from monty.serialization import loadfn, dumpfn
+                            path = "/home/tug03990/scripts/JPack_independent/projects/defectDB"
+                            taskid_error = loadfn(f"{path}/wf/C2DB_IR_vacancy_HSE/error.json")
+                            print(taskid_error)
+                            taskid_error.update({
+                                str(mx2["task_id"]): {"pycdt_index": de_idx, "message": e.__str__()}})
+                            dumpfn(taskid_error, f"{path}/wf/C2DB_IR_vacancy_HSE/error.json", indent=4)
+                            continue
+
+
+                        # add charge state depending on nelect
+                        charge, nupdn, n_of_e = None, None, None
+                        if MPRelaxSet(gen_defect.defect_st).nelect % 2 == 1:
+                            charge = [1, 0, -1]
+                            nupdn = [-1, -1, -1]
+                            n_of_e = "odd"
+                            # if odd nelect, it used to be charge=[0]
+                        else:
+                            # continue
+                            charge = [0]
+                            nupdn = [-1]
+                            n_of_e = "even"
+
+
+                        def data_to_db():
+                            d = {}
+                            # defect data
+                            defect_data = gen_defect.defect_entry.copy()
+                            defect_data.update(
+                                {
+                                    "from_host_sym_data": {
+                                        "site": defect_site[0],
+                                        "specie": defect_site[1],
+                                        "site_sym": defect_site[2],
+                                        "wyckoff": defect_site[3],
+                                        "site_idx": defect_site[4],
+                                    }
+                                }
+                            )
+                            d.update(
+                                {
+                                    "NN": gen_defect.NN,
+                                    "NN_dist": gen_defect.nn_dist,
+                                    "site_info": gen_defect.site_info,
+                                    "perturbed": gen_defect.distort,
+                                    "defect_entry": defect_data,
+                                    "defect_name": defect_data["name"],
+                                }
+                            )
+                            # host data
+                            host_data = {
+                                "pc_from": "C2DB_IR/calc_data/{}".format(mx2["task_id"]),
+                                "pc_from_id": mx2["task_id"],
+                                "host_info": {"sym_data": mx2["sym_data"]},
+                            }
+
+                            hse_bs_output = mx2["output"].copy()
+                            for remove in ["structure", "density", "energy", "energy_per_atom",
+                                           "forces", "stress", "spacegroup"]:
+                                hse_bs_output.pop(remove)
+                            band_edges = mx2.get("band_edges", None)
+                            hse_bs_output.update({"band_edges": band_edges})
+                            host_data["host_info"].update({"c2db_ir_hse_line": hse_bs_output})
+
+                            d.update(host_data)
+                            return d
+
+                        wf = get_wf_full_hse(
+                            structure=gen_defect.defect_st,
+                            task_arg=dict(lcharg=True),
+                            charge_states=charge,
+                            gamma_only=False,
+                            gamma_mesh=True,
+                            nupdowns=nupdn,
+                            task="hse_relax-hse_scf",
+                            vasptodb={},
+                            wf_addition_name="{}:{}".format(na, thick),
+                        )
+
+                        d = data_to_db()
+                        wf = add_additional_fields_to_taskdocs(wf, d, task_name_constraint="ToDb")
+                        wf = add_tags(
+                            wf, [{
+                                     "pc_from_id": d["pc_from_id"],
+                                     "defect_name": d["defect_name"],
+                                     "n_of_e": n_of_e,
+                                     "charge_state": charge
+                                 }]
+                            )
+
+                        if irvsp_fw:
+                            HSE_fws = wf.fws.copy()
+                            for idx, fw in enumerate(HSE_fws):
+                                if "HSE_scf" in fw.name:
+                                    irvsp_fw = IrvspFW(structure=gen_defect.defect_st,
+                                                       kpt_mode="single_kpt", symprec=0.001,
+                                                       irvsptodb_kwargs=dict(collection_name="ir_data"),
+                                                       name="irvsp",
+                                                       parents=fw)
+                                    HSE_fws.append(irvsp_fw)
+                            wf = Workflow(HSE_fws, name=wf.name)
+                            wf = set_execution_options(wf, category="ir_data", fworker_name=fworker,
+                                                       fw_name_constraint="irvsp")
+
+                        if pyzfs_fw:
+                            HSE_fws = wf.fws.copy()
+                            for idx, fw in enumerate(HSE_fws):
+                                if "HSE_scf" in fw.name:
+                                    pyzfs_fw = PyzfsFW(structure=gen_defect.defect_st,
+                                                       parents=fw,
+                                                       pyzfstodb_kwargs=dict(collection_name="zfs_data"))
+                                    HSE_fws.append(pyzfs_fw)
+                            wf = Workflow(HSE_fws, name=wf.name)
+                            wf = set_execution_options(wf, category="zfs_data", fworker_name=fworker,
+                                                       fw_name_constraint="pyzfs")
+
+                        wf = bash_scp_files(
+                            wf,
+                            dest=f"/mnt/sdc/tsai/Research/projects/{defect_db_name}/calc_data/",
+                            port=12348,
+                            task_name_constraint="RunVasp"
+                        )
+                        wf = set_execution_options(wf, category="calc_data", fw_name_constraint="HSE_relax",
+                                                   fworker_name=fworker)
+                        wf = set_execution_options(wf, category="calc_data", fw_name_constraint="HSE_scf",
+                                                   fworker_name=fworker)
+
+
+                        if irvsp_fw:
+                            wf = bash_scp_files(
+                                wf,
+                                dest=f"/mnt/sdc/tsai/Research/projects/{defect_db_name}/ir_data/",
+                                port=12348,
+                                task_name_constraint="ToDb",
+                                fw_name_constraint="irvsp"
+                            )
+                            wf = clean_up_files(wf, files=["WAVECAR*", "vasprun.xml*"], fw_name_constraint="irvsp",
+                                                task_name_constraint="ToDb")
+
+
+                        if pyzfs_fw:
+                            wf = bash_scp_files(
+                                wf,
+                                dest=f"/mnt/sdc/tsai/Research/projects/{defect_db_name}/zfs_data/",
+                                port=12348,
+                                task_name_constraint="ToDb",
+                                fw_name_constraint="pyzfs"
+                            )
+                            wf = clean_up_files(wf, files=["WAVECAR*", "vasprun.xml*"], fw_name_constraint="pyzfs",
+                                                task_name_constraint="ToDb")
+
+                        wf = add_modify_incar(wf, {"incar_update": {"SIGMA": 0.01, "EDIFF": 1E-4}},
+                                              fw_name_constraint="HSE_relax")
+                        wf = add_modify_incar(wf, {"incar_update": {"SIGMA": 0.01}}, fw_name_constraint="HSE_scf")
+                        wf = add_modify_incar(wf)
+
+                        wf.name = f"{pc_entry['task_id']}:{gen_defect.defect_entry['name']}:" \
+                                  f"{':'.join(wf.name.split(':')[3:5])}"
+                        print(wf.name)
+                        wfs.append(wf)
+    return wfs
 
 
 def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
@@ -440,26 +664,36 @@ def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
     return wfs
 
 def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvsp_fw=True): #1e-4
+
+
     def antisite_TMD_pc():
-        # 3083: S-W, 3091: Se-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
-        db_name, col_name = "owls", "mx2_antisite_pc"
-        col = get_db(db_name, col_name, port=12345).collection
-        # taskids = [3091, 3083, 3093, 3097, 3094, 3102]
-        taskids = [3093]
-        mx2s = col.find({"task_id":{"$in": taskids}})
-        pcs = [Structure.from_dict(mx2["output"]["structure"]) for mx2 in mx2s]
+        """
+        1. HSE-relax pc: db_name, col_name = "owls", "mx2_antisite_pc" (in our Nature comm.)
+        * taskids: 3083: Se-W, 3091: S-W, 3093: Te-W, 3097:Mo-S, 3094: Mo-Se, 3102:Mo-Te
+
+        2. C2DB PBE pc:  db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
+        * uid: "MoS2-MoS2-NM", "MoSe2-MoS2-NM", "MoTe2-MoS2-NM", "WS2-MoTe2-NM", "WSe2-MoTe2-NM", "WTe2-MoS2-NM",
+        :return:
+        """
+        db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
+
+        col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
+        taskids = ["WTe2-MoS2-NM"]
+        mx2s = col.find({"uid":{"$in": taskids}})
+        pcs = [Structure.from_dict(mx2["structure"]) for mx2 in mx2s]
         defect_inputs = {"pc": [], "defect_name": [], "charge": [], "defect_type": [], "scan_taskids":[], "db_name":
-            [], "col_name": [], "taskid": []}
+            [], "col_name": [], "taskid": [], "spin": []}
         for pc, taskid in zip(pcs, taskids):
             cation, anion = find_cation_anion(pc)
             defect_inputs["pc"].append(pc)
             defect_inputs["defect_name"].append("as_1_{}_on_{}".format(cation, anion))
-            defect_inputs["charge"].append(0)
             defect_inputs["defect_type"].append("antisite")
             defect_inputs["scan_taskids"].append(None)
             defect_inputs["db_name"].append(db_name)
             defect_inputs["col_name"].append(col_name)
             defect_inputs["taskid"].append(taskid)
+            defect_inputs["charge"].append(0)
+            defect_inputs["spin"].append(0)
             df = pd.DataFrame(defect_inputs)
         return df
 
@@ -496,6 +730,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
         return df, db_name, col_name
 
 
+
     # defect_df = IOTools(cwd=INPUT_PATH, excel_file="defect_2021-11-18").read_excel()
     # triplet_df = defect_df.loc[(defect_df["mag"] == 2), ["uid", "charge", "defect_name", "defect_type", "task_id"]]
     # triplet_df = triplet_df.iloc[24:34, :]
@@ -510,10 +745,10 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
     #                                                  ):
     pc_df = antisite_TMD_pc()
     wfs = []
-    for pc, charge, defect_name, defect_type, scan2dDefect_taskid, db_name, col_name, pc_taskid in zip(
-            pc_df["pc"], pc_df["charge"], pc_df["defect_name"], pc_df["defect_type"], pc_df["scan_taskids"],
-            pc_df["db_name"], pc_df["col_name"], pc_df["taskid"]):
-
+    for pc, charge, spin, defect_name, defect_type, scan2dDefect_taskid, db_name, col_name, pc_taskid in zip(
+            pc_df["pc"], pc_df["charge"], pc_df["spin"], pc_df["defect_name"], pc_df["defect_type"],
+            pc_df["scan_taskids"], pc_df["db_name"], pc_df["col_name"], pc_df["taskid"]):
+        print(f"@@@@@@@@@@@@{defect_name} {charge} {spin}")
         scaling = find_scaling_for_2d_defect(pc, 15)[0]
         area = scaling[0]*scaling[1]
         geo_spec = {area*pc.num_sites: [20]}
@@ -547,7 +782,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
                         charge_states=[charge],
                         gamma_only=False,
                         gamma_mesh=True,
-                        nupdowns=[2],
+                        nupdowns=[spin],
                         task="hse_relax-hse_scf",
                         vasptodb={
                             "category": category, "NN": gen_defect.NN,
@@ -1229,6 +1464,18 @@ def transition_level_wf(category="charge_state"):
 
 
 def main():
+    def run_grand_hse_defect():
+        lpad = LaunchPad.from_file(
+            os.path.join(
+                os.path.expanduser("~"),
+                "config/project/C2DB_IR_vacancy_HSE/calc_data/my_launchpad.yaml"
+            )
+        )
+        wfs = grand_hse_defect()
+        for idx, wf in enumerate(wfs):
+            lpad.add_wf(wf)
+            print(idx, wf.name, wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
+
     def run_binary_scan_defect():
         lpad = LaunchPad.from_file(
             os.path.join(
@@ -1252,35 +1499,39 @@ def main():
                 "config/project/HSE_triplets_from_Scan2dDefect/calc_data/my_launchpad.yaml"))
         wfs = binary_triplet_HSE_wf(irvsp_fw=True)
         for idx, wf in enumerate(wfs[:1]):
-            wf = set_execution_options(wf, fworker_name="efrc")
+            wf = set_execution_options(wf, fworker_name="gpu_nersc")
             wf = preserve_fworker(wf)
 
-            wte2_magmom = [0.006, 0.0, 0.001, -0.0, -0.001, 0.0, -0.002, -0.0, -0.001,
-                           0.001, -0.002, 0.0, -0.0, -0.0, 0.0, -0.0, -0.001, 0.0, -0.002,
-                           0.006, 0.001, -0.0, -0.002, 0.001, 0.056, -0.0, -0.0, -0.001,
-                           0.005, 0.005, 0.006, -0.002, 0.0, -0.003, -0.001, -0.002,  -0.0, 0.0, 0.0, -0.0, -0.001,
-                           -0.001, -0.0, -0.002, -0.0, 0.001, -0.0, -0.002, 0.006,  -0.135, -0.004, -0.004, -0.012,
-                           0.192, -0.213, -0.142, 0.046, 0.004, 0.047, 0.045, 0.207,  0.018, -0.002, -0.004, 0.003,
-                           -0.012, -0.001, -0.002, -0.002, 0.044, -0.003, 0.014, -0.001, 0.018, 1.224]
-            mote2_magmom = [-0.001, 0.003, 0.0, 0.004, 0.002, 0.008, -0.003, 0.001, -0.005, 0.0,  -0.001, 0.001,
-                            0.001, 0.001, 0.002, -0.0, 0.001, 0.0, -0.003, -0.001, -0.007,  -0.0, -0.0, 0.009, 0.075,
-                            0.007, 0.002, 0.0, -0.003, -0.003, 0.007, -0.003, 0.001, -0.003,  0.0, -0.001, -0.0,
-                            0.001, 0.001, 0.002, -0.001, 0.001, -0.0, -0.003, 0.006, -0.007,  -0.0, -0.0, 0.006,
-                            -0.427, 0.427, -0.032, -0.005, 0.093, -0.218, -0.446, 0.024,  -0.012, 0.031, 0.026,
-                            0.135, 0.067, -0.002, -0.001, -0.012, -0.008, -0.021, -0.004,  -0.002, 0.019, -0.028,
-                            0.009, -0.017, 0.07, 1.843]
+            # wte2_magmom = [0.006, 0.0, 0.001, -0.0, -0.001, 0.0, -0.002, -0.0, -0.001,
+            #                0.001, -0.002, 0.0, -0.0, -0.0, 0.0, -0.0, -0.001, 0.0, -0.002,
+            #                0.006, 0.001, -0.0, -0.002, 0.001, 0.056, -0.0, -0.0, -0.001,
+            #                0.005, 0.005, 0.006, -0.002, 0.0, -0.003, -0.001, -0.002,  -0.0, 0.0, 0.0, -0.0, -0.001,
+            #                -0.001, -0.0, -0.002, -0.0, 0.001, -0.0, -0.002, 0.006,  -0.135, -0.004, -0.004, -0.012,
+            #                0.192, -0.213, -0.142, 0.046, 0.004, 0.047, 0.045, 0.207,  0.018, -0.002, -0.004, 0.003,
+            #                -0.012, -0.001, -0.002, -0.002, 0.044, -0.003, 0.014, -0.001, 0.018, 1.224]
+            # mote2_magmom = [-0.001, 0.003, 0.0, 0.004, 0.002, 0.008, -0.003, 0.001, -0.005, 0.0,  -0.001, 0.001,
+            #                 0.001, 0.001, 0.002, -0.0, 0.001, 0.0, -0.003, -0.001, -0.007,  -0.0, -0.0, 0.009, 0.075,
+            #                 0.007, 0.002, 0.0, -0.003, -0.003, 0.007, -0.003, 0.001, -0.003,  0.0, -0.001, -0.0,
+            #                 0.001, 0.001, 0.002, -0.001, 0.001, -0.0, -0.003, 0.006, -0.007,  -0.0, -0.0, 0.006,
+            #                 -0.427, 0.427, -0.032, -0.005, 0.093, -0.218, -0.446, 0.024,  -0.012, 0.031, 0.026,
+            #                 0.135, 0.067, -0.002, -0.001, -0.012, -0.008, -0.021, -0.004,  -0.002, 0.019, -0.028,
+            #                 0.009, -0.017, 0.07, 1.843]
 
 
 
-            wf = add_modify_incar(wf, {"incar_update": {"MAGMOM": wte2_magmom}})
+            # wf = add_modify_incar(wf, {"incar_update": {"MAGMOM": wte2_magmom}})
             lpad.add_wf(wf)
             print(idx, wf.name)
 
     def run_cdft():
         # qubit_df = IOTools(excel_file="hse_screened_qubit_2021-11-18", cwd=INPUT_PATH).read_excel()
-        qubit_df = IOTools(excel_file="wte2_mote2", cwd=INPUT_PATH).read_excel()
-        fworker = "efrc"
-        taskids = qubit_df.loc[qubit_df["fworker"]==fworker, "task_id"]
+        qubit_df = IOTools(excel_file="pure_c2db_TMD_2022-07-08", cwd=INPUT_PATH).read_excel()
+        qubit_df = qubit_df[qubit_df["task_id"].isin([2739])]
+        print(qubit_df.head())
+
+        fworker = "gpu_nersc"
+        taskids = qubit_df.loc[:, "task_id"]
+        print(f"taskids: {taskids}")
         for taskid in taskids[:]:
             print("{}=".format(taskid)*20)
             nbands = qubit_df.loc[qubit_df["task_id"] == taskid, "nbands"].iloc[0]
@@ -1431,7 +1682,7 @@ def main():
             lpad.add_wf(wf)
         print(len(wfs))
 
-    run_transition_levels()
+    run_grand_hse_defect()
 
 
 if __name__ == '__main__':

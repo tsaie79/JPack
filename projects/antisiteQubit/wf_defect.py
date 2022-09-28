@@ -1661,7 +1661,6 @@ class AnalyzeDefectStates:
         defect_db = get_db("single_photon_emitter", "soc_standard_defect", port=1234)
         # host_db = get_db("Scan2dMat", "calc_data", port=1236)
 
-
         tk_id = 467
         # pc_from_id = defect_db.collection.find_one({"task_id": tk_id})["pc_from_id"]
         # c2db_uid = host_db.collection.find_one({"task_id": pc_from_id})["c2db_info"]["uid"]
@@ -1679,11 +1678,12 @@ class AnalyzeDefectStates:
         )
         return tot, proj, d_df
 # tot, proj, d_df = AnalyzeDefectStates.get_defect_state()
+
 def main():
 
-    cluster = Cluster(Structure.from_file("input/cluster/structure/pristine_cluster_2021-11-23.vasp"))
-    cluster.wf()
-    # DefectWF.MX2_formation_energy()
+    # cluster = Cluster(Structure.from_file("input/cluster/structure/pristine_cluster_2021-11-23.vasp"))
+    # cluster.wf()
+    DefectWF.MX2_formation_energy()
     # FormationEnergy.formation("M_rich")
     # MoveZ().get_sheet()
     # COHP.analysis()
@@ -1691,5 +1691,4 @@ def main():
 if __name__ == '__main__':
     print(os.getcwd())
     main()
-
 

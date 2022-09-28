@@ -391,12 +391,15 @@ class GenerateDefectTable(BackProcess):
             print(e["task_id"])
             c2db_uid = e["pc_from"].split("/")[-1] if not read_c2db_uid_key else e["c2db_uid"]
             e_from_host = C2DB_IR_calc_data.collection.find_one({"c2db_uid": c2db_uid, "task_label": "hse line"})
-            host_c2db_info = e_from_host["c2db_info"]
+            if e_from_host is None:
+                print("No host data found for {}".format(e["task_id"]))
+                continue
+            host_c2db_info = e_from_host.get("c2db_info", {})
             for field in ["spacegroup", "pmg_point_gp", "irreps", "formula"]:
                 if host_c2db_info.get(field):
                     host_c2db_info.pop(field)
 
-            host_band_edges = e_from_host["band_edges"]
+            host_band_edges = e_from_host.get("band_edges", {})
             for field in ["vbm_up_proj_on_el", "vbm_up_orbital_proj_on_el",
                           "vbm_down_proj_on_el", "vbm_down_orbital_proj_on_el",
                           "cbm_up_proj_on_el", "cbm_up_orbital_proj_on_el",
@@ -494,6 +497,7 @@ class GenerateDefectTable(BackProcess):
             data.append(info)
 
         self.defect_df = pd.DataFrame(data)
+        self.defect_df["C2DB_uid"] = self.defect_df["uid"]
         self.defect_df.fillna("None", inplace=True)
         self.defect_df.replace({"up_tran_en": "None"}, 0, inplace=True)
         self.defect_df.replace({"dn_tran_en": "None"}, 0, inplace=True)
@@ -507,6 +511,9 @@ class GenerateDefectTable(BackProcess):
         self.add_transition_wavevlength()
         self.add_cdft_occupations()
         self.add_hse_fworker()
+        self.add_singlet_triplet_en_diff()
+        self.add_defect_symmetry()
+        self.add_LUDL_HODL_info()
         if excel_name:
             self.df_to_excel(excel_name=excel_name)
 
@@ -549,8 +556,10 @@ def main():
     # define a function to generate a table of defects
     def get_defect_table():
         from analysis.analysis_api import hse_qubit_df
-        # antisite_tmd = {"pc_from": {"$regex": "owls"}, "task_label": "HSE_scf",
-        #                 "chemsys": {"$in": ["S-W", "Se-W", "Te-W", "Mo-S", "Mo-Se", "Mo-Te"]}}
+        # antisite_tmd = {"pc_from": {"$regex": "2dMat_from_cmr_fysik"}, "task_label": "HSE_scf",
+        #                 "chemsys": {"$in": ["S-W", "Se-W", "Te-W", "Mo-S", "Mo-Se", "Mo-Te"]},
+        #                 "nupdown_set": 2
+        # }
 
         # hse_qubit = hse_qubit_df.copy()
         # taskid_list = hse_qubit["task_id"].to_list()
@@ -558,17 +567,19 @@ def main():
         #     taskid_list.remove(i)
         # print(taskid_list)
 
-        tkids = defects_36_groups_df["task_id"].to_list()
+        # tkids = defects_36_groups_df["task_id"].to_list()
 
-        # filter = antisite_tmd
-        # DataPrepDefect.cp_symdata_bandedges(filter, read_c2db_uid_key=True)
-        # DataPrepDefect.is_site_sym_uniform(filter)
-        # DataPrepDefect.cp_site_oxi_state(filter, read_c2db_uid_key=True)
+        def main(filter):
+            DataPrepDefect.cp_symdata_bandedges(filter, read_c2db_uid_key=False)
+            DataPrepDefect.is_site_sym_uniform(filter)
+            DataPrepDefect.cp_site_oxi_state(filter, read_c2db_uid_key=False)
 
-        test = GenerateDefectTable({"task_id": {"$in": tkids}})
-        test.get_defect_df_v2_hse(read_c2db_uid_key=False)
-        test.backprocess()
-        test.df_to_excel(excel_name="defects_36_groups")
+            defect_table_gen = GenerateDefectTable(filter)
+            defect_table_gen.get_defect_df_v2_hse(read_c2db_uid_key=False)
+            defect_table_gen.backprocess()
+            defect_table_gen.df_to_excel(excel_name="hse_qubit")
+
+        main({"pc_from": {"$regex": "2dMat_from_cmr_fysik"}, "task_label": "HSE_scf", "nupdown_set": 2,})
 
     def get_defect_table_scan():
         table1_df_failed = table1_df.loc[(table1_df["up_tran_en"]==0) & (table1_df["dn_tran_en"]==0)]
@@ -590,7 +601,7 @@ def main():
         IOTools(pandas_df=zpl.zpl_df, cwd=os.path.join(p_path, "analysis/output/xlsx")).to_excel(
             "test_zpl_df")
 
-    update_c2db_ir_calc_data()
+    get_defect_table()
 
 if __name__ == '__main__':
     main()

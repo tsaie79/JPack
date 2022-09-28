@@ -2,19 +2,32 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c03654ef-b62d-4598-9a7b-9ab89ff536d2" name="Changes" comment="update">
-      <change afterPath="$PROJECT_DIR$/../antisiteQubit/input/cluster/structure/pristine_cluster_2021-11-23.vasp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../defect_qubit_in_36_group/data_preparation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../defect_qubit_in_36_group/wf.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../twisted/anoj_wf.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../twisted/structures/POSCAR_4.0.vasp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../antisiteQubit/wf_defect.py" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/wf_defect.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../co2_hydrogenation/analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/../co2_hydrogenation/analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../co2_hydrogenation/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/../co2_hydrogenation/wf.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/defectDB.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/defectDB.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis/data_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/analysis/data_analysis_2021-11-18.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis_2021-11-18.ipynb" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis/input/defect_2021-11-03.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/wf/job_management.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/job_management.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new_entry_prep/data_preparation.py" beforeDir="false" afterPath="$PROJECT_DIR$/new_entry_prep/data_preparation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wf/Scan2dMat/scan_pc_in_scf_way.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/wf/Scan2dMat/scan_pc_in_scf_way.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/wf/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/wf.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../qubit_sensor/analysis/data_analysis.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../qubit_sensor/analysis/data_analysis.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../twisted/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/../twisted/wf.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="DjangoConsoleOptions" custom-start-script="import sys; print('Python %s on %s' % (sys.version, sys.platform))&#10;import django; print('Django %s' % django.get_version())&#10;sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])&#10;if 'setup' in dir(django): django.setup()&#10;import django_manage_shell; django_manage_shell.run(PROJECT_ROOT)">
+    <option name="myCustomStartScript" value="import sys; print('Python %s on %s' % (sys.version, sys.platform))&#10;import django; print('Django %s' % django.get_version())&#10;sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])&#10;if 'setup' in dir(django): django.setup()&#10;import django_manage_shell; django_manage_shell.run(PROJECT_ROOT)" />
   </component>
   <component name="FlaskConsoleOptions" custom-start-script="import sys&#10;sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])&#10;from flask.cli import ScriptInfo&#10;locals().update(ScriptInfo(create_app=None).load_app().make_shell_context())&#10;print(&quot;Python %s on %s\nApp: %s [%s]\nInstance: %s&quot; % (sys.version, sys.platform, app.import_name, app.env, app.instance_path))">
     <envs>
@@ -39,19 +52,21 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/wf/Scan2dDefect/bg_gte_1_and_inhomo_07272021" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/wf/Scan2dDefect/scan_defect.yaml" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/symBaseBinaryQubit/tools.py" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/searching_triplet/screening_defects.py" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/searching_triplet/screening_hosts.py" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/electron_counting/analysis.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/analysis_backup.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/defect_db.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/electron_counting/analysis.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/searching_triplet/screening_defects.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/searching_triplet/screening_hosts.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/symBaseBinaryQubit/manuscript.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/symBaseBinaryQubit/tools.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/wf/Scan2dDefect/bg_gte_1_and_inhomo_07272021" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/wf/Scan2dDefect/scan_defect.yaml" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/wf/Scan2dMat/scan_pc.yaml" root0="SKIP_INSPECTION" />
-    <setting file="file://$USER_HOME$/Library/Caches/JetBrains/PyCharm2021.1/remote_sources/-49146549/-1831604395/qubitPack/qc_searching/analysis/main.py" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/wf/job_management.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/wf/wf.py" root0="SKIP_INSPECTION" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectId" id="20eIb1ktV555gAoBox7sd6vqOrI" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
@@ -61,19 +76,22 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">
-    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
-    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="WebServerToolWindowFactoryState" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/analysis/input" />
-    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
-  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/jeng-yuantsai/anaconda3/envs/workflow/lib/python3.7/site-packages/JPack_independent/projects/defectDB/analysis/input&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
+  }
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/analysis/input" />
+      <recent name="$PROJECT_DIR$/new_entry_prep" />
+      <recent name="$PROJECT_DIR$/wf/Scan2dMat" />
       <recent name="$PROJECT_DIR$/analysis" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/wf" />
       <recent name="$PROJECT_DIR$/analysis/input" />
     </key>
   </component>
@@ -131,6 +149,70 @@
       <workItem from="1640833231287" duration="125414000" />
       <workItem from="1641780869103" duration="21740000" />
       <workItem from="1641860722421" duration="14507000" />
+      <workItem from="1641920166985" duration="57066000" />
+      <workItem from="1642119997222" duration="7506000" />
+      <workItem from="1642212747055" duration="174000" />
+      <workItem from="1642213034373" duration="80600000" />
+      <workItem from="1643318150205" duration="52773000" />
+      <workItem from="1643778392438" duration="24475000" />
+      <workItem from="1644422521971" duration="8755000" />
+      <workItem from="1644875526349" duration="26062000" />
+      <workItem from="1645241043309" duration="597000" />
+      <workItem from="1645295566828" duration="52453000" />
+      <workItem from="1645544602276" duration="20152000" />
+      <workItem from="1645681952738" duration="59297000" />
+      <workItem from="1647313952398" duration="659000" />
+      <workItem from="1647467148838" duration="2000" />
+      <workItem from="1647825716985" duration="13036000" />
+      <workItem from="1648005096190" duration="83575000" />
+      <workItem from="1648957388224" duration="28000" />
+      <workItem from="1648957436883" duration="16345000" />
+      <workItem from="1649048367525" duration="161776000" />
+      <workItem from="1649907582643" duration="64220000" />
+      <workItem from="1650382531527" duration="50000" />
+      <workItem from="1650382598969" duration="103633000" />
+      <workItem from="1650855679358" duration="136000" />
+      <workItem from="1650856944645" duration="116084000" />
+      <workItem from="1651460906771" duration="13000" />
+      <workItem from="1651460954234" duration="88369000" />
+      <workItem from="1652044119679" duration="77734000" />
+      <workItem from="1652641048142" duration="127000" />
+      <workItem from="1652641196251" duration="333000" />
+      <workItem from="1652641581200" duration="3436000" />
+      <workItem from="1652661019566" duration="30935000" />
+      <workItem from="1652891509002" duration="1002000" />
+      <workItem from="1652894304201" duration="3087000" />
+      <workItem from="1653016127985" duration="3682000" />
+      <workItem from="1653022705620" duration="51513000" />
+      <workItem from="1653622477603" duration="15248000" />
+      <workItem from="1653940001757" duration="8574000" />
+      <workItem from="1653969627426" duration="13927000" />
+      <workItem from="1654148196157" duration="917000" />
+      <workItem from="1654192571212" duration="10230000" />
+      <workItem from="1654307395581" duration="12958000" />
+      <workItem from="1654623665407" duration="12724000" />
+      <workItem from="1655239308116" duration="593000" />
+      <workItem from="1655612828553" duration="31000" />
+      <workItem from="1656119061963" duration="359000" />
+      <workItem from="1656119493381" duration="4017000" />
+      <workItem from="1656128969168" duration="4139000" />
+      <workItem from="1656305623896" duration="621000" />
+      <workItem from="1656315416489" duration="110000" />
+      <workItem from="1656315573861" duration="8757000" />
+      <workItem from="1656582834988" duration="4205000" />
+      <workItem from="1656724289736" duration="15808000" />
+      <workItem from="1656818678726" duration="11775000" />
+      <workItem from="1657221066287" duration="21633000" />
+      <workItem from="1657382193417" duration="13643000" />
+      <workItem from="1658976368035" duration="5000" />
+      <workItem from="1660069107306" duration="2000" />
+      <workItem from="1660069118827" duration="52858000" />
+      <workItem from="1660664545482" duration="598000" />
+      <workItem from="1660850684068" duration="4622000" />
+      <workItem from="1662476920457" duration="601000" />
+      <workItem from="1662922762702" duration="1926000" />
+      <workItem from="1664246771976" duration="68000" />
+      <workItem from="1664246877019" duration="4716000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1636403040202</created>
@@ -230,7 +312,133 @@
       <option name="project" value="LOCAL" />
       <updated>1640225767361</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="add main api for analysis">
+      <created>1644991358492</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1644991358492</updated>
+    </task>
+    <task id="LOCAL-00016" summary="update">
+      <created>1644991452595</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1644991452595</updated>
+    </task>
+    <task id="LOCAL-00017" summary="update">
+      <created>1645404843685</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1645404843685</updated>
+    </task>
+    <task id="LOCAL-00018" summary="update">
+      <created>1645405295375</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1645405295375</updated>
+    </task>
+    <task id="LOCAL-00019" summary="update">
+      <created>1648841315166</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1648841315166</updated>
+    </task>
+    <task id="LOCAL-00020" summary="update">
+      <created>1648841367484</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1648841367484</updated>
+    </task>
+    <task id="LOCAL-00021" summary="update">
+      <created>1648842293820</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1648842293820</updated>
+    </task>
+    <task id="LOCAL-00022" summary="update">
+      <created>1648842437745</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1648842437745</updated>
+    </task>
+    <task id="LOCAL-00023" summary="update">
+      <created>1648930671040</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1648930671040</updated>
+    </task>
+    <task id="LOCAL-00024" summary="update">
+      <created>1649699103022</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1649699103022</updated>
+    </task>
+    <task id="LOCAL-00025" summary="update">
+      <created>1649874095853</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1649874095853</updated>
+    </task>
+    <task id="LOCAL-00026" summary="update">
+      <created>1649874142185</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1649874142185</updated>
+    </task>
+    <task id="LOCAL-00027" summary="update">
+      <created>1649874187794</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1649874187794</updated>
+    </task>
+    <task id="LOCAL-00028" summary="update">
+      <created>1651461041821</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1651461041821</updated>
+    </task>
+    <task id="LOCAL-00029" summary="update">
+      <created>1655138093986</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1655138093986</updated>
+    </task>
+    <task id="LOCAL-00030" summary="update">
+      <created>1655138107189</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1655138107189</updated>
+    </task>
+    <task id="LOCAL-00031" summary="update">
+      <created>1655138115791</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1655138115791</updated>
+    </task>
+    <task id="LOCAL-00032" summary="update">
+      <created>1661195077001</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1661195077001</updated>
+    </task>
+    <option name="localTasksCounter" value="33" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -243,10 +451,10 @@
         </entry>
       </map>
     </option>
-    <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="test" />
+    <MESSAGE value="add main api for analysis" />
     <MESSAGE value="update" />
     <option name="LAST_COMMIT_MESSAGE" value="update" />
   </component>

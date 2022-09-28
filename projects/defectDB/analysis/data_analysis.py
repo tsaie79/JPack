@@ -25,7 +25,7 @@ SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", 
 SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
 SCAN2dIR = get_db("Scan2dDefect", "ir_data", port=12347)
 
-HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347, user="Jeng_ro")
+HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347, user="Jeng")
 HSEQubitIR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data-pbe_pc", port=12347)
 HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12347, user="Jeng_ro")
 
@@ -1118,6 +1118,29 @@ class BackProcess:
         defect_df["dn_tran_wavelength"] = defect_df.apply(lambda x: fun(x)[1], axis=1)
         defect_df.fillna("None", inplace=True)
 
+    def add_LUDL_HODL_info(self):
+        def dn_fun(x):
+            gap_tran_bottom_to_vbm = x["dn_tran_bottom"]
+            if x["level_gap"] != "None" and x["dn_tran_top"] != "None":
+                gap_tran_top_to_cbm = x["level_gap"] - x["dn_tran_top"]
+            else:
+                gap_tran_top_to_cbm = "None"
+            return gap_tran_bottom_to_vbm, gap_tran_top_to_cbm
+
+        def up_fun(x):
+            gap_tran_bottom_to_vbm = x["up_tran_bottom"]
+            if x["level_gap"] != "None" and x["up_tran_top"] != "None":
+                gap_tran_top_to_cbm = x["level_gap"] - x["up_tran_top"]
+            else:
+                gap_tran_top_to_cbm = "None"
+            return gap_tran_bottom_to_vbm, gap_tran_top_to_cbm
+
+        df = self.input_df
+        df["up_tran_bottom_to_vbm"] = df.apply(lambda x: up_fun(x)[0], axis=1)
+        df["up_tran_top_to_cbm"] = df.apply(lambda x: up_fun(x)[1], axis=1)
+        df["dn_tran_bottom_to_vbm"] = df.apply(lambda x: dn_fun(x)[0], axis=1)
+        df["dn_tran_top_to_cbm"] = df.apply(lambda x: dn_fun(x)[1], axis=1)
+
     def add_hse_fworker(self):
         db = HSEQubitDefect
         def fun(x):
@@ -1138,6 +1161,19 @@ class BackProcess:
         defect_df["fworker"] = defect_df.apply(lambda x: fun(x), axis=1)
         defect_df.fillna("None", inplace=True)
         return defect_df
+
+    def add_singlet_triplet_en_diff(self):
+        from JPack_independent.projects.defectDB.analysis.analysis_api import DefectAnalysis
+        da = DefectAnalysis(self.input_df)
+        da.get_singlet_triplet_en_diff()
+        self.input_df = self.input_df.merge(
+            da.singlet_df, on=["C2DB_uid", "defect_name", "charge", "task_id"], how="left")
+
+    def add_defect_symmetry(self):
+        from JPack_independent.projects.defectDB.analysis.analysis_api import DefectAnalysis
+        da = DefectAnalysis(self.input_df)
+        da.get_defect_symmetry(self.input_df)
+        self.input_df = self.input_df.merge(da.defect_symmetry_df, on=["task_id"], how="left")
 
     def add_cdft_occupations(self):
         def fun(x):
@@ -1837,7 +1873,7 @@ class TransitionLevels:
 
             fig, ax = plt.subplots(figsize=(12,11), dpi=300)
             fig_y_height = 1, 1.5
-            font_size = 7.25
+            font_size = 15 #7.25
             vbm_lim, cbm_lim = tls_df["vbm"].min(), tls_df["cbm"].max()
             ax.set_ylim(vbm_lim-fig_y_height[0], cbm_lim+fig_y_height[1])
 
@@ -1892,16 +1928,15 @@ class TransitionLevels:
                 tick.set_fontsize(15)
 
             ax.tick_params(axis="x", bottom=False, labelbottom=True)
-            ax.tick_params(axis="y", right=False, which="both")
+            ax.tick_params(axis="y", right=False, which="both", length=5, width=1)
 
 
-            ax.set_xticks(np.arange(0, len(tls_df.groupby(["prototype", "chemsys", "defect_name"]))*5, 5))
-
-            ax.set_xticklabels(defect_labels, fontdict={"fontsize": 10}, rotation=0)
+            ax.set_xticks(np.arange(0, len(tls_df.groupby(["prototype", "chemsys", "defect_name"]))*5, 5), )
+            ax.set_xticklabels(defect_labels, fontdict={"fontsize": 20}, rotation=270)
 
             # remove minor and major xticks
             ax.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=True)
-            ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=15)
+            ax.set_ylabel("Energy relative to vacuum (eV)", fontsize=20)
 
             return fig, ax
 
@@ -1972,4 +2007,5 @@ if __name__ == '__main__':
 
     # a, b, c, d, e = Tools.extract_defect_levels_v2_hse(2590, localisation=0.2)
     a, b, c, d, e = Tools.extract_defect_levels_v2(89, localisation=0.1)
+
 
