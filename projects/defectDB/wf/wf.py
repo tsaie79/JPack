@@ -242,9 +242,9 @@ def hse_relax_pc():
         lpad.add_wf(wf)
 
 
-def grand_hse_defect(defect_choice="vacancies", impurity_on_nn=None, pyzfs_fw=True, irvsp_fw=True): #1e-4
+def grand_hse_defect(defect_choice="substitutions", impurity_on_nn=None, pyzfs_fw=True, irvsp_fw=True): #1e-4
     fworker = "efrc" #"gpu_nersc"
-    defect_db_name = "C2DB_IR_vacancy_HSE"
+    defect_db_name = "C2DB_IR_antisite_HSE" #"C2DB_IR_vacancy_HSE"
 
     col = get_db("C2DB_IR", "calc_data", port=12345).collection
 
@@ -304,11 +304,11 @@ def grand_hse_defect(defect_choice="vacancies", impurity_on_nn=None, pyzfs_fw=Tr
                             print("error", type(e.__str__()))
                             from monty.serialization import loadfn, dumpfn
                             path = "/home/tug03990/scripts/JPack_independent/projects/defectDB"
-                            taskid_error = loadfn(f"{path}/wf/C2DB_IR_vacancy_HSE/error.json")
+                            taskid_error = loadfn(f"{path}/wf/{defect_db_name}/error.json")
                             print(taskid_error)
                             taskid_error.update({
                                 str(mx2["task_id"]): {"pycdt_index": de_idx, "message": e.__str__()}})
-                            dumpfn(taskid_error, f"{path}/wf/C2DB_IR_vacancy_HSE/error.json", indent=4)
+                            dumpfn(taskid_error, f"{path}/wf/{defect_db_name}/error.json", indent=4)
                             continue
 
 
