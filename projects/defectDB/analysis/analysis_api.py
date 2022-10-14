@@ -2877,32 +2877,32 @@ class DefectAnalysis(SheetCollection):
 
     def get_IPR(self, df=None):
         df = df.copy()
-        ipr_df = {"task_id": [], "level_dn_ipr": [], "level_up_ipr": []}
+        ipr_df = {"task_id": [], "dn_in_gap_ipr": [], "up_in_gap_ipr": []}
         for taskid in df.task_id:
             print("=="*10, taskid, "=="*10)
             ipr_df["task_id"].append(taskid)
             entry = SCAN2dDefect.collection.find_one({"task_id": taskid})
             up_ipr = entry["IPR"]["up"]["ipr"]
             dn_ipr = entry["IPR"]["down"]["ipr"]
-            level_dn = df.loc[df.task_id==taskid, "level_dn_index"].iloc[0]
-            level_up = df.loc[df.task_id==taskid, "level_up_index"].iloc[0]
+            level_dn = df.loc[df.task_id==taskid, "dn_in_gap_band_index"].iloc[0]
+            level_up = df.loc[df.task_id==taskid, "up_in_gap_band_index"].iloc[0]
             if level_dn != ():
-                print("level_dn_index", level_dn)
+                print("dn_in_gap_band_index", level_dn)
                 level_dn_ipr = []
                 for level in level_dn:
                     level_dn_ipr.append(dn_ipr[level-1])
                     # add level_dn_ipr to "dn_ipr" of df
-                ipr_df["level_dn_ipr"].append(tuple(level_dn_ipr))
+                ipr_df["dn_in_gap_ipr"].append(tuple(level_dn_ipr))
             else:
-                ipr_df["level_dn_ipr"].append(())
+                ipr_df["dn_in_gap_ipr"].append(())
             if level_up != ():
-                print("level_up_index", level_up)
+                print("up_in_gap_band_index", level_up)
                 level_up_ipr = []
                 for level in level_up:
                     level_up_ipr.append(up_ipr[level-1])
-                ipr_df["level_up_ipr"].append(tuple(level_up_ipr))
+                ipr_df["up_in_gap_ipr"].append(tuple(level_up_ipr))
             else:
-                ipr_df["level_up_ipr"].append(())
+                ipr_df["up_in_gap_ipr"].append(())
         self.ipr_df = pd.DataFrame(ipr_df)
 
 class HostAnaylsis:
