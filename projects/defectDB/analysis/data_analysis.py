@@ -30,14 +30,13 @@ HSEQubitIR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data-pbe_pc", port=123
 HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12347, user="Jeng_ro")
 
 C2DB_IR = get_db("C2DB_IR", "calc_data", port=12345, user="Jeng_ro")
-
+C2DB_IR_vacancy_HSE = get_db("C2DB_IR_vacancy_HSE", "calc_data", port=12347, user="Jeng_ro")
 
 DB1_PATH = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
 
 input_path = "analysis/input"
 save_xlsx_path = "analysis/output/xlsx"
 save_plt_path = "analysis/output/plt"
-
 
 class Tools:
     @classmethod
@@ -1251,6 +1250,13 @@ class BackProcess:
             lambda x: fun(x)[0], axis=1)
         self.input_df["dn_TDM_input"] = self.input_df.loc[self.input_df["task_label"] == "CDFT-B-HSE_scf"].apply(
             lambda x: fun(x)[1], axis=1)
+
+    def add_IPR(self):
+        from JPack_independent.projects.defectDB.analysis.analysis_api import DefectAnalysis
+        da = DefectAnalysis(self.input_df)
+        da.get_IPR(self.input_df)
+        self.input_df = self.input_df.merge(da.ipr_df, on=["task_id"], how="left")
+
 
 class CDFT:
     def __init__(self):
