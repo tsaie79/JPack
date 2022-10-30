@@ -1257,6 +1257,18 @@ class BackProcess:
         da.get_IPR(self.input_df)
         self.input_df = self.input_df.merge(da.ipr_df, on=["task_id"], how="left")
 
+    def add_IPR_average(self):
+        def fun(x):
+            dn_in_gap_ipr = x["dn_in_gap_ipr"]
+            up_in_gap_ipr = x["up_in_gap_ipr"]
+            dn_in_gap_ipr_avg, up_in_gap_ipr_avg = 0, 0
+            if dn_in_gap_ipr != ():
+                dn_in_gap_ipr_avg = np.mean(dn_in_gap_ipr)
+            if up_in_gap_ipr != ():
+                up_in_gap_ipr_avg = np.mean(up_in_gap_ipr)
+            return up_in_gap_ipr_avg, dn_in_gap_ipr_avg
+        self.input_df["up_in_gap_ipr_avg"], self.input_df["dn_in_gap_ipr_avg"] = zip(*self.input_df.apply(fun, axis=1))
+
 
 class CDFT:
     def __init__(self):

@@ -1,3 +1,6 @@
+# from multiprocessing import set_start_method
+# set_start_method("spawn")
+
 import json
 import shutil
 import subprocess
@@ -242,10 +245,9 @@ def hse_relax_pc():
         lpad.add_wf(wf)
 
 
-def grand_hse_defect(defect_choice="substitutions", impurity_on_nn=None, pyzfs_fw=True, irvsp_fw=True): #1e-4
-    fworker = "efrc" #"gpu_nersc"
-    defect_db_name = "C2DB_IR_antisite_HSE" #"C2DB_IR_vacancy_HSE"
-
+def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE", fworker="gpu_nersc", defect_choice="substitutions",
+                     impurity_on_nn=None, pyzfs_fw=True, irvsp_fw=True):
+    #1e-4
     col = get_db("C2DB_IR", "calc_data", port=12345).collection
 
     wfs = []
@@ -258,7 +260,7 @@ def grand_hse_defect(defect_choice="substitutions", impurity_on_nn=None, pyzfs_f
             "sym_data.good_ir_info.species": {"$ne": []},
         }
     )]
-    for pc_entry in pc_entries[316:]: #345 pcs, index: 0-d344
+    for pc_entry in pc_entries[180:210]: #345 pcs, index: 0-344
         print(f"-------{pc_entry['task_id']}"*10)
         mx2 = pc_entry.copy()
         pc = Structure.from_dict(mx2["output"]["structure"])
@@ -303,12 +305,15 @@ def grand_hse_defect(defect_choice="substitutions", impurity_on_nn=None, pyzfs_f
                         except Exception as e:
                             print("error", type(e.__str__()))
                             from monty.serialization import loadfn, dumpfn
-                            path = "/home/tug03990/scripts/JPack_independent/projects/defectDB"
-                            taskid_error = loadfn(f"{path}/wf/{defect_db_name}/error.json")
-                            print(taskid_error)
+                            path = "/home/tug03990/config/project"
+                            if os.path.exists(f"{path}/{defect_db_name}/error.json"):
+                                taskid_error = loadfn(f"{path}/{defect_db_name}/error.json")
+                            else:
+                                taskid_error = {}
                             taskid_error.update({
                                 str(mx2["task_id"]): {"pycdt_index": de_idx, "message": e.__str__()}})
-                            dumpfn(taskid_error, f"{path}/wf/{defect_db_name}/error.json", indent=4)
+                            print(taskid_error)
+                            dumpfn(taskid_error, f"{path}/{defect_db_name}/error.json", indent=4)
                             continue
 
 
@@ -1065,6 +1070,29 @@ def transition_dipole_moment(input_cdft_df):
                                                   "dn_KS_TDM_rate": list(dn_atomic_rate)
                                               }}})
 
+def localization_by_IPR(entry):
+    db = get_db("C2DB_IR_vacancy_HSE", "calc_data", user="Jeng", password="qimin", port=12347)
+    # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng", password="qimin", port=12347)
+
+    taskid = entry["task_id"]
+    base_dir = "/mnt/sdc/tsai/Research/projects/C2DB_IR_vacancy_HSE/calc_data/"
+    # base_dir = "/mnt/sdc/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc"
+    dir_name = os.path.join(base_dir, entry["dir_name"].split("/")[-1])
+
+    print(taskid, dir_name)
+    os.chdir(dir_name)
+    os.makedirs("IPR", exist_ok=True)
+    shutil.copyfile("WAVECAR.gz", "IPR/WAVECAR.gz")
+    try:
+        x = subprocess.check_output(["gunzip", "IPR/WAVECAR.gz"], input=b"Y")
+    except Exception as er:
+        pass
+    ipr = Ipr("IPR/WAVECAR")
+    shutil.rmtree("IPR")
+    ipr_all_ks_dic = ipr.get_ipr_all_ks()
+    db.collection.update_one({"task_id": taskid}, {"$set": {"IPR": ipr_all_ks_dic}})
+
+
 def finite_size_effect_HSE_wf(distort=0.0, category="finite_size_effect", pyzfs_fw=True, irvsp_fw=True): #1e-4
     wfs = []
     # db_name, col_name = "HSE_triplets_from_Scan2dDefect", "hse_pc"
@@ -1465,13 +1493,14 @@ def transition_level_wf(category="charge_state"):
 
 def main():
     def run_grand_hse_defect():
+        defect_db_name = "C2DB_IR_antisite_HSE"
         lpad = LaunchPad.from_file(
             os.path.join(
                 os.path.expanduser("~"),
-                "config/project/C2DB_IR_vacancy_HSE/calc_data/my_launchpad.yaml"
+                f"config/project/{defect_db_name}/calc_data/my_launchpad.yaml"
             )
         )
-        wfs = grand_hse_defect()
+        wfs = grand_hse_defect(defect_db_name, fworker="gpu_nersc") #gpu_nersc
         for idx, wf in enumerate(wfs):
             lpad.add_wf(wf)
             print(idx, wf.name, wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
@@ -1613,6 +1642,17 @@ def main():
         tgt_df = IOTools(excel_file="wte2_mote2", cwd=os.path.join(p_path, INPUT_PATH)).read_excel()
         transition_dipole_moment(tgt_df)
 
+    def run_IPR():
+        # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng_ro", password="qimin", port=12347)
+        db = get_db("C2DB_IR_vacancy_HSE", "calc_data", user="Jeng_ro", password="qimin", port=12347)
+
+        entries = list(db.collection.find({"task_label": "HSE_scf", "IPR": {"$exists": 0}}))
+        import time, concurrent.futures
+        t1 = time.perf_counter()
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = executor.map(localization_by_IPR, entries)
+        t2 = time.perf_counter()
+        print("time: ", t2 - t1)
 
     def run_finite_size_effect_wf():
         def std_wf():
@@ -1681,6 +1721,9 @@ def main():
             # add wf tags
             lpad.add_wf(wf)
         print(len(wfs))
+
+
+
 
     run_grand_hse_defect()
 
