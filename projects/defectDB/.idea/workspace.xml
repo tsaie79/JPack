@@ -2,24 +2,65 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c03654ef-b62d-4598-9a7b-9ab89ff536d2" name="Changes" comment="update">
-      <change afterPath="$PROJECT_DIR$/../defect_qubit_in_36_group/data_preparation.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../defect_qubit_in_36_group/wf.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../twisted/anoj_wf.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../twisted/structures/POSCAR_4.0.vasp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../antisiteQubit/wf_defect.py" beforeDir="false" afterPath="$PROJECT_DIR$/../antisiteQubit/wf_defect.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../co2_hydrogenation/analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/../co2_hydrogenation/analysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../co2_hydrogenation/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/../co2_hydrogenation/wf.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/other.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/remote-mappings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/sshConfigs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/webServers.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_1_df_2022-04-15.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_4_df_2022-05-03.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_4_df_2022-05-22.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_4_df_2022-06-27.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_5_df_2022-04-24.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_5_df_2022-05-03.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_5_df_2022-05-20.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/Table_5_df_2022-06-01.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/defect_2021-11-18.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/defect_2021-11-18_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/defects_36_groups_2022-03-07.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/defects_36_groups_2022-04-21.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/defects_36_groups_2022-04-27.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/defects_36_groups_cdft_complement_2022-03-09.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/defects_36_groups_zpl_zfs.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_cdft_TDM.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_qubit_2021-11-18.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_qubit_2022-04-13.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_qubit_2022-04-21.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_qubit_2022-07-09.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_qubit_2022-07-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_screened_qubit_2021-11-18.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_screened_qubit_cdft_2021-11-18_2022-01-31.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/hse_screened_qubit_cdft_zpl_2021-11-18_2022-01-31.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/pure_c2db_TMD_2022-07-08.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/qubit_2021-11-18.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/qubit_2021-11-18_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/task-1_cat22'_neutral_qubit-gp_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/task-1_cat33'_neutral_qubit-gp_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/task-1_neutral_cat2-2'_defect-gp_2021-11-18_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/task-1_neutral_cat2-2'_defect_2021-11-18_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/task-1_neutral_cat3-3'_defect-gp_2021-11-18_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/task-1_neutral_cat3-3'_defect_2021-11-18_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/task-1_neutral_hse-screened-qubit-gp_2021-11-18_2022-01-10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/tmd_antisites_2022-04-13.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/input/triplet_2021-11-18.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/output/xlsx/hse_qubit_2022-07-10 21:22:06.226804.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/output/xlsx/hse_qubit_2022-07-10 21:30:11.413589.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/analysis/output/xlsx/hse_qubit_2022-07-10 21:42:00.914260.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tmd_antisite_defect_table.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/wf/C2DB_IR_vacancy_HSE/error.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/wf/unfinished_jobs/nonuni_2021-11-11.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/wf/unfinished_jobs/uni_2021-11-11.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/defectDB.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/defectDB.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/analysis/analysis_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/analysis_api.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis/data_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis/data_analysis_2021-11-18.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/analysis/data_analysis_2021-11-18.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis/input/defect_2021-11-03.xlsx" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/new_entry_prep/data_preparation.py" beforeDir="false" afterPath="$PROJECT_DIR$/new_entry_prep/data_preparation.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/wf/Scan2dMat/scan_pc_in_scf_way.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/wf/Scan2dMat/scan_pc_in_scf_way.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/wf/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/wf/wf.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../qubit_sensor/analysis/data_analysis.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../qubit_sensor/analysis/data_analysis.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../twisted/wf.py" beforeDir="false" afterPath="$PROJECT_DIR$/../twisted/wf.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -28,6 +69,13 @@
   </component>
   <component name="DjangoConsoleOptions" custom-start-script="import sys; print('Python %s on %s' % (sys.version, sys.platform))&#10;import django; print('Django %s' % django.get_version())&#10;sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])&#10;if 'setup' in dir(django): django.setup()&#10;import django_manage_shell; django_manage_shell.run(PROJECT_ROOT)">
     <option name="myCustomStartScript" value="import sys; print('Python %s on %s' % (sys.version, sys.platform))&#10;import django; print('Django %s' % django.get_version())&#10;sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])&#10;if 'setup' in dir(django): django.setup()&#10;import django_manage_shell; django_manage_shell.run(PROJECT_ROOT)" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="FlaskConsoleOptions" custom-start-script="import sys&#10;sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])&#10;from flask.cli import ScriptInfo&#10;locals().update(ScriptInfo(create_app=None).load_app().make_shell_context())&#10;print(&quot;Python %s on %s\nApp: %s [%s]\nInstance: %s&quot; % (sys.version, sys.platform, app.import_name, app.env, app.instance_path))">
     <envs>
@@ -52,9 +100,12 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/analysis/analysis_api.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/analysis/data_analysis.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/analysis_backup.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/defect_db.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/electron_counting/analysis.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/new_entry_prep/data_preparation.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/searching_triplet/screening_defects.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/searching_triplet/screening_hosts.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/symBaseBinaryQubit/manuscript.py" root0="SKIP_INSPECTION" />
@@ -64,6 +115,9 @@
     <setting file="file://$PROJECT_DIR$/wf/Scan2dMat/scan_pc.yaml" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/wf/job_management.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/wf/wf.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/../../../qubitPack/qc_searching/analysis/main.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/../../../qubitPack/qc_searching/analysis/read_eigen.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/../../../qubitPack/tool_box.py" root0="SKIP_INSPECTION" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
@@ -76,13 +130,13 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/jeng-yuantsai/anaconda3/envs/workflow/lib/python3.7/site-packages/JPack_independent/projects/defectDB/analysis/input&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "WebServerToolWindowFactoryState": "true",
+    "last_opened_file_path": "/Users/jeng-yuantsai/anaconda3/envs/workflow/lib/python3.7/site-packages/JPack_independent/projects/defectDB/analysis/input",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/analysis/input" />
@@ -91,8 +145,8 @@
       <recent name="$PROJECT_DIR$/analysis" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/wf" />
       <recent name="$PROJECT_DIR$/analysis/input" />
+      <recent name="$PROJECT_DIR$/wf" />
     </key>
   </component>
   <component name="RunManager">
@@ -212,7 +266,46 @@
       <workItem from="1662476920457" duration="601000" />
       <workItem from="1662922762702" duration="1926000" />
       <workItem from="1664246771976" duration="68000" />
-      <workItem from="1664246877019" duration="4716000" />
+      <workItem from="1664246877019" duration="5354000" />
+      <workItem from="1664490902198" duration="1965000" />
+      <workItem from="1664508891020" duration="14112000" />
+      <workItem from="1664733171326" duration="16389000" />
+      <workItem from="1664847742871" duration="7104000" />
+      <workItem from="1664891472893" duration="21069000" />
+      <workItem from="1665011169449" duration="198000" />
+      <workItem from="1665011504732" duration="19433000" />
+      <workItem from="1665248538798" duration="774000" />
+      <workItem from="1665251497106" duration="471000" />
+      <workItem from="1665251985507" duration="1767000" />
+      <workItem from="1665442869211" duration="11313000" />
+      <workItem from="1665462005234" duration="20820000" />
+      <workItem from="1665715597864" duration="379000" />
+      <workItem from="1665716001975" duration="68849000" />
+      <workItem from="1666937848470" duration="1821000" />
+      <workItem from="1667056676763" duration="169000" />
+      <workItem from="1667056854945" duration="13181000" />
+      <workItem from="1667321358840" duration="11096000" />
+      <workItem from="1667603842133" duration="266000" />
+      <workItem from="1667604130971" duration="597000" />
+      <workItem from="1667619402941" duration="7610000" />
+      <workItem from="1668050397658" duration="2462000" />
+      <workItem from="1668362049016" duration="1201000" />
+      <workItem from="1668456910039" duration="109000" />
+      <workItem from="1668457115166" duration="308000" />
+      <workItem from="1668459068610" duration="20290000" />
+      <workItem from="1669015072608" duration="643000" />
+      <workItem from="1669015732452" duration="199000" />
+      <workItem from="1669015948172" duration="27126000" />
+      <workItem from="1669173984385" duration="8686000" />
+      <workItem from="1669183308587" duration="2271000" />
+      <workItem from="1669581653928" duration="10433000" />
+      <workItem from="1669702018250" duration="13431000" />
+      <workItem from="1669859138887" duration="598000" />
+      <workItem from="1669881464180" duration="598000" />
+      <workItem from="1669911038034" duration="192000" />
+      <workItem from="1669911372501" duration="487000" />
+      <workItem from="1669924354544" duration="17045000" />
+      <workItem from="1670260110481" duration="29344000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1636403040202</created>
@@ -438,7 +531,42 @@
       <option name="project" value="LOCAL" />
       <updated>1661195077001</updated>
     </task>
-    <option name="localTasksCounter" value="33" />
+    <task id="LOCAL-00033" summary="update">
+      <created>1664382964380</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1664382964380</updated>
+    </task>
+    <task id="LOCAL-00034" summary="update">
+      <created>1664691219136</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1664691219136</updated>
+    </task>
+    <task id="LOCAL-00035" summary="update">
+      <created>1665707975712</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1665707975712</updated>
+    </task>
+    <task id="LOCAL-00036" summary="update">
+      <created>1665712091980</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1665712091980</updated>
+    </task>
+    <task id="LOCAL-00037" summary="update">
+      <created>1667098150010</created>
+      <option name="number" value="00037" />
+      <option name="presentableId" value="LOCAL-00037" />
+      <option name="project" value="LOCAL" />
+      <updated>1667098150010</updated>
+    </task>
+    <option name="localTasksCounter" value="38" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

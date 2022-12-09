@@ -59,7 +59,7 @@ print(MODULE_DIR)
 INPUT_PATH = os.path.join(MODULE_DIR, "analysis/input")
 OUTPUT_PATH = os.path.join(MODULE_DIR, "analysis/output/xlsx")
 
-HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347, user="Jeng")
+HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12349, user="Jeng")
 
 def relax_pc():
     lpad = LaunchPad.from_file(os.path.expanduser(
@@ -106,7 +106,7 @@ def pc():
         os.path.dirname(os.path.abspath("__file__")),  "projects/defectDB/wf/Scan2dMat/calculated.json"))
     wait_list = loadfn(os.path.join(
         os.path.dirname(os.path.abspath("__file__")),  "projects/defectDB/wf/Scan2dMat/not_yet_calc.json"))
-    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
+    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12349, user="readUser", password="qiminyan").collection
 
     mx2s = col.find(
         {
@@ -177,7 +177,7 @@ def pc():
 def hse_relax_pc():
     cat = "hse_pc"
     qubit_df = IOTools(excel_file="qubit_2021-11-18", cwd="analysis/output/xlsx").read_excel()
-    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12345, user="readUser", password="qiminyan").collection
+    col = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", port=12349, user="readUser", password="qiminyan").collection
     mx2s = col.find({"uid":{"$in":list(qubit_df["uid"].unique())}})
     # remember to write OPTCELL 110 in folders
     for mx2 in mx2s:
@@ -245,22 +245,37 @@ def hse_relax_pc():
         lpad.add_wf(wf)
 
 
-def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE", fworker="gpu_nersc", defect_choice="substitutions",
+def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE",
+                     fworker=("gpu_nersc", None),
+                     defect_choice="substitutions",
                      impurity_on_nn=None, pyzfs_fw=True, irvsp_fw=True):
+
+    vasp_fworker, zfs_ir_fworker = fworker
+    if zfs_ir_fworker is None:
+        zfs_ir_fworker = vasp_fworker
+
+    defect_db_name = "C2DB_IR_vacancy_HSE"
+    vasp_fworker = "gpu_neu"
+    zfs_ir_fworker = "neu"
+    defect_choice = "vacancies"
+
     #1e-4
-    col = get_db("C2DB_IR", "calc_data", port=12345).collection
+    col = get_db("C2DB_IR", "calc_data", port=12349).collection
 
     wfs = []
     geo_spec = None
     pc_entries = [e for e in col.find(
         {
+            # "task_label": "hse line",
+            # "nelements": {"$lte": 2},
+            # "output.bandgap": {"$gte":1.0},
+            # "sym_data.good_ir_info.species": {"$ne": []},
             "task_label": "hse line",
-            "nelements": {"$lte": 2},
-            "output.bandgap": {"$gte":1.0},
-            "sym_data.good_ir_info.species": {"$ne": []},
+            "c2db_uid": "WS2-MoS2-NM"
         }
     )]
-    for pc_entry in pc_entries[180:210]: #345 pcs, index: 0-344
+    # for pc_entry in pc_entries[210:230]: #345 pcs, index: 0-344
+    for pc_entry in pc_entries[:]: #345 pcs, index: 0-344
         print(f"-------{pc_entry['task_id']}"*10)
         mx2 = pc_entry.copy()
         pc = Structure.from_dict(mx2["output"]["structure"])
@@ -326,7 +341,9 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE", fworker="gpu_nersc",
                             # if odd nelect, it used to be charge=[0]
                         else:
                             # continue
-                            charge = [0]
+                            # charge = [0]
+                            # nupdn = [-1]
+                            charge = [-2]
                             nupdn = [-1]
                             n_of_e = "even"
 
@@ -408,7 +425,7 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE", fworker="gpu_nersc",
                                                        parents=fw)
                                     HSE_fws.append(irvsp_fw)
                             wf = Workflow(HSE_fws, name=wf.name)
-                            wf = set_execution_options(wf, category="ir_data", fworker_name=fworker,
+                            wf = set_execution_options(wf, category="ir_data", fworker_name=zfs_ir_fworker,
                                                        fw_name_constraint="irvsp")
 
                         if pyzfs_fw:
@@ -420,26 +437,26 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE", fworker="gpu_nersc",
                                                        pyzfstodb_kwargs=dict(collection_name="zfs_data"))
                                     HSE_fws.append(pyzfs_fw)
                             wf = Workflow(HSE_fws, name=wf.name)
-                            wf = set_execution_options(wf, category="zfs_data", fworker_name=fworker,
+                            wf = set_execution_options(wf, category="zfs_data", fworker_name=zfs_ir_fworker,
                                                        fw_name_constraint="pyzfs")
-
+                        raw_data_base_path = "/home/tsai/work/Research/projects"
                         wf = bash_scp_files(
                             wf,
-                            dest=f"/mnt/sdc/tsai/Research/projects/{defect_db_name}/calc_data/",
-                            port=12348,
+                            dest=f"{raw_data_base_path}/{defect_db_name}/calc_data/",
+                            port=12350,
                             task_name_constraint="RunVasp"
                         )
                         wf = set_execution_options(wf, category="calc_data", fw_name_constraint="HSE_relax",
-                                                   fworker_name=fworker)
+                                                   fworker_name=vasp_fworker)
                         wf = set_execution_options(wf, category="calc_data", fw_name_constraint="HSE_scf",
-                                                   fworker_name=fworker)
+                                                   fworker_name=vasp_fworker)
 
 
                         if irvsp_fw:
                             wf = bash_scp_files(
                                 wf,
-                                dest=f"/mnt/sdc/tsai/Research/projects/{defect_db_name}/ir_data/",
-                                port=12348,
+                                dest=f"{raw_data_base_path}/{defect_db_name}/ir_data/",
+                                port=12350,
                                 task_name_constraint="ToDb",
                                 fw_name_constraint="irvsp"
                             )
@@ -450,8 +467,8 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE", fworker="gpu_nersc",
                         if pyzfs_fw:
                             wf = bash_scp_files(
                                 wf,
-                                dest=f"/mnt/sdc/tsai/Research/projects/{defect_db_name}/zfs_data/",
-                                port=12348,
+                                dest=f"{raw_data_base_path}/{defect_db_name}/zfs_data/",
+                                port=12350,
                                 task_name_constraint="ToDb",
                                 fw_name_constraint="pyzfs"
                             )
@@ -471,7 +488,7 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE", fworker="gpu_nersc",
 
 
 def binary_scan_defect(defect_choice="substitutions", impurity_on_nn=None):
-    col = get_db("Scan2dMat", "calc_data", port=12347).collection
+    col = get_db("Scan2dMat", "calc_data", port=12349).collection
 
     # group_json_file = "wf/Scan2dDefect/bg_gte_1_and_inhomo_07272021"
     group_json_file = "wf/Scan2dDefect/bg_gte_1_and_homo_07272021"
@@ -682,7 +699,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
         """
         db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
 
-        col = get_db(db_name, col_name, port=12345, user="readUser", password="qiminyan").collection
+        col = get_db(db_name, col_name, port=12349, user="readUser", password="qiminyan").collection
         taskids = ["WTe2-MoS2-NM"]
         mx2s = col.find({"uid":{"$in": taskids}})
         pcs = [Structure.from_dict(mx2["structure"]) for mx2 in mx2s]
@@ -705,7 +722,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
 
     def group_36_pc():
         db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
-        col = get_db(db_name, col_name,  port=12345, user="readUser", password="qiminyan")
+        col = get_db(db_name, col_name,  port=12349, user="readUser", password="qiminyan")
         taskids = ["In2Te2-GaSe-NM"]
         mx2s = col.find({"uid": {"$in": taskids}})
         pcs = [Structure.from_dict(mx2["structure"]) for mx2 in mx2s]
@@ -872,7 +889,7 @@ def binary_triplet_HSE_wf(distort=0.0, category="calc_data", pyzfs_fw=True, irvs
 def cdft(task, std_taskid, nbands=None, occ=None, std_base_dir=None, category="cdft", specific_poscar=None,
              prevent_JT=True):
     std_cat_name = "calc_data-pbe_pc"
-    std_db = get_db("HSE_triplets_from_Scan2dDefect", std_cat_name, port=12347)
+    std_db = get_db("HSE_triplets_from_Scan2dDefect", std_cat_name, port=12349)
     std_entry = std_db.collection.find_one({"task_id":std_taskid})
 
     std_path = std_entry["calcs_reversed"][0]["dir_name"]
@@ -993,8 +1010,8 @@ def transition_dipole_moment(input_cdft_df):
     df = input_cdft_df.copy()
     df = df.fillna("None")
     src_dft = df.loc[df["task_label"] == "CDFT-B-HSE_scf", ["gs_taskid", "up_TDM_input", "dn_TDM_input", "task_id"]]
-    db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc",  user="Jeng_ro", password="qimin", port=12347)
-    tgt_db = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc",  user="Jeng", password="qimin", port=12347)
+    db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc",  user="Jeng_ro", password="qimin", port=12349)
+    tgt_db = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc",  user="Jeng", password="qimin", port=12349)
     for idx, row in src_dft.iterrows():
         taskid = row["task_id"]
         print(taskid)
@@ -1071,11 +1088,11 @@ def transition_dipole_moment(input_cdft_df):
                                               }}})
 
 def localization_by_IPR(entry):
-    db = get_db("C2DB_IR_vacancy_HSE", "calc_data", user="Jeng", password="qimin", port=12347)
-    # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng", password="qimin", port=12347)
+    db = get_db("C2DB_IR_vacancy_HSE", "calc_data", user="Jeng", password="qimin", port=12349)
+    # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng", password="qimin", port=12349)
 
     taskid = entry["task_id"]
-    base_dir = "/mnt/sdc/tsai/Research/projects/C2DB_IR_vacancy_HSE/calc_data/"
+    base_dir = "/home/tsai/Research/projects/C2DB_IR_vacancy_HSE/calc_data/"
     # base_dir = "/mnt/sdc/tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc"
     dir_name = os.path.join(base_dir, entry["dir_name"].split("/")[-1])
 
@@ -1097,7 +1114,7 @@ def finite_size_effect_HSE_wf(distort=0.0, category="finite_size_effect", pyzfs_
     wfs = []
     # db_name, col_name = "HSE_triplets_from_Scan2dDefect", "hse_pc"
     db_name, col_name = "2dMat_from_cmr_fysik", "2dMaterial_v1"
-    hse_pc_db = get_db(db_name, col_name,  port=12345, user="readUser", password="qiminyan")
+    hse_pc_db = get_db(db_name, col_name,  port=12349, user="readUser", password="qiminyan")
     pc_db = hse_pc_db
 
     qubit_candidate_df = IOTools(cwd=os.path.join("~/scripts/JPack_independent/projects/defectDB", INPUT_PATH),
@@ -1247,7 +1264,7 @@ def scan_pc_in_scf_way():
             "config/project/Scan2dMat/{}/my_launchpad.yaml".format(cat)))
 
 
-    col = get_db("Scan2dMat", "calc_data", port=12347, user="Jeng_ro", password="qimin").collection
+    col = get_db("Scan2dMat", "calc_data", port=12349, user="Jeng_ro", password="qimin").collection
 
     mx2s = list(col.find({"task_label": "SCAN_nscf line"}))
     for idx, mx2 in enumerate(mx2s[:1]): #start from 100:!myq
@@ -1489,18 +1506,32 @@ def transition_level_wf(category="charge_state"):
     return wfs
 
 
+def bader_anaylsis(entry):
+    db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng", password="qimin", port=12349)
+    taskid = entry["task_id"]
+    print(taskid)
+    base_dir = "/home/qimin/sdc_tsai/Research/projects/HSE_triplets_from_Scan2dDefect/calc_data-pbe_pc"
+    dir_name = os.path.join(base_dir, entry["dir_name"].split("/")[-1])
 
+    import monty
+    from atomate.vasp.drones import bader_analysis_from_path
+    with monty.os.cd(dir_name):
+        print(dir_name)
+        bader_data = bader_analysis_from_path(".")
+        print(bader_data)
+        db.collection.update_one({"task_id": taskid}, {"$set": {"Bader": bader_data}})
 
 def main():
     def run_grand_hse_defect():
-        defect_db_name = "C2DB_IR_antisite_HSE"
+        # defect_db_name = "C2DB_IR_antisite_HSE"
+        defect_db_name = "C2DB_IR_vacancy_HSE"
         lpad = LaunchPad.from_file(
             os.path.join(
                 os.path.expanduser("~"),
                 f"config/project/{defect_db_name}/calc_data/my_launchpad.yaml"
             )
         )
-        wfs = grand_hse_defect(defect_db_name, fworker="gpu_nersc") #gpu_nersc
+        wfs = grand_hse_defect(defect_db_name, fworker="gpu_neu") #gpu_nersc
         for idx, wf in enumerate(wfs):
             lpad.add_wf(wf)
             print(idx, wf.name, wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
@@ -1588,8 +1619,9 @@ def main():
         pair_taskids =(172, 874)
         df = df.loc[df["task_id"].isin(pair_taskids)]
 
-        db = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
-        # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc",  user="Jeng_ro", password="qimin", port=12347)
+        db = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12349)
+        # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc",  user="Jeng_ro", password="qimin",
+        # port=12349)
         for taskid in df["task_id"]:
             level_cat = df.loc[df["task_id"] == taskid, "level_cat"].iloc[0]
             e = db.collection.find_one({"task_id": taskid})
@@ -1643,14 +1675,28 @@ def main():
         transition_dipole_moment(tgt_df)
 
     def run_IPR():
-        # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng_ro", password="qimin", port=12347)
-        db = get_db("C2DB_IR_vacancy_HSE", "calc_data", user="Jeng_ro", password="qimin", port=12347)
+        # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng_ro", password="qimin",
+        # port=12349)
+        db = get_db("C2DB_IR_vacancy_HSE", "calc_data", user="Jeng_ro", password="qimin", port=12349)
 
         entries = list(db.collection.find({"task_label": "HSE_scf", "IPR": {"$exists": 0}}))
         import time, concurrent.futures
         t1 = time.perf_counter()
         with concurrent.futures.ProcessPoolExecutor() as executor:
             results = executor.map(localization_by_IPR, entries)
+        t2 = time.perf_counter()
+        print("time: ", t2 - t1)
+
+
+    def run_Bader():
+        db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng_ro", password="qimin",
+        port=12349)
+
+        entries = list(db.collection.find({"task_label": "HSE_scf", "Bader": {"$exists": 0}}))
+        import time, concurrent.futures
+        t1 = time.perf_counter()
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = executor.map(bader_anaylsis, entries)
         t2 = time.perf_counter()
         print("time: ", t2 - t1)
 
@@ -1725,7 +1771,7 @@ def main():
 
 
 
-    run_grand_hse_defect()
+    run_IPR()
 
 
 if __name__ == '__main__':

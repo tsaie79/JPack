@@ -9,9 +9,11 @@ from IPython.display import display
 from subprocess import check_output
 from pymatgen.io.vasp.outputs import Wavecar
 from pymatgen.io.vasp.inputs import Poscar, Element
+from pymatgen.core.units import ang_to_bohr
+
 from pathlib import Path
 
-from JPack_independent.projects.defectDB.analysis.data_analysis import Defect
+from JPack_independent.projects.defectDB.analysis.data_analysis import *
 from JPack_independent.projects.defectDB.new_entry_prep.data_preparation import *
 
 
@@ -44,11 +46,12 @@ defects_36_groups_df = IOTools(cwd=input_path, excel_file="defects_36_groups_202
 defects_36_groups_zpl_zfs_df = IOTools(cwd=input_path, excel_file="defects_36_groups_zpl_zfs").read_excel()
 
 # hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-04-15").read_excel()
-hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-06-01").read_excel()
+hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-12-05").read_excel()
 
+prev_hse_candidate_df = IOTools(cwd=input_path, excel_file="Table_5_df_2022-06-01").read_excel()
 
 table1_df = IOTools(cwd=input_path, excel_file="Table_1_df_2022-04-15").read_excel()
-table4_df = IOTools(cwd=input_path, excel_file="Table_4_df_2022-06-27").read_excel()
+table4_df = IOTools(cwd=input_path, excel_file="Table_4_df_2022-12-05").read_excel()
 
 new_defect_df = IOTools(cwd=input_path, excel_file="new_defect_2022-10-14").read_excel()
 
@@ -60,9 +63,9 @@ class Toolbox:
     def get_poscar_and_wavecar(cls, taskid, hse, files=["POSCAR"]):
         from qubitPack.tool_box import get_db
         if hse:
-            col = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347).collection
+            col = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12349).collection
         else:
-            col = get_db("Scan2dDefect", "calc_data", port=12347).collection
+            col = get_db("Scan2dDefect", "calc_data", port=12349).collection
         def scp(taskid):
             for i in col.find({"task_id": taskid}):
                 task_id = i["task_id"]
@@ -113,8 +116,8 @@ class Toolbox:
     @classmethod
     def coop_query(cls):
         from qubitPack.tool_box import get_db
-        scan_cohp_db = get_db("Scan2dDefect", "lobster", user="Jeng_ro", password="qimin", port=12347)
-        scan_mat_db = get_db("Scan2dMat", "calc_data", user="Jeng_ro", password="qimin", port=12347)
+        scan_cohp_db = get_db("Scan2dDefect", "lobster", user="Jeng_ro", password="qimin", port=12349)
+        scan_mat_db = get_db("Scan2dMat", "calc_data", user="Jeng_ro", password="qimin", port=12349)
 
 
         data = {"pair": [], "task_id": [], "level_cat": [], "defect_name": [], "uid": [], "prev_fw_taskid": []}
@@ -294,7 +297,7 @@ class Task3Qubit:
         # df["host_has_d_f_element"] = df.apply(lambda x: add_host_d_f_nature(x), axis=1)
 
         def add_zfs_data(x):
-            zfs_collection = get_db("HSE_triplets_from_Scan2dDefect", "zfs_data-pbe_pc", port=12347).collection
+            zfs_collection = get_db("HSE_triplets_from_Scan2dDefect", "zfs_data-pbe_pc", port=12349).collection
             try:
                 gs_taskid = x["task_id"]
             except:
@@ -1460,6 +1463,7 @@ class FigureAndStats(SheetCollection):
                     color = "yellow"
                 else:
                     color = "black"
+                    color = "black"
 
                 ax.hlines(level, x+0.5, x+2, colors=color)
                 if occ == 0:
@@ -1981,21 +1985,22 @@ class FigureAndStats(SheetCollection):
             df_antisite_proj = da.get_antisite_projection()
         else:
             df_antisite_proj = df.copy()
-        df_antisite_proj["group_row"] = df_antisite_proj.apply(lambda x: f'{x["level_source_group"]}-{x["level_source_row"]}', axis=1)
+        df_antisite_proj["group_row"] = df_antisite_proj.apply(
+            lambda x: f'{x["level_source_group"]}-{x["level_source_row"]}', axis=1)
         x = df_antisite_proj.groupby(["level_source_group"])
         fig, ax = plt.subplots()
         for k, v in x:
             print(k)
             r = None
             if k in [6]:
-                r = "average_anionic_radius"
+                r = "average_cationic_radius"
             elif k in [16, 17]:
-                r = "average_anionic_radius"
+                r = "Atomic radius calculated"
             else:
                 r = "Atomic radius calculated"
             v = v.sort_values("level_source_row")
             display(v.loc[:, ["level_source_specie", r, "zfs_D"]])
-            label = {6: "VIB", 13: "IIIA", 16: "VIA", 17: "VIIA", 12: "IIA", 14:"IVA"}
+            label = {6: "VIB", 13: "IIIA", 16: "VIA", 17: "VIIA", 12: "IIB", 14:"IVA"}
             ax.scatter(v[r], v["zfs_D"], label=label[k])
             # display(v.loc[:, ["group_row", "zfs_D"]])
             # ax.scatter(v["group_row"], v["zfs_D"])
@@ -2006,7 +2011,7 @@ class FigureAndStats(SheetCollection):
         ax.legend(loc="upper center", ncol=4, frameon=True)
         ax.set_ylabel("ZFS D (GHz)")
         ax.set_xlabel("Atomic radius (Å)")
-        ax.set_title("ZFS parameter D vs. atomic radius of antisite atom")
+        ax.set_title("ZFS D vs. atomic radius of antisite atom")
 
         #remove subticks in x-axis
         ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
@@ -2018,6 +2023,53 @@ class FigureAndStats(SheetCollection):
         # plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
         return fig
 
+    def get_zfs_vs_ipr_fig(self, df, turn_on_lr=True):
+        from scipy import stats
+        plot_df = df.copy()
+
+        x_name = "Spin-up HODL IPR"
+        plot_df.rename(columns={"up_homo_ipr": x_name}, inplace=True)
+        plot_df.rename(columns={"zfs_D": "ZFS D"}, inplace=True)
+        group_df = plot_df.groupby(["chem_group"])
+        fig = plt.figure(figsize=(12, 3))
+        # use first 3 rows and first 3 columns as a big plot
+        ax1 = plt.subplot2grid((3, 26), (0, 0), colspan=10, rowspan=3)
+        colors = ["blue", "red", "lime", "purple", "orange", "cyan"]
+        group_name = {6: "VIB", 12: "IIB", 13: "IIIA", 14: "IVA", 15: "VA", 16: "VIA", 17: "VIIA"}
+        plot_markers = ['(b)', '(c)', '(d)', '(e)', '(f)', '(g)']
+        for (name, group), index, color, plot_mark in zip(group_df, range(len(group_df)), colors, plot_markers):
+            name = group_name[name]
+            ax1.plot(group[x_name], group["ZFS D"], marker="o", linestyle="", label=name,
+                     color=color)
+
+            x = group[x_name]
+            y = group["ZFS D"]
+
+            # plot scatter plot and regression line for each group at those subplots at last two columns and first 3 rows
+            subplot_locs = [(0, 10), (1, 10), (2, 10), (0, 18), (1, 18), (2, 18)]
+            ax2 = plt.subplot2grid((3, 26), (subplot_locs[index]), colspan=8, rowspan=1)
+            # make text box at middle top to show name
+            ax2.text(0.5, 1.03, name, horizontalalignment="center", verticalalignment="center", transform=ax2.transAxes)
+            ax2.plot(x, y, marker="o", linestyle="", color=color)
+            # add text next to each point
+            for i, txt in enumerate(group["level_source_specie"]):
+                ax2.annotate(txt, (x.iloc[i], y.iloc[i]))
+
+            if turn_on_lr:
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+                print(f"r-squared: {r_value**2}, slope: {slope}, intercept: {intercept}")
+                ax2.plot(x, intercept + slope * x, color=color, alpha=0.2)
+        # set a title for the figure
+        # set labels for the big plot
+        ax1.set_ylim(0, 12)
+        ax1.set_xlabel(x_name)
+        ax1.set_ylabel("ZFS D (GHz)")
+        ax1.set_title(f"ZFS D vs. {x_name}")
+        # turn on legend
+        ax1.legend(loc="upper left")
+        # set space between ax1 and ax2 larger
+        plt.subplots_adjust(wspace=9)
+        return fig
 
     def get_tdm_fig(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
@@ -2051,7 +2103,8 @@ class FigureAndStats(SheetCollection):
         df1 = df.loc[:, "TDM_rate"]
         # plot bar chart for the distribution of the data in the main plot, with the range from 0 to 175 with increment of 5
         ax.bar(
-            [i+2.5 for i in range(0, 175, 5)],
+            # [i+2.5 for i in range(0, 175, 5)],
+            [i + 2.5 for i in range(0, 175, 5)],
             [df1.loc[(df1 >= i) & (df1 < i + 5)].count() for i in range(0, 175, 5)],
             width=5,
             edgecolor="black",
@@ -2084,6 +2137,31 @@ class FigureAndStats(SheetCollection):
 
         self.figures.append(fig)
         return fig
+
+    def get_tdm_fig_new(self, df=None):
+        df = self.get_hse_candidate_df().copy() if df is None else df.copy()
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        df1 = df.loc[:, "TDM_rate"]
+
+        # plot histogram of df1
+        ax.hist(df1, bins=35, edgecolor="black")
+
+        # add a vertical line at x=6
+        ax.axvline(x=6, color="red", linestyle="--")
+
+        ax.set_xlabel("Dipole transition rate (MHz)")
+        ax.set_ylabel("Frequency")
+        ax.set_title("Dipole transition rate distribution")
+        ax.tick_params(axis="x", which="minor", bottom=True, top=False, labelbottom=False, direction="out")
+        ax.tick_params(axis="x", which="major", bottom=True, top=False, direction="out")
+        ax.tick_params(axis="y", which="minor", left=False, right=False, labelbottom=True, direction="out")
+        ax.tick_params(axis="y", which="major", left=True, right=False, labelbottom=True, direction="out")
+
+        self.figures.append(fig)
+        return fig
+
 
     def get_tdm_stat(self, df=None):
         df = self.get_hse_candidate_df().copy() if df is None else df.copy()
@@ -2347,6 +2425,534 @@ class FigureAndStats(SheetCollection):
 
         self.figures.append(fig)
         return fig
+
+
+    def get_ST_en_diff_vs_ipr_fig(self, df, turn_on_lr=True, turn_on_inset=False, exclude_VII=False):
+        from scipy import stats
+        plot_df = df.copy()
+
+        if exclude_VII:
+            plot_df = plot_df.loc[plot_df.chem_group != 17]
+        # plot ZPL vs abs_pot_mean and color by groups which are grouped by defect_symmetry and chem_group
+        x_value, x_name = "ST_in_gap_occ_ipr", "Tot. occ. defect level IPR"
+        # x_value, x_name = "zpl_ipr_avg", "Avg. IPR of LUDL and HODL"
+
+        plot_df.rename(columns={x_value: x_name}, inplace=True)
+        plot_df.rename(columns={"singlet_triplet_energy_diff": "Energy diff. between spin singlet and triplet states"},
+        inplace=True)
+        group_df = plot_df.groupby(["chem_group"])
+        fig = plt.figure(figsize=(12, 6))
+        # use first 3 rows and first 3 columns as a big plot
+        ax1 = plt.subplot2grid((3, 26), (0, 0), colspan=10, rowspan=3)
+        colors = ["blue", "red", "lime", "purple", "orange", "cyan"]
+        group_name = {6: "VIB", 12: "IIB", 13: "IIIA", 14: "IVA", 15: "VA", 16: "VIA", 17: "VIIA"}
+
+        plot_markers = ['(b)', '(c)', '(d)', '(e)', '(f)', '(g)']
+        for (name, group), index, color, plot_mark in zip(group_df, range(len(group_df)), colors, plot_markers):
+            name = group_name[name]
+            x = group[x_name]
+            y = group["Energy diff. between spin singlet and triplet states"]
+
+            ax1.plot(group[x_name], group["Energy diff. between spin singlet and triplet states"],
+                     marker="o", linestyle="", label=name, color=color)
+            # make values of x axis in scientific notation with 3 decimal places
+            ax1.ticklabel_format(style='sci', axis='x', scilimits=(0, 0), useMathText=True)
+
+            if name != "VIIA" and turn_on_inset:
+                # plot an inset figure at the left center of the ax1
+                ax1_inset = plt.axes([0.2, 0.45, 0.2, 0.2])
+                ax1_inset.plot(x, y, marker="o", linestyle="", label=name, color=color)
+                ax1_inset.set_xlim(x.min() * 0.1, x.max() * 1.2)
+                ax1_inset.set_ylim(y.min() * 0.1, y.max() * 2)
+
+
+
+            # plot scatter plot and regression line for each group at those subplots at last two columns and first 3 rows
+            subplot_locs = [(0, 10), (1, 10), (2, 10), (0, 18), (1, 18), (2, 18)]
+            ax2 = plt.subplot2grid((3, 26), (subplot_locs[index]), colspan=8, rowspan=1)
+            # make ax2 x and y limit increase +- 5% of the max and min values of x and y
+            if name == "VIB":
+                ax2.set_xlim(x.min() * 0.80, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.80, y.max() * 1.1)
+            elif name == "IIB":
+                ax2.set_xlim(x.min() * 0.80, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.85, y.max() * 1.1)
+            elif name == "IIIA":
+                ax2.set_xlim(x.min() * 0.95, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.50, y.max() * 1.1)
+            elif name == "IVA":
+                ax2.set_xlim(x.min() * 0.95, x.max() * 1.05)
+                ax2.set_ylim(y.min() * 0.5, y.max() * 1.1)
+            elif name == "VIA":
+                ax2.set_xlim(x.min() * 0.95, x.max() * 1.05)
+                ax2.set_ylim(y.min() * 0.95, y.max() * 1.1)
+            elif name == "VIIA":
+                ax2.set_xlim(x.min() * 0.85, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.95, y.max() * 1.05)
+
+            # make text box at middle top to show name
+            ax2.text(0.5, 1.03, name, horizontalalignment="center", verticalalignment="center", transform=ax2.transAxes)
+            ax2.plot(x, y, marker="o", linestyle="", color=color)
+            ax2.ticklabel_format(style='sci', axis='x', scilimits=(0, 0), useMathText=True)
+
+
+            #make line very light color
+            # add text next to each point
+            # for i, txt in enumerate(group["level_source_specie"]):
+            #     ax2.annotate(txt, (x.iloc[i], y.iloc[i]))
+
+            if turn_on_lr:
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+                ax2.plot(x, intercept + slope * x, color=color, alpha=0.2)
+
+        # set a title for the figure
+        # set labels for the big plot
+        ax1.set_xlabel(x_name)
+        ax1.set_ylabel("Energy diff. between spin singlet and triplet states (eV)")
+        ax1.set_title(f"Energy diff. between spin singlet and triplet states vs. {x_name}")
+        # turn on legend
+        if exclude_VII:
+            ax1.legend(loc="upper left")
+        else:
+            ax1.legend(loc="upper right")
+        # set space between ax1 and ax2 larger
+        plt.subplots_adjust(wspace=9)
+        return fig
+
+
+
+
+    def get_zpl_vs_pot(self, df):
+        import re
+        test_df = df.copy()
+        def add_nn_info(df):
+            entries = HSEQubitDefect.collection.find({"task_id": {"$in": df.task_id.tolist()}})
+            # get a dataframe that contains task_id and NN
+            d = {
+                "task_id": [],
+                "NN": [],
+                "NN_dist": [],
+                "NN_part_charge": [],
+                "NN_bader_charge": [],
+                "Ant_part_charge": [],
+                "Ant_bader_charge": [],
+                "NN_atom_vol": [],
+                "Ant_atom_vol": [],
+                "NN_pot": [],
+                "NN_dip": [],
+                "NN_part_chg_diff": [],
+                "the_other_el_vol": [],
+                "NN_dist_inverse": [],
+                "NN_part_chg_mult_ant_chg": [],
+            }
+            for e in entries:
+                d["task_id"].append(e["task_id"])
+                d["NN"].append(e["NN"])
+                # loop over NN except the last one
+                nn_dist = []
+                nn_dist_inverse = []
+                nn_part_charge = []
+                nn_charge = []
+                nn_atom_vol = []
+                nn_part_charge_diff = []
+                nn_part_chg_mult_ant_chg = []
+                the_other_el_vol = []
+                st = Structure.from_dict(e["output"]["structure"])
+                for i in e["NN"][:-1]:
+                    nn_dist.append(st.get_distance(i, e["NN"][-1]))
+                    nn_part_charge.append(-1 * e["Bader"]["charge_transfer"][i])
+                    nn_charge.append(e["Bader"]["charge"][i])
+                    nn_atom_vol.append(e["Bader"]["atomic_volume"][i])
+                    nn_dist_inverse = 1 / np.array(nn_dist)
+                    nn_part_chg_mult_ant_chg.append(
+                        e["Bader"]["charge_transfer"][i] * e["Bader"]["charge_transfer"][e["NN"][-1]]
+                    )
+                    nn_part_charge_diff.append(
+                        e["Bader"]["charge_transfer"][i] - e["Bader"]["charge_transfer"][e["NN"][-1]]
+                        )
+
+                ant_el = st.sites[e["NN"][-1]].specie.symbol
+                the_other_el_index = [index for index, i in enumerate(st.sites) if i.specie.symbol != ant_el]
+                for el_index in the_other_el_index:
+                    the_other_el_vol.append(e["Bader"]["atomic_volume"][el_index])
+
+                d["NN_dist"].append(nn_dist)
+                d["NN_dist_inverse"].append(nn_dist_inverse)
+                d["NN_part_charge"].append(nn_part_charge)
+                d["NN_bader_charge"].append(nn_charge)
+                d["NN_atom_vol"].append(nn_atom_vol)
+                d["NN_part_chg_mult_ant_chg"].append(nn_part_chg_mult_ant_chg)
+                d["NN_pot"].append(np.array(nn_part_chg_mult_ant_chg) * np.array(nn_dist_inverse))
+                d["NN_dip"].append(np.array(nn_part_charge_diff) * np.array(nn_dist_inverse) ** 3)
+                d["Ant_part_charge"].append(-1 * e["Bader"]["charge_transfer"][e["NN"][-1]])
+                d["Ant_bader_charge"].append(e["Bader"]["charge"][e["NN"][-1]])
+                d["Ant_atom_vol"].append(e["Bader"]["atomic_volume"][e["NN"][-1]])
+                d["NN_part_chg_diff"].append(nn_part_charge_diff)
+                d["the_other_el_vol"].append(the_other_el_vol)
+            nn_dist_df = pd.DataFrame(d)
+            nn_dist_df["the_other_el_vol"] = nn_dist_df["the_other_el_vol"].apply(lambda x: np.mean(x))
+            nn_dist_df["Ant_the_other_el_vol_diff"] = nn_dist_df["Ant_atom_vol"] - nn_dist_df["the_other_el_vol"]
+            return nn_dist_df
+
+        def get_data_df(df):
+            data_df = df[[
+                "task_id",
+                # "tr",
+                # "vertical_transition_up",
+                # "vertical_transition_down",
+                # "atomic_radius",
+                "NN_dist",
+                "NN_dist_inverse",
+                # "chem_group",
+                "NN_part_charge",
+                "NN_bader_charge",
+                "Ant_part_charge",
+                "Ant_bader_charge",
+                "NN_atom_vol",
+                "Ant_atom_vol",
+                "NN_pot",
+                "NN_dip",
+                "NN_part_chg_diff",
+                "Ant_the_other_el_vol_diff",
+                # "lattice_a",
+                # "lattice_b",
+                "NN_part_chg_mult_ant_chg"
+            ]]
+
+            # separate the NN_dist into columns named nn_dist_1, nn_dist_2, nn_dist_3, nn_dist_4 ... etc
+            data_df = data_df.join(pd.DataFrame(data_df["NN_dist"].tolist(), index=data_df.index))
+            # rename columns 0, 1, 2, 3 ... etc to nn_dist_1, nn_dist_2, nn_dist_3, nn_dist_4 ... etc
+            data_df = data_df.rename(columns=lambda x: "nn_dist_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_dist"])
+
+            data_df = data_df.join(pd.DataFrame(data_df["NN_dist_inverse"].tolist(), index=data_df.index))
+            data_df = data_df.rename(columns=lambda x: "nn_dist_inverse_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_dist_inverse"])
+
+            # separate the part_charge into columns named part_charge_1, part_charge_2, part_charge_3, part_charge_4 ... etc
+            data_df = data_df.join(pd.DataFrame(data_df["NN_part_charge"].tolist(), index=data_df.index))
+            # rename columns 0, 1, 2, 3 ... etc to part_charge_1, part_charge_2, part_charge_3, part_charge_4 ... etc
+            data_df = data_df.rename(columns=lambda x: "NN_part_charge_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_part_charge"])
+            # separate the bader_charge into columns named bader_charge_1, bader_charge_2, bader_charge_3, bader_charge_4
+            # ... etc
+            data_df = data_df.join(pd.DataFrame(data_df["NN_bader_charge"].tolist(), index=data_df.index))
+            # rename columns 0, 1, 2, 3 ... etc to bader_charge_1, bader_charge_2, bader_charge_3, bader_charge_4 ... etc
+            data_df = data_df.rename(columns=lambda x: "NN_bader_charge_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_bader_charge"])
+            # separate the atom_vol into columns named atom_vol_1, atom_vol_2, atom_vol_3, atom_vol_4 ... etc
+            data_df = data_df.join(pd.DataFrame(data_df["NN_atom_vol"].tolist(), index=data_df.index))
+            # rename columns 0, 1, 2, 3 ... etc to atom_vol_1, atom_vol_2, atom_vol_3, atom_vol_4 ... etc
+            data_df = data_df.rename(columns=lambda x: "NN_atom_vol_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_atom_vol"])
+            # separate the pot into columns named pot_1, pot_2, pot_3, pot_4 ... etc
+            data_df = data_df.join(pd.DataFrame(data_df["NN_pot"].tolist(), index=data_df.index))
+            # rename columns 0, 1, 2, 3 ... etc to pot_1, pot_2, pot_3, pot_4 ... etca
+            data_df = data_df.rename(columns=lambda x: "NN_pot_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_pot"])
+            # separate the dip into columns named dip_1, dip_2, dip_3, dip_4 ... etc
+            data_df = data_df.join(pd.DataFrame(data_df["NN_dip"].tolist(), index=data_df.index))
+            # rename columns 0, 1, 2, 3 ... etc to dip_1, dip_2, dip_3, dip_4 ... etc
+            data_df = data_df.rename(columns=lambda x: "NN_dip_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_dip"])
+            # separate the part_chg_diff into columns named part_chg_diff_1, part_chg_diff_2, part_chg_diff_3,
+            # part_chg_diff_4 ... etc
+            data_df = data_df.join(pd.DataFrame(data_df["NN_part_chg_diff"].tolist(), index=data_df.index))
+            # rename columns 0, 1, 2, 3 ... etc to part_chg_diff_1, part_chg_diff_2, part_chg_diff_3, part_chg_diff_4 ...
+            # etc
+            data_df = data_df.rename(columns=lambda x: "NN_part_chg_diff_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_part_chg_diff"])
+
+            data_df = data_df.join(pd.DataFrame(data_df["NN_part_chg_mult_ant_chg"].tolist(), index=data_df.index))
+            data_df = data_df.rename(columns=lambda x: "NN_part_chg_mult_ant_chg_" + str(x) if isinstance(x, int) else x)
+            data_df = data_df.drop(columns=["NN_part_chg_mult_ant_chg"])
+            return data_df
+
+
+
+        def replace_nan_with_zero(data_df):
+            # find all columns containing nn_dist
+            # regex nn_dist_n where n is a number
+            nn_dist_cols = [col for col in data_df.columns if re.search("nn_dist_\d+", col)]
+            max_len_of_nn_dist = len(nn_dist_cols)
+            # calculate mean of nn_dist from 0 to 7 not including any nan value in the list of nn_dist from 0 to
+            # max_len_of_nn_dist-1
+            data_df["nn_dist_mean"] = data_df.apply(lambda row: np.nanmean(row[nn_dist_cols[0:max_len_of_nn_dist]]), axis=1)
+            for i in range(1, max_len_of_nn_dist):
+                data_df["nn_dist_" + str(i)] = data_df["nn_dist_" + str(i)].fillna(1000)
+
+            # drop the column "nn_dist_mean"
+            # data_df = data_df.drop(columns=["nn_dist_mean"])
+
+            nn_dist_inverse_cols = [col for col in data_df.columns if "nn_dist_inverse" in col]
+            max_len_of_nn_dist_inverse = len(nn_dist_inverse_cols)
+            data_df["nn_dist_inverse_mean"] = data_df.apply(lambda row: np.nanmean(row[nn_dist_inverse_cols[0:max_len_of_nn_dist_inverse]]), axis=1)
+            # data_df["nn_dist_inverse_mean"] = data_df.apply(
+            #     lambda x: np.nanmean(
+            #         x[["nn_dist_inverse_0", "nn_dist_inverse_1", "nn_dist_inverse_2", "nn_dist_inverse_3",
+            #            "nn_dist_inverse_4", "nn_dist_inverse_5", "nn_dist_inverse_6", "nn_dist_inverse_7"]]
+            #         ), axis=1
+            #     )
+            # fill nan value in nn_dist_inverse_1 to nn_dist_inverse_7 with data_df["nn_dist_inverse_mean"]
+            for i in range(1, max_len_of_nn_dist_inverse):
+                data_df["nn_dist_inverse_" + str(i)] = data_df["nn_dist_inverse_" + str(i)].fillna(0)
+            # calculate mean of part_charge from 0 to 7 not including any nan value in the list of part_charge from 0
+            # to 7
+
+            part_charge_cols = [col for col in data_df.columns if "NN_part_charge" in col]
+            max_len_of_part_charge = len(part_charge_cols)
+            data_df["part_charge_mean"] = data_df.apply(lambda row: np.nanmean(row[part_charge_cols[0:max_len_of_part_charge]]), axis=1)
+            for i in range(1, max_len_of_part_charge):
+                data_df["NN_part_charge_" + str(i)] = data_df["NN_part_charge_" + str(i)].fillna(0)
+            # drop the column "part_charge_mean"
+            # data_df = data_df.drop(columns=["part_charge_mean"])
+
+
+            # calculate mean of bader_charge from 0 to 7 not including any nan value in the list of bader_charge from
+            # 0 to 7
+            bader_charge_cols = [col for col in data_df.columns if "NN_bader_charge" in col]
+            max_len_of_bader_charge = len(bader_charge_cols)
+            data_df["bader_charge_mean"] = data_df.apply(lambda row: np.nanmean(row[bader_charge_cols[0:max_len_of_bader_charge]]), axis=1)
+            for i in range(1, max_len_of_bader_charge):
+                data_df["NN_bader_charge_" + str(i)] = data_df["NN_bader_charge_" + str(i)].fillna(0)
+            # drop the column "bader_charge_mean"
+            # data_df = data_df.drop(columns=["bader_charge_mean"]
+
+
+            # calculate mean of atom_vol from 0 to 7 not including any nan value in the list of atom_vol from 0 to 7
+            atom_vol_cols = [col for col in data_df.columns if "NN_atom_vol" in col]
+            max_len_of_atom_vol = len(atom_vol_cols)
+            data_df["atom_vol_mean"] = data_df.apply(lambda row: np.nanmean(row[atom_vol_cols[0:max_len_of_atom_vol]]), axis=1)
+            for i in range(1, max_len_of_atom_vol):
+                data_df["NN_atom_vol_" + str(i)] = data_df["NN_atom_vol_" + str(i)].fillna(0)
+            # drop the column "atom_vol_mean"
+            # data_df = data_df.drop(columns=["atom_vol_mean"])
+
+
+            # calculate mean of pot from 0 to 7 not including any nan value in the list of pot from 0 to 7
+            pot_cols = [col for col in data_df.columns if "NN_pot" in col]
+            max_len_of_pot = len(pot_cols)
+            data_df["pot_mean"] = data_df.apply(lambda row: np.nanmean(row[pot_cols[0:max_len_of_pot]]), axis=1)
+            for i in range(1, max_len_of_pot):
+                data_df["NN_pot_" + str(i)] = data_df["NN_pot_" + str(i)].fillna(0)
+            # drop the column "pot_mean"
+            # data_df = data_df.drop(columns=["pot_mean"])
+
+
+            # calculate mean of dip from 0 to 7 not including any nan value in the list of dip from 0 to 7
+            dip_cols = [col for col in data_df.columns if "NN_dip" in col]
+            max_len_of_dip = len(dip_cols)
+            data_df["dip_mean"] = data_df.apply(lambda row: np.nanmean(row[dip_cols[0:max_len_of_dip]]), axis=1)
+            for i in range(1, max_len_of_dip):
+                data_df["NN_dip_" + str(i)] = data_df["NN_dip_" + str(i)].fillna(0)
+            # drop the column "dip_mean"
+            # data_df = data_df.drop(columns=["dip_mean"])
+
+
+            part_charge_cols = [col for col in data_df.columns if "NN_part_chg_diff" in col]
+            max_len_of_part_charge = len(part_charge_cols)
+            data_df["NN_part_chg_diff_mean"] = data_df.apply(lambda row: np.nanmean(row[part_charge_cols[0:max_len_of_part_charge]]), axis=1)
+            for i in range(1, max_len_of_part_charge):
+                data_df["NN_part_chg_diff_" + str(i)] = data_df["NN_part_chg_diff_" + str(i)].fillna(0)
+
+
+            part_chg_mult_cols = [col for col in data_df.columns if "NN_part_chg_mult_ant_chg" in col]
+            max_len_of_part_chg_mult = len(part_chg_mult_cols)
+            data_df["NN_part_chg_mult_ant_chg_mean"] = data_df.apply(lambda row: np.nanmean(row[part_chg_mult_cols[0:max_len_of_part_chg_mult]]), axis=1)
+            for i in range(1, max_len_of_part_chg_mult):
+                data_df["NN_part_chg_mult_ant_chg_" + str(i)] = data_df["NN_part_chg_mult_ant_chg_" + str(i)].fillna(0)
+            return data_df
+
+        def add_addtional_info():
+            df = pd.DataFrame()
+            for i, row in test_df.iterrows():
+                lattice = Structure.from_dict(
+                    C2DB_IR_calc_data.collection.find_one(
+                        {"c2db_uid": row["uid"], "task_label": "hse line"}
+                    )["output"]["structure"]
+                    ).lattice
+                ant_specie = Element(row["level_source_specie"])
+                # add row of (task_id, lattice_a, lattice_b, lattice_c, is_lattice_a_eq_b)
+                lumo_homo_deg = row["dn_tran_lumo_homo_deg"] if row["transition_from"] == 'dn' else row[
+                                "up_tran_lumo_homo_deg"]
+                df = df.append(
+                    pd.DataFrame(
+                        {   "task_id": row["task_id"],
+                            "defect_type": row["defect_type"],
+                            "C2DB_uid": row["C2DB_uid"],
+                            "defect_name": row["defect_name"],
+                            "charge": row["charge"],
+                            "lattice_a": round(lattice.a, 3),
+                            "lattice_b": round(lattice.b, 3),
+                            "lattice_c": round(lattice.c, 3),
+                            "is_lattice_a_eq_b": round(lattice.a, 3) == round(lattice.b, 3),
+                            "tr": max(row["vertical_transition_up"], row["vertical_transition_down"]),
+                            "chem_row": ant_specie.row,
+                            "chem_group": ant_specie.group,
+                            "atomic_radius": ant_specie.data["Atomic radius calculated"] if
+                            ant_specie.group !=6 else ant_specie.average_cationic_radius,
+                            "antisite_ion_type": "cation" if ant_specie.common_oxidation_states[0] > 0 else "anion",
+                            "is_transition_metal": ant_specie.is_transition_metal,
+                            "ant_elec_neg": ant_specie.X,
+                            "level_source_specie": row["level_source_specie"],
+                            "defect_symmetry": row["defect_symmetry"],
+                            "ZPL": row["ZPL"],
+                            "prototype": row["prototype"],
+                            "spacegroup": row["spacegroup"],
+                            "lumo_homo_deg": str(lumo_homo_deg)
+
+                        }, index=[0]
+                    )
+                )
+            # if ant_specie == "Sn", set antisite_ion_type to "cation"
+            df.loc[df["level_source_specie"].isin(["Ge", "Sn"]), "antisite_ion_type"] = "cation"
+            display(df.head())
+            return df
+
+        def merge_all(df):
+            df = add_nn_info(df)
+            df = get_data_df(df)
+            df = replace_nan_with_zero(df)
+            df = add_addtional_info().merge(df, on="task_id")
+
+            df["atom_vol_diff"] = df["Ant_atom_vol"] - df["atom_vol_mean"]
+            df["abs_NN_part_chg_diff_mean"] = df["NN_part_chg_diff_mean"].abs()
+            df["sign_NN_part_chg_diff_mean"] = df["NN_part_chg_diff_mean"].apply(
+                lambda x: "positive" if x > 0 else "negative"
+                )
+            df["sign_ant_part_charge"] = df["Ant_part_charge"].apply(
+                lambda x: "positive" if x > 0 else "negative"
+                )
+            df["sign_part_charge"] = df["part_charge_mean"].apply(
+                lambda x: "positive" if x > 0 else "negative"
+                )
+            df["abs_pot_mean"] = df["pot_mean"].abs()
+
+            # merge data_df with the column ZPL in sheet.hse_candidate_df
+            # test_df = pd.merge(df, test_df.loc[:, ["task_id", "ZPL"]], on="task_id", how="left")
+            # test_df = test_df.loc[test_df.ZPL.notnull(), :]
+            # # test_df = test_df.loc[test_df.antisite_ion_type=="anions", :]
+
+            return df
+        return merge_all(df=test_df)
+
+    def get_zpl_vs_pot_fig(self, df, turn_on_lr=True):
+        from scipy import stats
+        plot_df = df.copy()
+        # plot ZPL vs abs_pot_mean and color by groups which are grouped by defect_symmetry and chem_group
+        plot_df.rename(columns={"abs_pot_mean": "Abs. Coulombic potential"}, inplace=True)
+        group_df = plot_df.groupby(["chem_group"])
+        fig = plt.figure(figsize=(12, 6))
+        # use first 3 rows and first 3 columns as a big plot
+        ax1 = plt.subplot2grid((3, 26), (0, 0), colspan=10, rowspan=3)
+        colors = ["blue", "red", "lime", "purple", "orange", "cyan"]
+        group_name = {6: "VIB", 12: "IIB", 13: "IIIA", 14: "IVA", 15: "VA", 16: "VIA", 17: "VIIA"}
+        plot_markers = ['(b)', '(c)', '(d)', '(e)', '(f)', '(g)']
+        for (name, group), index, color, plot_mark in zip(group_df, range(len(group_df)), colors, plot_markers):
+            name = group_name[name]
+            ax1.plot(group["Abs. Coulombic potential"], group["ZPL"], marker="o", linestyle="", label=name, color=color)
+            x = group["Abs. Coulombic potential"]
+            y = group["ZPL"]
+            # plot scatter plot and regression line for each group at those subplots at last two columns and first 3 rows
+            subplot_locs = [(0, 10), (1, 10), (2, 10), (0, 18), (1, 18), (2, 18)]
+            ax2 = plt.subplot2grid((3, 26), (subplot_locs[index]), colspan=8, rowspan=1)
+            # make text box at middle top to show name
+            ax2.text(0.5, 1.03, name, horizontalalignment="center", verticalalignment="center", transform=ax2.transAxes)
+            ax2.plot(x, y, marker="o", linestyle="", color=color)
+            # add text in plot_markers at the top left of the small plots and make them bold
+            # ax2.text(-0.08, 1.1, plot_mark, horizontalalignment="left", verticalalignment="top",
+            #          transform=ax2.transAxes, fontweight="bold")
+
+            #make line very light color
+            if turn_on_lr:
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+                ax2.plot(x, intercept + slope * x, color=color, alpha=0.2)
+            # add text next to each point
+            # for i, txt in enumerate(group["level_source_specie"]):
+            #     ax2.annotate(txt, (x.iloc[i], y.iloc[i]))
+
+            if name == "VIB":
+                ax2.set_xlim(x.min() * 0.60, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.80, y.max() * 1.1)
+            elif name == "IIB":
+                ax2.set_xlim(x.min() * 0.95, x.max() * 1.05)
+                ax2.set_ylim(y.min() * 0.8, y.max() * 1.2)
+            elif name == "IIIA":
+                ax2.set_xlim(x.min() * 0.8, x.max() * 1.2)
+                ax2.set_ylim(y.min() * 0.9, y.max() * 1.1)
+            elif name == "IVA":
+                ax2.set_xlim(-0.01, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.9, y.max() * 1.1)
+            elif name == "VIA":
+                ax2.set_xlim(0, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.95, y.max() * 1.05)
+            elif name == "VIIA":
+                ax2.set_xlim(x.min() * 0.85, x.max() * 1.1)
+                ax2.set_ylim(y.min() * 0.95, y.max() * 1.05)
+
+        # set a title for the figure
+        # set labels for the big plot
+        ax1.set_xlabel("Abs. Coulombic potential energy (a.u.)")
+        ax1.set_ylabel("ZPL (eV)")
+        ax1.set_title("ZPL vs. Abs. Coulombic potential energy")
+        # turn on legend
+        ax1.legend(loc="upper right")
+
+        # set space between ax1 and ax2 larger
+        plt.subplots_adjust(wspace=9)
+
+
+        return fig
+
+
+    def get_zpl_vs_prototype(self, df):
+        plot_df = df.copy()
+        plot_df.rename(columns={"abs_pot_mean": "Abs. Coulombic potential"}, inplace=True)
+        # plot sub-plots of Abs. Coulombic potential vs ZPL for each prototype. The number of sub-plots depende on
+        # the number of unique prototypes in the df.
+        import plotly.express as px
+        import plotly.graph_objects as go
+        from scipy import stats
+
+        df = plot_df.groupby(
+            [ "defect_symmetry", "chem_group"],
+            as_index=False
+            )
+
+        for name, group in df:
+            # do linear fitting for each group
+            x = group["Abs. Coulombic potential"]
+            y = group["ZPL"]
+            slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+            fig = px.scatter(
+                group, x="Abs. Coulombic potential", y="ZPL", color="chem_row",
+                title="ZPL vs Abs. Coulombic potential for {}-lr: slope:{:.3f} R^2:{:.2%}".format(name, slope,
+                                                                                                r_value**2),
+                hover_data=["defect_name", "C2DB_uid", "task_id"]
+                )
+            # plot linear fitting line
+            fig.add_trace(
+                go.Scatter(
+                    x=x, y=slope * x + intercept, mode="lines", name="linear fitting"
+                    )
+                )
+            fig.show()
+
+        return df
+
+            # lambda x: px.scatter(
+            #     x, x="Abs. Coulombic potential", y="ZPL", color="antisite_ion_type", title="{} {} {} {}".format(
+            #         x["anion_specie_chem_group"].iloc[0], x["defect_symmetry"].iloc[0], x["spacegroup"].iloc[0],
+            #         x["prototype"].iloc[0]
+            #         ), hover_data=["task_id", "defect_name", "chem_row"]
+            #     ).show()
+            # )
+
+
+
+
+
+
 
 
 class DefectAnalysis(SheetCollection):
@@ -2707,7 +3313,8 @@ class DefectAnalysis(SheetCollection):
 
             singlet_e = HSEQubitDefect.collection.find_one({"pc_from": triplet_e["pc_from"], "nupdown_set": 0,
                                                             "defect_entry.name": triplet_e["defect_entry"]["name"],
-                                                            "charge_state": triplet_e["charge_state"]})
+                                                            "charge_state": triplet_e["charge_state"], "task_label":
+                                                                "HSE_scf"})
             if singlet_e is None:
                 print(f"Processing triplet taskid:{t}, No singlet found!")
             else:
@@ -3048,12 +3655,12 @@ class DefectAnalysis(SheetCollection):
 
             df.loc[df.task_id.isin([2688, 2657]), "level_source_gs_term"] = "5D0.0"
 
-            df = df.loc[~(df["task_id"].isin([383, 499]) & (df["LUMO_HOMO_deg"] == (1,2)))]
+            df = df.loc[~(df["task_id"].isin([383, 499]) & (df["LUMO_HOMO_deg"] == (2,1)))]
             return df
 
         return get_table9()
 
-    def get_IPR(self, df):
+    def get_IPR_SCAN(self, df):
         ipr_df = {"task_id": [], "dn_in_gap_ipr": [], "up_in_gap_ipr": []}
         for taskid in df.task_id:
             print("=="*10, taskid, "=="*10)
@@ -3081,6 +3688,121 @@ class DefectAnalysis(SheetCollection):
             else:
                 ipr_df["up_in_gap_ipr"].append(())
         self.ipr_df = pd.DataFrame(ipr_df)
+
+    def get_IPR_HSE(self, df, include_singlet_in_gap_occ_ipr=True):
+        def get_singlet_in_gap_occ_ipr(singlet_taskid):
+            _, _, in_gap_levels, _ = GenerateDefectTable.extract_defect_levels_v2_hse(
+                singlet_taskid,
+                localisation=0.2,
+                selected_bands=None,
+                edge_tol=(.5, .5)
+            )
+
+            entry = HSEQubitDefect.collection.find_one({"task_id": singlet_taskid})
+            up_ipr = entry["IPR"]["up"]["ipr"]
+            dn_ipr = entry["IPR"]["down"]["ipr"]
+
+
+            in_gap_dn, in_gap_dn_occ = in_gap_levels["dn_in_gap_band_index"], in_gap_levels["dn_in_gap_occ"]
+            dn_in_gap_df = pd.DataFrame({"in_gap_dn": in_gap_dn, "in_gap_dn_occ": in_gap_dn_occ})
+            in_gap_up, in_gap_up_occ = in_gap_levels["up_in_gap_band_index"], in_gap_levels["up_in_gap_occ"]
+            up_in_gap_df = pd.DataFrame({"in_gap_up": in_gap_up, "in_gap_up_occ": in_gap_up_occ})
+
+            # keep those rows with occ = 1
+            dn_in_gap_df = dn_in_gap_df.loc[dn_in_gap_df.in_gap_dn_occ > 0]
+            up_in_gap_df = up_in_gap_df.loc[up_in_gap_df.in_gap_up_occ > 0]
+
+            # get the ipr of dn_in_gap_df and up_in_gap_df
+            dn_in_gap_df["in_gap_dn_ipr"] = dn_in_gap_df.in_gap_dn.apply(lambda x: dn_ipr[x-1])
+            up_in_gap_df["in_gap_up_ipr"] = up_in_gap_df.in_gap_up.apply(lambda x: up_ipr[x-1])
+
+            # get the sum of ipr of dn_in_gap_df and up_in_gap_df and add to ipr_df
+            singlet_in_gap_occ_ipr = dn_in_gap_df.in_gap_dn_ipr.sum() + up_in_gap_df.in_gap_up_ipr.sum()
+            return singlet_in_gap_occ_ipr
+
+
+        ipr_df = {"task_id": [], "dn_lumo_homo_ipr": [], "up_lumo_homo_ipr": [], "transition_from": [],
+                  "chem_group": [], "chem_row": [],"up_homo_ipr":[], "triplet_in_gap_occ_ipr": [],
+                  "singlet_in_gap_occ_ipr": [], "ST_in_gap_occ_ipr": []}
+        # for taskid in df.task_id:
+        #loop over rows of ipr_df
+        for row in df.itertuples():
+            print("=="*10, row.task_id, "=="*10)
+            taskid = row.task_id
+            ipr_df["task_id"].append(taskid)
+
+            entry = HSEQubitDefect.collection.find_one({"task_id": taskid})
+
+            up_ipr = entry["IPR"]["up"]["ipr"]
+            dn_ipr = entry["IPR"]["down"]["ipr"]
+
+            in_gap_dn, in_gap_dn_occ = row.dn_in_gap_band_index, row.dn_in_gap_occ
+            dn_in_gap_df = pd.DataFrame({"in_gap_dn": in_gap_dn, "in_gap_dn_occ": in_gap_dn_occ})
+            in_gap_up, in_gap_up_occ = row.up_in_gap_band_index, row.up_in_gap_occ
+            up_in_gap_df = pd.DataFrame({"in_gap_up": in_gap_up, "in_gap_up_occ": in_gap_up_occ})
+
+            # keep those rows with occ = 1
+            dn_in_gap_df = dn_in_gap_df.loc[dn_in_gap_df.in_gap_dn_occ > 0]
+            up_in_gap_df = up_in_gap_df.loc[up_in_gap_df.in_gap_up_occ > 0]
+
+            # get the ipr of dn_in_gap_df and up_in_gap_df
+            dn_in_gap_df["in_gap_dn_ipr"] = dn_in_gap_df.in_gap_dn.apply(lambda x: dn_ipr[x-1])
+            up_in_gap_df["in_gap_up_ipr"] = up_in_gap_df.in_gap_up.apply(lambda x: up_ipr[x-1])
+
+            # get the sum of ipr of dn_in_gap_df and up_in_gap_df and add to ipr_df
+            triplet_in_gap_occ_ipr = dn_in_gap_df.in_gap_dn_ipr.sum() + up_in_gap_df.in_gap_up_ipr.sum()
+            ipr_df["triplet_in_gap_occ_ipr"].append(triplet_in_gap_occ_ipr)
+
+            if include_singlet_in_gap_occ_ipr:
+                singlet_taskid = row.singlet_taskid
+                singlet_in_gap_occ_ipr = get_singlet_in_gap_occ_ipr(singlet_taskid)
+                singlet_triplet_in_gap_occ_sum_ipr = triplet_in_gap_occ_ipr + singlet_in_gap_occ_ipr
+                ipr_df["singlet_in_gap_occ_ipr"].append(singlet_in_gap_occ_ipr)
+                ipr_df["ST_in_gap_occ_ipr"].append(singlet_triplet_in_gap_occ_sum_ipr)
+
+            # get "up_in_gap_band_index" and "up_in_gap_occ" of row
+            up_in_gap_band_index = getattr(row, "up_in_gap_band_index")
+            up_in_gap_occ = getattr(row, "up_in_gap_occ")
+            # find the max element of "up_in_gap_band_index" that has "up_in_gap_occ" > 0
+            up_homo_band_index = pd.DataFrame(
+                list(zip(up_in_gap_band_index, up_in_gap_occ)), columns=["band_index", "occ"]
+                ).query("occ > 0").band_index.max()
+
+            ipr_df["up_homo_ipr"].append(up_ipr[up_homo_band_index-1])
+
+
+            transition_from = row.transition_from
+            ipr_df["transition_from"].append(transition_from)
+
+            ant_specie = Element(row.level_source_specie)
+            chem_group = ant_specie.group
+            chem_row = ant_specie.row
+            ipr_df["chem_group"].append(chem_group)
+            ipr_df["chem_row"].append(chem_row)
+
+            level_dn = row.dn_tran_lumo_homo_band_index
+            level_up = row.up_tran_lumo_homo_band_index
+            print(transition_from)
+            if level_dn != ():
+                print("dn_tran_lumo_homo_band_index", level_dn)
+                level_dn_ipr = []
+                for level in level_dn:
+                    level_dn_ipr.append(dn_ipr[level-1])
+                    # add level_dn_ipr to "dn_ipr" of df
+                ipr_df["dn_lumo_homo_ipr"].append(tuple(level_dn_ipr))
+            else:
+                ipr_df["dn_lumo_homo_ipr"].append(())
+            if level_up != ():
+                print("up_tran_lumo_homo_band_index", level_up)
+                level_up_ipr = []
+                for level in level_up:
+                    level_up_ipr.append(up_ipr[level-1])
+                ipr_df["up_lumo_homo_ipr"].append(tuple(level_up_ipr))
+            else:
+                ipr_df["up_lumo_homo_ipr"].append(())
+
+        self.ipr_df = pd.DataFrame(ipr_df)
+
 
 class HostAnaylsis:
     def __init__(self, host_db):

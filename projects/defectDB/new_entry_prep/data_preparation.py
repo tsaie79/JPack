@@ -11,9 +11,9 @@ import pandas as pd
 
 import os
 
-C2DB_IR_calc_data = get_db("C2DB_IR", "calc_data", user="Jeng", password="qimin", port=12345)
-C2DB_IR_ir_data = get_db("C2DB_IR", "ir_data", user="Jeng_ro", password="qimin", port=12345)
-C2DB = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=12345)
+C2DB_IR_calc_data = get_db("C2DB_IR", "calc_data", user="Jeng", password="qimin", port=12349)
+C2DB_IR_ir_data = get_db("C2DB_IR", "ir_data", user="Jeng_ro", password="qimin", port=12349)
+C2DB = get_db("2dMat_from_cmr_fysik", "2dMaterial_v1", user="readUser", password="qiminyan", port=12349)
 
 """
 Prepare the data for the new entry in the database, and then to update the database.
@@ -254,7 +254,7 @@ class GenerateDefectTable(BackProcess):
                 ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
                 selected_bands=selected_bands,
             )
-            tot, proj, d_df, levels, defect_levels = state
+            tot, proj, d_df, levels, defect_levels, _, _ = state
             level_info = d_df.to_dict("records")[0]
         except Exception as er:
             print(er)
@@ -262,8 +262,8 @@ class GenerateDefectTable(BackProcess):
             levels = {}
             defect_levels = {}
         return level_info, levels, defect_levels
-
-    def extract_defect_levels_v2_hse(self, defect_taskid, localisation=0.2, selected_bands=None, edge_tol=(0.5, 0.5)):
+    @classmethod
+    def extract_defect_levels_v2_hse(cls, defect_taskid, localisation=0.2, selected_bands=None, edge_tol=(0.5, 0.5)):
         from qubitPack.qc_searching.analysis.main import get_defect_state_v3
         from qubitPack.tool_box import get_db
 
@@ -296,7 +296,7 @@ class GenerateDefectTable(BackProcess):
                 ir_entry_filter={"prev_fw_taskid": defect_taskid},
                 selected_bands=selected_bands,
             )
-            tot, proj, d_df, levels, defect_levels = state
+            tot, proj, d_df, levels, defect_levels, _, _ = state
             level_info = d_df.to_dict("records")[0]
         except Exception as er:
             print(er)
@@ -336,7 +336,7 @@ class GenerateDefectTable(BackProcess):
                 ir_entry_filter={"pc_from_id": pc_from_id, "defect_name": defect_name, "charge_state": charge_state},
                 selected_bands=selected_bands,
             )
-            tot, proj, d_df, levels, defect_levels = state
+            tot, proj, d_df, levels, defect_levels, _, _ = state
             level_info = d_df.to_dict("records")[0]
         except Exception as er:
             print(er)
@@ -520,7 +520,7 @@ class GenerateDefectTable(BackProcess):
             localisation, selected_bands, edge_tol = settings_for_36group(e["task_id"])
 
 
-            d_df, levels, in_gpa_levels, proj_df = self.extract_defect_levels_v2_hse(
+            d_df, levels, in_gpa_levels, proj_df = GenerateDefectTable.extract_defect_levels_v2_hse(
                 e["task_id"],
                 localisation=localisation,
                 selected_bands=selected_bands,
@@ -627,7 +627,10 @@ class GenerateDefectTable(BackProcess):
         self.add_singlet_triplet_en_diff,
         self.add_defect_symmetry,
         self.add_LUDL_HODL_info,
-        self.add_IPR,
+        self.add_IPR_HSE,
+        self.add_IPR_average_HSE,
+        self.add_IPR_SCAN,
+        self.add_IPR_average_SCAN,
         ]
         if sequence == None:
             for process in processes:
@@ -695,8 +698,8 @@ def main():
 
             defect_table_gen = GenerateDefectTable(filter)
             defect_table_gen.get_defect_df_v2_hse(read_c2db_uid_key=False)
-            defect_table_gen.backprocess()
-            defect_table_gen.df_to_excel(excel_name="hse_qubit")
+            defect_table_gen.backprocess([i for i in range(7)])
+            defect_table_gen.df_to_excel(excel_name="hse_qubit_singlet_revised")
 
         main({"pc_from": {"$regex": "2dMat_from_cmr_fysik"}, "task_label": "HSE_scf", "nupdown_set": 2,})
 
@@ -739,7 +742,7 @@ def main():
         IOTools(pandas_df=zpl.zpl_df, cwd=os.path.join(p_path, "analysis/output/xlsx")).to_excel(
             "test_zpl_df")
 
-    get_scan_defect_bad_tran()
+    get_defect_table()
 
 if __name__ == '__main__':
     main()

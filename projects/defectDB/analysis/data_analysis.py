@@ -21,16 +21,16 @@ from ase.units import _hplanck, _eps0, _c
 from VaspBandUnfolding.vasp_constant import *
 DEBYETOSI = 3.335640952e-30
 
-SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
-SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12347)
-SCAN2dIR = get_db("Scan2dDefect", "ir_data", port=12347)
+SCAN2dMat = get_db("Scan2dMat", "calc_data",  user="Jeng_ro", password="qimin", port=12349)
+SCAN2dDefect = get_db("Scan2dDefect", "calc_data",  user="Jeng_ro", password="qimin", port=12349)
+SCAN2dIR = get_db("Scan2dDefect", "ir_data", port=12349)
 
-HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12347, user="Jeng")
-HSEQubitIR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data-pbe_pc", port=12347)
-HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12347, user="Jeng_ro")
+HSEQubitDefect = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", port=12349, user="Jeng")
+HSEQubitIR = get_db("HSE_triplets_from_Scan2dDefect", "ir_data-pbe_pc", port=12349)
+HSEQubitCDFT = get_db("HSE_triplets_from_Scan2dDefect", "cdft-pbe_pc", port=12349, user="Jeng_ro")
 
-C2DB_IR = get_db("C2DB_IR", "calc_data", port=12345, user="Jeng_ro")
-C2DB_IR_vacancy_HSE = get_db("C2DB_IR_vacancy_HSE", "calc_data", port=12347, user="Jeng_ro")
+C2DB_IR = get_db("C2DB_IR", "calc_data", port=12349, user="Jeng_ro")
+C2DB_IR_vacancy_HSE = get_db("C2DB_IR_vacancy_HSE", "calc_data", port=12349, user="Jeng_ro")
 
 DB1_PATH = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
 
@@ -160,7 +160,7 @@ class Tools:
                 ir_entry_filter={"prev_fw_taskid": defect_taskid},
                 selected_bands=selected_bands,
             )
-            tot, proj, d_df, levels, defect_levels = state
+            tot, proj, d_df, levels, defect_levels, _, _ = state
             level_info = d_df.to_dict("records")[0]
         except Exception as er:
             print(er)
@@ -1251,13 +1251,13 @@ class BackProcess:
         self.input_df["dn_TDM_input"] = self.input_df.loc[self.input_df["task_label"] == "CDFT-B-HSE_scf"].apply(
             lambda x: fun(x)[1], axis=1)
 
-    def add_IPR(self):
+    def add_IPR_SCAN(self):
         from JPack_independent.projects.defectDB.analysis.analysis_api import DefectAnalysis
         da = DefectAnalysis(self.input_df)
-        da.get_IPR(self.input_df)
+        da.get_IPR_SCAN(self.input_df)
         self.input_df = self.input_df.merge(da.ipr_df, on=["task_id"], how="left")
 
-    def add_IPR_average(self):
+    def add_IPR_average_SCAN(self):
         def fun(x):
             dn_in_gap_ipr = x["dn_in_gap_ipr"]
             up_in_gap_ipr = x["up_in_gap_ipr"]
@@ -1269,6 +1269,31 @@ class BackProcess:
             return up_in_gap_ipr_avg, dn_in_gap_ipr_avg
         self.input_df["up_in_gap_ipr_avg"], self.input_df["dn_in_gap_ipr_avg"] = zip(*self.input_df.apply(fun, axis=1))
 
+    def add_IPR_HSE(self):
+        from JPack_independent.projects.defectDB.analysis.analysis_api import DefectAnalysis
+        da = DefectAnalysis(self.input_df)
+        da.get_IPR_HSE(self.input_df)
+        # merge input_df and ipr_df on task_id and transition_from
+        self.input_df = self.input_df.merge(da.ipr_df, on=["task_id", 'transition_from'], how="left")
+
+    def add_IPR_average_HSE(self):
+        def fun(x):
+            dn_in_gap_ipr = x["dn_lumo_homo_ipr"]
+            up_in_gap_ipr = x["up_lumo_homo_ipr"]
+            dn_in_gap_ipr_avg, up_in_gap_ipr_avg = 0, 0
+            if dn_in_gap_ipr != ():
+                dn_in_gap_ipr_avg = np.mean(dn_in_gap_ipr)
+            if up_in_gap_ipr != ():
+                up_in_gap_ipr_avg = np.mean(up_in_gap_ipr)
+            return up_in_gap_ipr_avg, dn_in_gap_ipr_avg
+        self.input_df["up_lumo_homo_ipr_avg"], self.input_df["dn_lumo_homo_ipr_avg"] = zip(*self.input_df.apply(fun, axis=1))
+
+        def fun(x):
+            if x["transition_from"] == "up":
+                return x["up_lumo_homo_ipr_avg"]
+            else:
+                return x["dn_lumo_homo_ipr_avg"]
+        self.input_df["zpl_ipr_avg"] = self.input_df.apply(fun, axis=1)
 
 class CDFT:
     def __init__(self):
@@ -1593,7 +1618,7 @@ class CDFT:
 
 class COHP:
     # LOBSTER_DB = get_db("HSE_triplets_from_Scan2dDefect", "lobster",  user="Jeng_ro", password="qimin", port=12347)
-    LOBSTER_DB = get_db("Scan2dDefect", "lobster",  user="Jeng_ro", password="qimin", port=12347)
+    LOBSTER_DB = get_db("Scan2dDefect", "lobster",  user="Jeng_ro", password="qimin", port=12349)
 
     @classmethod
     def find_label_in_cohp(cls, completecohp, nn, defect_type="vacancy"):
