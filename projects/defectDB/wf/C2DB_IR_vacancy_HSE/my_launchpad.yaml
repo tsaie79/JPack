@@ -1,0 +1,10 @@
+host: localhost
+logdir: /home/tsai/.conda/envs/workflow/lib/python3.7/site-packages/JPack_independent/projects/defectDB/wf/C2DB_IR_vacancy_HSE/logs
+name: C2DB_IR_vacancy_HSE
+password: qimin
+port: 12349
+ssl_ca_file: null
+strm_lvl: INFO
+user_indices: []
+username: Jeng
+wf_user_indices: []

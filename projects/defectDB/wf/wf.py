@@ -265,7 +265,7 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE",
             "sym_data.good_ir_info.species": {"$ne": []},
         }
     )]
-    for pc_entry in pc_entries[210:230]: #345 pcs, index: 0-344
+    for pc_entry in pc_entries[230:231]: #345 pcs, index: 0-344
         print(f"-------{pc_entry['task_id']}"*10)
         mx2 = pc_entry.copy()
         pc = Structure.from_dict(mx2["output"]["structure"])
@@ -310,7 +310,7 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE",
                         except Exception as e:
                             print("error", type(e.__str__()))
                             from monty.serialization import loadfn, dumpfn
-                            path = "/home/tug03990/config/project"
+                            path = os.path.join(MODULE_DIR, "wf")
                             if os.path.exists(f"{path}/{defect_db_name}/error.json"):
                                 taskid_error = loadfn(f"{path}/{defect_db_name}/error.json")
                             else:
@@ -431,7 +431,8 @@ def grand_hse_defect(defect_db_name="C2DB_IR_antisite_HSE",
                             wf = set_execution_options(wf, category="zfs_data", fworker_name=fworker.get(
                                 "zfs_ir_fworker", "cpu_nersc"),
                                                        fw_name_constraint="pyzfs")
-                        raw_data_base_path = "/home/tsai/work/Research/projects"
+
+                        raw_data_base_path = "/home/tsai/work2/Research/projects"
                         wf = bash_scp_files(
                             wf,
                             dest=f"{raw_data_base_path}/{defect_db_name}/calc_data/",
@@ -1517,22 +1518,24 @@ def bader_anaylsis(entry):
         print(bader_data)
         db.collection.update_one({"task_id": taskid}, {"$set": {"Bader": bader_data}})
 
-def main():
-    def run_grand_hse_defect():
+class Main():
+    @classmethod
+    def run_grand_hse_defect(cls):
         # defect_db_name = "C2DB_IR_antisite_HSE"
         defect_db_name = "C2DB_IR_vacancy_HSE"
         lpad = LaunchPad.from_file(
             os.path.join(
-                os.path.expanduser("~"),
-                f"config/project/{defect_db_name}/calc_data/my_launchpad.yaml"
+                MODULE_DIR, "wf", f"{defect_db_name}/my_launchpad.yaml"
             )
         )
-        wfs = grand_hse_defect(defect_db_name, fworker="gpu_neu") #gpu_nersc
+        wfs = grand_hse_defect(defect_db_name, fworker={"vasp_fworker": "gpu_neu", "zfs_ir_fworker": "neu"})
+        #gpu_nersc
         for idx, wf in enumerate(wfs):
             lpad.add_wf(wf)
             print(idx, wf.name, wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
 
-    def run_binary_scan_defect():
+    @classmethod
+    def run_binary_scan_defect(cls):
         lpad = LaunchPad.from_file(
             os.path.join(
                 os.path.expanduser("~"),
@@ -1548,7 +1551,8 @@ def main():
                   wf.fws[0].tasks[-1]["additional_fields"]["group_id"],
                   wf.fws[0].tasks[-1]["additional_fields"]["pc_from_id"])
 
-    def run_triplet_HSE_wf():
+    @classmethod
+    def run_triplet_HSE_wf(cls):
         lpad = LaunchPad.from_file(
             os.path.join(
                 os.path.expanduser("~"),
@@ -1579,7 +1583,8 @@ def main():
             lpad.add_wf(wf)
             print(idx, wf.name)
 
-    def run_cdft():
+    @classmethod
+    def run_cdft(cls):
         # qubit_df = IOTools(excel_file="hse_screened_qubit_2021-11-18", cwd=INPUT_PATH).read_excel()
         qubit_df = IOTools(excel_file="pure_c2db_TMD_2022-07-08", cwd=INPUT_PATH).read_excel()
         qubit_df = qubit_df[qubit_df["task_id"].isin([2739])]
@@ -1609,7 +1614,8 @@ def main():
                     "config/project/HSE_triplets_from_Scan2dDefect/cdft/my_launchpad.yaml"))
             lpad.add_wf(wf)
 
-    def run_cohp():
+    @classmethod
+    def run_cohp(cls):
         a = Defect(defect_xlsx="defect_2021-11-18")
         df = a.defect_df.copy()
         pair_taskids =(172, 874)
@@ -1665,12 +1671,14 @@ def main():
             )
             lpad.add_wf(wf)
 
-    def run_TDM():
+    @classmethod
+    def run_TDM(cls):
         p_path = "/home/qimin/sdb_tsai/site-packages/JPack_independent/projects/defectDB"
         tgt_df = IOTools(excel_file="wte2_mote2", cwd=os.path.join(p_path, INPUT_PATH)).read_excel()
         transition_dipole_moment(tgt_df)
 
-    def run_IPR():
+    @classmethod
+    def run_IPR(cls):
         # db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng_ro", password="qimin",
         # port=12349)
         db = get_db("tmd_defect_cluster", "calc_data", user="Jeng_ro", password="qimin", port=12349)
@@ -1683,8 +1691,8 @@ def main():
         t2 = time.perf_counter()
         print("time: ", t2 - t1)
 
-
-    def run_Bader():
+    @classmethod
+    def run_Bader(cls):
         db = get_db("HSE_triplets_from_Scan2dDefect", "calc_data-pbe_pc", user="Jeng_ro", password="qimin",
         port=12349)
 
@@ -1696,7 +1704,8 @@ def main():
         t2 = time.perf_counter()
         print("time: ", t2 - t1)
 
-    def run_finite_size_effect_wf():
+    @classmethod
+    def run_finite_size_effect_wf(cls):
         def std_wf():
             lpad = LaunchPad.from_file(
                 os.path.join(
@@ -1737,10 +1746,12 @@ def main():
             lpad.add_wf(wf)
         std_wf()
 
-    def run_scan_pc_in_scf_way():
+    @classmethod
+    def run_scan_pc_in_scf_way(cls):
         scan_pc_in_scf_way()
 
-    def run_pyzfs_wf():
+    @classmethod
+    def run_pyzfs_wf(cls):
         lpad = LaunchPad.from_file(
             os.path.join(
                 os.path.expanduser("~"),
@@ -1752,7 +1763,8 @@ def main():
             lpad.add_wf(wf)
             print(idx, wf.name)
 
-    def run_transition_levels():
+    @classmethod
+    def run_transition_levels(cls):
         cat = "charge_state"
         lpad = LaunchPad.from_file("/home/tug03990/config/project/defect_qubit_in_36_group/{}/"
                                    "my_launchpad.yaml".format(cat))
@@ -1764,14 +1776,8 @@ def main():
             lpad.add_wf(wf)
         print(len(wfs))
 
-
-
-
-    run_IPR()
-
-
 if __name__ == '__main__':
-    main()
+    Main.run_grand_hse_defect()
 
 
 
